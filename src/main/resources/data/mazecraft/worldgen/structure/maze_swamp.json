@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "swamp",
+  "biomes": "#mazecraft:has_structure/maze_swamp",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

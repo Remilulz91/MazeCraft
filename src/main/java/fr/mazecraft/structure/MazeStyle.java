@@ -13,7 +13,8 @@ import java.util.Locale;
  *
  * <ul>
  *   <li>{@code wall}      — wall body</li>
- *   <li>{@code pillar}    — posts at every wall intersection (also holds the levers: must be a full solid block)</li>
+ *   <li>{@code pillar}    — posts at every wall intersection (also holds the levers: must be a full solid block).
+ *                           Must NOT be a soil either: its top is open to the sky and trees grow there</li>
  *   <li>{@code wallBase}  — floor block under the walls (hidden)</li>
  *   <li>{@code floor}     — corridor + ring floor. Must NOT be a soil (dirt/grass/sand/moss...), so no tree,
  *                           cactus or plant can grow in or next to the maze</li>
@@ -92,6 +93,115 @@ public enum MazeStyle {
                     Blocks.MOSSY_COBBLESTONE.getDefaultState(), 15,
                     Blocks.COBBLESTONE.getDefaultState(), 10,
                     Blocks.ANDESITE.getDefaultState(), 5)
+    ),
+    /** Badlands: striped terracotta walls (bands by height), red sandstone floor. */
+    BADLANDS(
+            Blocks.TERRACOTTA.getDefaultState(),
+            Blocks.CHISELED_RED_SANDSTONE.getDefaultState(),
+            Blocks.RED_SANDSTONE.getDefaultState(),
+            Blocks.SMOOTH_RED_SANDSTONE.getDefaultState(),
+            Blocks.CUT_RED_SANDSTONE.getDefaultState(),
+            lantern(),
+            Blocks.RED_SANDSTONE.getDefaultState(),
+            Blocks.IRON_BARS.getDefaultState(),
+            5,
+            // No terracotta / red sand in the ring: dead bushes grow on them
+            Mix.of(Blocks.SMOOTH_RED_SANDSTONE.getDefaultState(), 50,
+                    Blocks.RED_SANDSTONE.getDefaultState(), 25,
+                    Blocks.CUT_RED_SANDSTONE.getDefaultState(), 20,
+                    Blocks.CHISELED_RED_SANDSTONE.getDefaultState(), 5),
+            new BlockState[]{
+                    Blocks.RED_TERRACOTTA.getDefaultState(),
+                    Blocks.ORANGE_TERRACOTTA.getDefaultState(),
+                    Blocks.WHITE_TERRACOTTA.getDefaultState(),
+                    Blocks.TERRACOTTA.getDefaultState()
+            }
+    ),
+    /** Dark forest: dark oak hedges, soul lanterns. Wide ring: dark oaks are large and dense. */
+    DARK_FOREST(
+            leaves(Blocks.DARK_OAK_LEAVES),
+            Blocks.DARK_OAK_LOG.getDefaultState(),
+            Blocks.MOSSY_STONE_BRICKS.getDefaultState(),
+            Blocks.DIRT_PATH.getDefaultState(),
+            Blocks.DARK_OAK_PLANKS.getDefaultState(),
+            Blocks.SOUL_LANTERN.getDefaultState().with(LanternBlock.HANGING, false),
+            Blocks.DIRT.getDefaultState(),
+            Blocks.DARK_OAK_FENCE.getDefaultState(),
+            8,
+            Mix.of(Blocks.DIRT_PATH.getDefaultState(), 40,
+                    Blocks.PACKED_MUD.getDefaultState(), 25,
+                    Blocks.MOSSY_COBBLESTONE.getDefaultState(), 20,
+                    Blocks.GRAVEL.getDefaultState(), 15)
+    ),
+    /** Cherry grove: pink hedges, cherry wood. */
+    CHERRY(
+            leaves(Blocks.CHERRY_LEAVES),
+            Blocks.CHERRY_LOG.getDefaultState(),
+            Blocks.STONE_BRICKS.getDefaultState(),
+            Blocks.DIRT_PATH.getDefaultState(),
+            Blocks.CHERRY_PLANKS.getDefaultState(),
+            lantern(),
+            Blocks.DIRT.getDefaultState(),
+            Blocks.CHERRY_FENCE.getDefaultState(),
+            6,
+            Mix.of(Blocks.DIRT_PATH.getDefaultState(), 50,
+                    Blocks.GRAVEL.getDefaultState(), 15,
+                    Blocks.PACKED_MUD.getDefaultState(), 15,
+                    Blocks.STONE_BRICKS.getDefaultState(), 10,
+                    Blocks.CRACKED_STONE_BRICKS.getDefaultState(), 10)
+    ),
+    /** Swamp / mangrove: mangrove hedges, muddy roots, mud floor. Wide ring: mangroves spread. */
+    SWAMP(
+            leaves(Blocks.MANGROVE_LEAVES),
+            // NOT muddy mangrove roots: they count as soil (#minecraft:dirt), so mangrove trees
+            // grew on top of the posts
+            Blocks.MANGROVE_LOG.getDefaultState(),
+            Blocks.MUD_BRICKS.getDefaultState(),
+            Blocks.PACKED_MUD.getDefaultState(),
+            Blocks.MANGROVE_PLANKS.getDefaultState(),
+            lantern(),
+            Blocks.DIRT.getDefaultState(),
+            Blocks.MANGROVE_FENCE.getDefaultState(),
+            8,
+            Mix.of(Blocks.PACKED_MUD.getDefaultState(), 45,
+                    Blocks.MUD_BRICKS.getDefaultState(), 25,
+                    Blocks.MOSSY_COBBLESTONE.getDefaultState(), 10,
+                    Blocks.GRAVEL.getDefaultState(), 10,
+                    Blocks.MANGROVE_PLANKS.getDefaultState(), 10)
+    ),
+    /** Savanna: acacia hedges. Wide ring: acacias lean and spread far from their trunk. */
+    SAVANNA(
+            leaves(Blocks.ACACIA_LEAVES),
+            Blocks.ACACIA_LOG.getDefaultState(),
+            Blocks.STONE_BRICKS.getDefaultState(),
+            Blocks.DIRT_PATH.getDefaultState(),
+            Blocks.ACACIA_PLANKS.getDefaultState(),
+            lantern(),
+            Blocks.DIRT.getDefaultState(),
+            Blocks.ACACIA_FENCE.getDefaultState(),
+            8,
+            Mix.of(Blocks.DIRT_PATH.getDefaultState(), 45,
+                    Blocks.PACKED_MUD.getDefaultState(), 20,
+                    Blocks.GRAVEL.getDefaultState(), 15,
+                    Blocks.SMOOTH_SANDSTONE.getDefaultState(), 10,
+                    Blocks.COBBLESTONE.getDefaultState(), 10)
+    ),
+    /** Taiga: spruce hedges. Wide ring: old-growth taigas have giant spruces. */
+    TAIGA(
+            leaves(Blocks.SPRUCE_LEAVES),
+            Blocks.SPRUCE_LOG.getDefaultState(),
+            Blocks.MOSSY_COBBLESTONE.getDefaultState(),
+            Blocks.DIRT_PATH.getDefaultState(),
+            Blocks.SPRUCE_PLANKS.getDefaultState(),
+            lantern(),
+            Blocks.DIRT.getDefaultState(),
+            Blocks.SPRUCE_FENCE.getDefaultState(),
+            8,
+            Mix.of(Blocks.DIRT_PATH.getDefaultState(), 40,
+                    Blocks.GRAVEL.getDefaultState(), 20,
+                    Blocks.MOSSY_COBBLESTONE.getDefaultState(), 15,
+                    Blocks.COBBLESTONE.getDefaultState(), 15,
+                    Blocks.PACKED_MUD.getDefaultState(), 10)
     );
 
     public final BlockState wall;
@@ -104,6 +214,8 @@ public enum MazeStyle {
     public final BlockState gate;
     public final int margin;
     public final Mix ring;
+    /** Optional horizontal bands: wall block per height above the floor (1 = lowest). Null = plain {@link #wall}. */
+    private final BlockState[] wallBands;
 
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
               BlockState plaza, BlockState light, BlockState foundation, BlockState gate, int margin, Mix ring) {
@@ -117,6 +229,32 @@ public enum MazeStyle {
         this.gate = gate;
         this.margin = margin;
         this.ring = ring;
+        this.wallBands = null;
+    }
+
+    MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
+              BlockState plaza, BlockState light, BlockState foundation, BlockState gate, int margin, Mix ring,
+              BlockState[] wallBands) {
+        this.wall = wall;
+        this.pillar = pillar;
+        this.wallBase = wallBase;
+        this.floor = floor;
+        this.plaza = plaza;
+        this.light = light;
+        this.foundation = foundation;
+        this.gate = gate;
+        this.margin = margin;
+        this.ring = ring;
+        this.wallBands = wallBands;
+    }
+
+    /** Wall block at {@code dy} blocks above the floor (1..WALL_HEIGHT). */
+    public BlockState wallAt(int dy) {
+        return wallBands == null ? wall : wallBands[(dy - 1) % wallBands.length];
+    }
+
+    private static BlockState leaves(net.minecraft.block.Block block) {
+        return block.getDefaultState().with(LeavesBlock.PERSISTENT, true);
     }
 
     private static BlockState lantern() {

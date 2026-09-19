@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "badlands",
+  "biomes": "#mazecraft:has_structure/maze_badlands",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

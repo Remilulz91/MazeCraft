@@ -35,5 +35,17 @@
   "advancements.mazecraft.enter_snow.title": "Frozen Paths",
   "advancements.mazecraft.enter_snow.description": "Enter a snow maze",
   "advancements.mazecraft.enter_jungle.title": "Overgrown Ruins",
-  "advancements.mazecraft.enter_jungle.description": "Enter a jungle maze"
+  "advancements.mazecraft.enter_jungle.description": "Enter a jungle maze",
+  "advancements.mazecraft.enter_badlands.title": "Painted Walls",
+  "advancements.mazecraft.enter_badlands.description": "Enter a badlands maze",
+  "advancements.mazecraft.enter_dark_forest.title": "Afraid of the Dark",
+  "advancements.mazecraft.enter_dark_forest.description": "Enter a dark forest maze",
+  "advancements.mazecraft.enter_cherry.title": "Petal Path",
+  "advancements.mazecraft.enter_cherry.description": "Enter a cherry grove maze",
+  "advancements.mazecraft.enter_swamp.title": "Muddy Waters",
+  "advancements.mazecraft.enter_swamp.description": "Enter a swamp maze",
+  "advancements.mazecraft.enter_savanna.title": "Savanna Stroll",
+  "advancements.mazecraft.enter_savanna.description": "Enter a savanna maze",
+  "advancements.mazecraft.enter_taiga.title": "Needle in a Maze",
+  "advancements.mazecraft.enter_taiga.description": "Enter a taiga maze"
 }

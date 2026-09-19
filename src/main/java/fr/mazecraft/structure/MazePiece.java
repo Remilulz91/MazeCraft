@@ -242,7 +242,7 @@ public class MazePiece extends StructurePiece {
                     pos.set(x, floorY + dy, z);
                     BlockState target;
                     if (isWall && dy <= WALL_HEIGHT) {
-                        target = isPillar ? style.pillar : style.wall;
+                        target = isPillar ? style.pillar : style.wallAt(dy);
                     } else if (isPillar && dy == WALL_HEIGHT + 1 && lx % 8 == 0 && lz % 8 == 0) {
                         target = style.light;
                     } else {

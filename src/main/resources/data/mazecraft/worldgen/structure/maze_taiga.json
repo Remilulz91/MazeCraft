@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "taiga",
+  "biomes": "#mazecraft:has_structure/maze_taiga",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

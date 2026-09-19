@@ -4,6 +4,12 @@
     "mazecraft:maze_hedge",
     "mazecraft:maze_desert",
     "mazecraft:maze_snow",
-    "mazecraft:maze_jungle"
+    "mazecraft:maze_jungle",
+    "mazecraft:maze_badlands",
+    "mazecraft:maze_dark_forest",
+    "mazecraft:maze_cherry",
+    "mazecraft:maze_swamp",
+    "mazecraft:maze_savanna",
+    "mazecraft:maze_taiga"
   ]
 }

@@ -35,5 +35,17 @@
   "advancements.mazecraft.enter_snow.title": "Sentiers gelés",
   "advancements.mazecraft.enter_snow.description": "Entrer dans un labyrinthe des neiges",
   "advancements.mazecraft.enter_jungle.title": "Ruines envahies",
-  "advancements.mazecraft.enter_jungle.description": "Entrer dans un labyrinthe de la jungle"
+  "advancements.mazecraft.enter_jungle.description": "Entrer dans un labyrinthe de la jungle",
+  "advancements.mazecraft.enter_badlands.title": "Murs peints",
+  "advancements.mazecraft.enter_badlands.description": "Entrer dans un labyrinthe des badlands",
+  "advancements.mazecraft.enter_dark_forest.title": "Peur du noir",
+  "advancements.mazecraft.enter_dark_forest.description": "Entrer dans un labyrinthe de la forêt sombre",
+  "advancements.mazecraft.enter_cherry.title": "Sentier de pétales",
+  "advancements.mazecraft.enter_cherry.description": "Entrer dans un labyrinthe de cerisiers",
+  "advancements.mazecraft.enter_swamp.title": "Eaux troubles",
+  "advancements.mazecraft.enter_swamp.description": "Entrer dans un labyrinthe des marais",
+  "advancements.mazecraft.enter_savanna.title": "Balade dans la savane",
+  "advancements.mazecraft.enter_savanna.description": "Entrer dans un labyrinthe de la savane",
+  "advancements.mazecraft.enter_taiga.title": "Aiguille dans un labyrinthe",
+  "advancements.mazecraft.enter_taiga.description": "Entrer dans un labyrinthe de la taïga"
 }

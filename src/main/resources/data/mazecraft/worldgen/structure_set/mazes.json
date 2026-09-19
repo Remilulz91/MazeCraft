@@ -15,6 +15,30 @@
     {
       "structure": "mazecraft:maze_jungle",
       "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_badlands",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_dark_forest",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_cherry",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_swamp",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_savanna",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_taiga",
+      "weight": 1
     }
   ],
   "placement": {
