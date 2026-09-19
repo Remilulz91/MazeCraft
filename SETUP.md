@@ -62,7 +62,7 @@ src/main/
 
 **One-time setup before the first release:**
 
-- Create the project on Modrinth and put its ID in `build.gradle` (`projectId = "REPLACE_ME"`).
+- Modrinth project ID (`GEfPlo7m`) is already set in `build.gradle`.
 - Add the `MODRINTH_TOKEN` secret in the GitHub repo (Settings → Secrets and variables → Actions).
 
 ## Troubleshooting

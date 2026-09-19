@@ -123,9 +123,8 @@ publishMods {
 
     modrinth {
         accessToken = providers.environmentVariable("MODRINTH_TOKEN")
-        // TODO: replace with the real Modrinth project ID once the project is created
-        // (Modrinth → project settings → "Copy ID"). https://modrinth.com/mod/mazecraft
-        projectId = "REPLACE_ME"
+        // https://modrinth.com/mod/mazecraft
+        projectId = "GEfPlo7m"
         minecraftVersions.add(project.minecraft_version) // exact 1.21.1 only
         requires {
             slug = "fabric-api"
