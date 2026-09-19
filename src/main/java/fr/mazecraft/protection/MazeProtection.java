@@ -168,7 +168,7 @@ public final class MazeProtection {
                 hit = locked ? Optional.of(found) : Optional.empty();
                 cache.put(chunkKey, hit);
             }
-            return hit.isPresent() && hit.get().piece().getBoundingBox().contains(pos);
+            return hit.isPresent() && hit.get().piece().isProtected(pos);
         });
     }
 

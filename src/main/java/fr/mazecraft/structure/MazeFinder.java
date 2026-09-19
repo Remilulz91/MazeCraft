@@ -71,9 +71,12 @@ public final class MazeFinder {
         return null;
     }
 
+    /** The box covers the maze above its floor; floor + foundation below it count too. */
+    private static final int BELOW = MazePiece.FOUNDATION_DEPTH + 1;
+
     private static boolean contains(BlockBox box, BlockPos pos, int extraAbove, boolean anyY) {
         return pos.getX() >= box.getMinX() && pos.getX() <= box.getMaxX()
                 && pos.getZ() >= box.getMinZ() && pos.getZ() <= box.getMaxZ()
-                && (anyY || (pos.getY() >= box.getMinY() && pos.getY() <= box.getMaxY() + extraAbove));
+                && (anyY || (pos.getY() >= box.getMinY() - BELOW && pos.getY() <= box.getMaxY() + extraAbove));
     }
 }

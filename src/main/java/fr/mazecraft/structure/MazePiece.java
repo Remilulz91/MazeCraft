@@ -97,13 +97,14 @@ public class MazePiece extends StructurePiece {
         int minX = centerX - half - MARGIN;
         int minZ = centerZ - half - MARGIN;
         int side = size.span() + 2 * MARGIN;
-        // The box starts AT the floor on purpose: with terrain_adaptation "beard_thin", Minecraft
-        // raises the ground up to the box bottom and clears above it, with a smooth slope around
-        // the box (like villages). A box starting below the floor made it carve a huge flat
-        // cavern around the maze. The foundation below the floor is still written (inside the
-        // chunk), it just isn't part of the box.
+        // The box starts just ABOVE the floor on purpose: with terrain_adaptation "beard_thin",
+        // Minecraft makes the ground solid up to the box bottom (so up to floorY, flush with our
+        // floor) and clears above it, with a smooth slope around the box (like villages).
+        // A box starting below the floor made it carve a huge flat cavern around the maze.
+        // The floor and foundation are still written (inside the chunk) and still protected
+        // (see isProtected / MazeFinder), they just aren't part of the box.
         return new BlockBox(
-                minX, floorY, minZ,
+                minX, floorY + 1, minZ,
                 minX + side - 1, floorY + CLEAR_HEIGHT, minZ + side - 1);
     }
 
@@ -174,6 +175,13 @@ public class MazePiece extends StructurePiece {
             if (leverPos(i).equals(pos)) return i;
         }
         return -1;
+    }
+
+    /** Blocks protected by this maze: its box, plus the floor and foundation below it. */
+    public boolean isProtected(BlockPos pos) {
+        return pos.getX() >= boundingBox.getMinX() && pos.getX() <= boundingBox.getMaxX()
+                && pos.getZ() >= boundingBox.getMinZ() && pos.getZ() <= boundingBox.getMaxZ()
+                && pos.getY() >= floorY - FOUNDATION_DEPTH && pos.getY() <= boundingBox.getMaxY();
     }
 
     /** True if (x, z) is inside the maze proper (not the margin). */
