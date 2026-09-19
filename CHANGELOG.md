@@ -13,8 +13,8 @@ First mazes in the world: the hedge maze.
 - "Growing tree" maze layout (mix of long winding corridors and many side branches): exactly **one path** from the entrance to the center, every other branch is a dead end. One entrance on a random side; the 3×3-cell central plaza has a single door, on the side facing away from the entrance.
 - **Central chest** with dedicated loot tables per size (`mazecraft:chests/maze_<size>`): diamonds, enchanted books and gear, golden apples; totems and netherite in large and colossal mazes.
 - Terrain handling: mazes skip spots with water or more than 12 blocks of height difference, clear hills inside the footprint and fill gaps underneath.
-- Corridor floor is dirt path, so no trees or flowers grow inside the maze.
-- **Entrance placement**: the entrance faces the side where the surrounding terrain is closest to the maze floor, and a flattened 4-block ring with a path leads to it — no more entrance opening into a cliff.
+- No vegetation inside the maze: corridor floor and surrounding ring are dirt path (no tree can grow there), and the maze is generated after trees and plants (last decoration step), clearing anything that spilled into the corridors.
+- **Entrance placement**: the entrance faces the side where the surrounding terrain is closest to the maze floor, and a flattened 5-block dirt-path ring surrounds the maze — no more entrance opening into a cliff.
 - **Protection until conquered** (survival/adventure; creative and spectator are exempt): blocks can't be broken or placed inside a maze until its central chest is opened. Refused block placements are immediately given back in the inventory. Players on top of the walls or flying over the maze are sent back to the entrance. Both rules configurable (`protectUntilSolved`, `preventWallWalking`).
 - **Maze conquered**: opening the central chest lifts the protections for everyone (saved per world).
 - **Advancements**: *MazeCraft* (enter a maze), *Hedge Your Bets* (enter a hedge maze), *Maze Runner* (conquer a maze), *Minotaur's Nightmare* (conquer a colossal maze, challenge, 500 XP).

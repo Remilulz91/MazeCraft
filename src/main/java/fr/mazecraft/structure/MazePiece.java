@@ -30,8 +30,11 @@ import net.minecraft.world.gen.chunk.ChunkGenerator;
  * each time, so every chunk agrees on the maze, and we only ever write inside
  * {@code chunkBox} — required to stay safe when neighbouring chunks are not generated yet.
  *
- * The bounding box includes a flattened {@link #MARGIN}-block ring around the maze, with a
- * path leading to the entrance, so the entrance is never buried in a slope.
+ * The bounding box includes a flattened {@link #MARGIN}-block ring around the maze, so the
+ * entrance is never buried in a slope and no tree grows against the hedges.
+ *
+ * The structure is generated at the LAST decoration step (top_layer_modification), after
+ * trees and plants of the same chunk: anything they put inside the box is cleared.
  */
 public class MazePiece extends StructurePiece {
 
@@ -41,8 +44,11 @@ public class MazePiece extends StructurePiece {
     public static final int CLEAR_HEIGHT = 10;
     /** Maximum depth filled with foundation under the floor on uneven ground. */
     public static final int FOUNDATION_DEPTH = 12;
-    /** Flattened ring around the maze (blocks). */
-    public static final int MARGIN = 4;
+    /**
+     * Flattened ring around the maze (blocks). Its floor is the corridor floor (dirt path),
+     * so no tree can grow close enough for its canopy to spill into the corridors.
+     */
+    public static final int MARGIN = 5;
 
     private final MazeStyle style;
     private final MazeSize size;
@@ -150,7 +156,6 @@ public class MazePiece extends StructurePiece {
 
         BlockPos.Mutable pos = new BlockPos.Mutable();
         BlockState air = Blocks.AIR.getDefaultState();
-        BlockState grass = Blocks.GRASS_BLOCK.getDefaultState();
 
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
@@ -174,7 +179,7 @@ public class MazePiece extends StructurePiece {
                 // 2. Floor
                 BlockState floor;
                 if (!inside) {
-                    floor = layout.isApproach(lx, lz) ? style.floor : grass; // margin ring
+                    floor = style.floor; // margin ring: no dirt/grass → no trees next to the hedges
                 } else if (isWall) {
                     floor = style.wallBase;
                 } else {
