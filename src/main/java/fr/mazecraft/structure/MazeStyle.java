@@ -114,7 +114,8 @@ public enum MazeStyle {
                     Blocks.RED_TERRACOTTA.getDefaultState(),
                     Blocks.ORANGE_TERRACOTTA.getDefaultState(),
                     Blocks.WHITE_TERRACOTTA.getDefaultState(),
-                    Blocks.TERRACOTTA.getDefaultState()
+                    // Top band: cut red sandstone coping, NOT terracotta (dead bushes grow on terracotta)
+                    Blocks.CUT_RED_SANDSTONE.getDefaultState()
             }
     ),
     /** Dark forest: dark oak hedges, soul lanterns. Wide ring: dark oaks are large and dense. */

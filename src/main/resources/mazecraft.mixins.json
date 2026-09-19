@@ -7,7 +7,9 @@
   "mixins": [
     "BlockItemMixin",
     "EnderPearlEntityMixin",
-    "ExplosionMixin"
+    "ExplosionMixin",
+    "VineBlockMixin",
+    "VinesFeatureMixin"
   ],
   "injectors": {
     "defaultRequire": 1
