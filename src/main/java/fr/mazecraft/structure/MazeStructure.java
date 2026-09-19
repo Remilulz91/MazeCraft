@@ -1,6 +1,9 @@
 package fr.mazecraft.structure;
 
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
+import fr.mazecraft.MazeCraft;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.Heightmap;
@@ -24,13 +27,25 @@ import java.util.OptionalInt;
  */
 public class MazeStructure extends Structure {
 
-    public static final MapCodec<MazeStructure> CODEC = Structure.createCodec(MazeStructure::new);
+    /** JSON: the usual structure fields + {@code "style": "hedge" | "desert" | "snow" | "jungle"...}. */
+    public static final MapCodec<MazeStructure> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
+            Structure.configCodecBuilder(instance),
+            Codec.STRING.optionalFieldOf("style", "hedge").forGetter(s -> s.style.id())
+    ).apply(instance, MazeStructure::new));
+
+    private final MazeStyle style;
 
     /** Rejects the spot if the terrain height varies more than this across the footprint. */
     private static final int MAX_HEIGHT_DIFFERENCE = 12;
 
-    public MazeStructure(Structure.Config config) {
+    public MazeStructure(Structure.Config config, String styleId) {
         super(config);
+        MazeStyle parsed = MazeStyle.fromId(styleId);
+        if (parsed == null) {
+            MazeCraft.LOGGER.warn("[MazeCraft] Unknown maze style '{}' in worldgen JSON, using hedge", styleId);
+            parsed = MazeStyle.HEDGE;
+        }
+        this.style = parsed;
     }
 
     @Override
@@ -47,9 +62,9 @@ public class MazeStructure extends Structure {
             if (floorY.isPresent()) {
                 final MazeSize finalSize = size;
                 final int y = floorY.getAsInt();
-                final int entrance = bestEntranceSide(context, centerX, centerZ, finalSize, y);
+                final int entrance = bestEntranceSide(context, centerX, centerZ, finalSize, y, style);
                 return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
-                        collector.addPiece(new MazePiece(MazeStyle.HEDGE, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
+                        collector.addPiece(new MazePiece(style, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
             }
         }
         return Optional.empty();
@@ -89,10 +104,10 @@ public class MazeStructure extends Structure {
      * Picks the side whose surrounding terrain is closest to the maze floor, so the entrance
      * opens onto walkable ground instead of a cliff or a slope. Water counts as very bad.
      */
-    private static int bestEntranceSide(Context context, int centerX, int centerZ, MazeSize size, int floorY) {
+    private static int bestEntranceSide(Context context, int centerX, int centerZ, MazeSize size, int floorY, MazeStyle style) {
         ChunkGenerator gen = context.chunkGenerator();
         int half = size.span() / 2;
-        int dist = half + MazePiece.MARGIN + 3; // just past the flattened ring
+        int dist = half + style.margin + 3; // just past the flattened ring
         int[][] sideDirs = {
                 {0, -1}, // NORTH
                 {0, 1},  // SOUTH

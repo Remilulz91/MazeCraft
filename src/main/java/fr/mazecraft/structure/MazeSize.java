@@ -16,7 +16,7 @@ public enum MazeSize {
     SMALL(15, 2),     //  61 ×  61 blocks, 2 gates
     MEDIUM(25, 3),    // 101 × 101 blocks, 3 gates
     LARGE(37, 4),     // 149 × 149 blocks, 4 gates
-    COLOSSAL(55, 5);  // 221 × 221 blocks, 5 gates — max: must stay within the 8-chunk structure reach
+    COLOSSAL(55, 5);  // 221 × 221 blocks, 5 gates — max: half-span 110 + ring (≤ MAX_MARGIN 8) + 8 must stay < 128 (8-chunk structure reach)
 
     private final int cells;
     private final int gates;

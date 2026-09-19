@@ -36,7 +36,7 @@ import java.util.List;
  * each time, so every chunk agrees on the maze, and we only ever write inside
  * {@code chunkBox} — required to stay safe when neighbouring chunks are not generated yet.
  *
- * The bounding box includes a flattened {@link #MARGIN}-block ring around the maze, so the
+ * The bounding box includes a flattened ring ({@link MazeStyle#margin} blocks) around the maze, so the
  * entrance is never buried in a slope and no tree grows against the hedges.
  *
  * The structure is generated at the surface_structures step, BEFORE trees and plants: its
@@ -50,11 +50,6 @@ public class MazePiece extends StructurePiece {
     public static final int CLEAR_HEIGHT = 10;
     /** Maximum depth filled with foundation under the floor on uneven ground. */
     public static final int FOUNDATION_DEPTH = 12;
-    /**
-     * Flattened ring around the maze (blocks). Its floor is the corridor floor (dirt path),
-     * so no tree can grow close enough for its canopy to spill into the corridors.
-     */
-    public static final int MARGIN = 5;
     /** Height of the levers above the floor. */
     public static final int LEVER_DY = 2;
 
@@ -71,7 +66,7 @@ public class MazePiece extends StructurePiece {
      * @param entranceSide {@link MazeLayout#NORTH}.. {@link MazeLayout#EAST}, or -1 for random
      */
     public MazePiece(MazeStyle style, MazeSize size, long seed, int centerX, int floorY, int centerZ, int entranceSide) {
-        super(ModStructures.MAZE_PIECE, 0, boxFor(size, centerX, floorY, centerZ));
+        super(ModStructures.MAZE_PIECE, 0, boxFor(style, size, centerX, floorY, centerZ));
         this.style = style;
         this.size = size;
         this.seed = seed;
@@ -92,11 +87,11 @@ public class MazePiece extends StructurePiece {
         this.entranceSide = nbt.contains("Entrance") ? nbt.getInt("Entrance") : -1;
     }
 
-    private static BlockBox boxFor(MazeSize size, int centerX, int floorY, int centerZ) {
+    private static BlockBox boxFor(MazeStyle style, MazeSize size, int centerX, int floorY, int centerZ) {
         int half = size.span() / 2;
-        int minX = centerX - half - MARGIN;
-        int minZ = centerZ - half - MARGIN;
-        int side = size.span() + 2 * MARGIN;
+        int minX = centerX - half - style.margin;
+        int minZ = centerZ - half - style.margin;
+        int side = size.span() + 2 * style.margin;
         // The box starts just ABOVE the floor on purpose: with terrain_adaptation "beard_thin",
         // Minecraft makes the ground solid up to the box bottom (so up to floorY, flush with our
         // floor) and clears above it, with a smooth slope around the box (like villages).
@@ -126,11 +121,11 @@ public class MazePiece extends StructurePiece {
 
     /** World X of local maze coordinate 0 (the maze proper, not the margin). */
     private int originX() {
-        return boundingBox.getMinX() + MARGIN;
+        return boundingBox.getMinX() + style.margin;
     }
 
     private int originZ() {
-        return boundingBox.getMinZ() + MARGIN;
+        return boundingBox.getMinZ() + style.margin;
     }
 
     /** World position of the central chest. */

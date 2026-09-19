@@ -1,0 +1,36 @@
+{
+  "parent": "mazecraft:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:mossy_cobblestone"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.enter_jungle.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.enter_jungle.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "entered": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "location": {
+                "structures": "mazecraft:maze_jungle"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

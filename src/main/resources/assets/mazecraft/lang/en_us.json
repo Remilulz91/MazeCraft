@@ -29,5 +29,11 @@
   "mazecraft.protection.forbidden_item": "This item can't be used in or near the maze until its treasure is claimed.",
   "mazecraft.protection.no_pearl": "The maze swallows your ender pearl...",
   "advancements.mazecraft.pull_lever.title": "Pull the Bobbin",
-  "advancements.mazecraft.pull_lever.description": "Pull a maze lever to open a gate"
+  "advancements.mazecraft.pull_lever.description": "Pull a maze lever to open a gate",
+  "advancements.mazecraft.enter_desert.title": "Lost in the Dunes",
+  "advancements.mazecraft.enter_desert.description": "Enter a desert maze",
+  "advancements.mazecraft.enter_snow.title": "Frozen Paths",
+  "advancements.mazecraft.enter_snow.description": "Enter a snow maze",
+  "advancements.mazecraft.enter_jungle.title": "Overgrown Ruins",
+  "advancements.mazecraft.enter_jungle.description": "Enter a jungle maze"
 }

@@ -1,6 +1,9 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_hedge"
+    "mazecraft:maze_hedge",
+    "mazecraft:maze_desert",
+    "mazecraft:maze_snow",
+    "mazecraft:maze_jungle"
   ]
 }

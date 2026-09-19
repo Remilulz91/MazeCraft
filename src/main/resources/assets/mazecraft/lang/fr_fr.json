@@ -29,5 +29,11 @@
   "mazecraft.protection.forbidden_item": "Cet objet est inutilisable dans ou près du labyrinthe tant que son trésor n'est pas récupéré.",
   "mazecraft.protection.no_pearl": "Le labyrinthe engloutit votre perle de l'Ender...",
   "advancements.mazecraft.pull_lever.title": "Tire la chevillette",
-  "advancements.mazecraft.pull_lever.description": "Actionner un levier de labyrinthe pour ouvrir une herse"
+  "advancements.mazecraft.pull_lever.description": "Actionner un levier de labyrinthe pour ouvrir une herse",
+  "advancements.mazecraft.enter_desert.title": "Perdu dans les dunes",
+  "advancements.mazecraft.enter_desert.description": "Entrer dans un labyrinthe du désert",
+  "advancements.mazecraft.enter_snow.title": "Sentiers gelés",
+  "advancements.mazecraft.enter_snow.description": "Entrer dans un labyrinthe des neiges",
+  "advancements.mazecraft.enter_jungle.title": "Ruines envahies",
+  "advancements.mazecraft.enter_jungle.description": "Entrer dans un labyrinthe de la jungle"
 }

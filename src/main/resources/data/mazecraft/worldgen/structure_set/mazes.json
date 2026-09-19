@@ -3,6 +3,18 @@
     {
       "structure": "mazecraft:maze_hedge",
       "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_desert",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_snow",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_jungle",
+      "weight": 1
     }
   ],
   "placement": {
