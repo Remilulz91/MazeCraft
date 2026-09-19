@@ -1,0 +1,23 @@
+# Dependabot config for MazeCraft.
+#
+# The Gradle dependencies we consume are all transitives of Minecraft itself
+# (jackson, netty, log4j, gson, ...) — we don't declare them directly and can't
+# update them independently. Disabling gradle entirely prevents noisy security
+# update failures while keeping GitHub Actions itself up-to-date.
+#
+# See https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Keep GitHub Actions workflows (checkout, setup-java, setup-gradle, ...)
+  # up to date with weekly PRs.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # Gradle: intentionally NOT declared. Combined with disabling security-updates
+  # for this ecosystem in repo settings (Security → Code security → Dependabot
+  # security updates → OFF for Gradle), this prevents the false-positive noise
+  # about Minecraft's own transitive dependencies.

@@ -1,0 +1,9 @@
+{
+  "mazecraft.command.reloaded": "Configuration de MazeCraft rechargée.",
+
+  "config.mazecraft.title": "Configuration de MazeCraft",
+  "config.mazecraft.category.debug": "Débogage",
+  "config.mazecraft.enableDebugCommands": "Activer les commandes de débogage",
+  "config.mazecraft.enableDebugCommands.tooltip": "Disponible uniquement dans le build DEBUG. Ignoré dans le build public.",
+  "config.mazecraft.publicBuildNotice": "Les options de débogage ne sont disponibles que dans le build DEBUG."
+}

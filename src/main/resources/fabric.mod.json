@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "mazecraft",
+  "version": "${version}",
+  "name": "MazeCraft",
+  "description": "Procedurally generated mazes across the Overworld, the Nether and the End. Each maze takes the style of its biome — pull the levers to open the gates and reach the treasure at its heart.",
+  "authors": [
+    "Remilulz_91"
+  ],
+  "contact": {
+    "homepage": "https://github.com/Remilulz91/MazeCraft",
+    "sources": "https://github.com/Remilulz91/MazeCraft",
+    "issues": "https://github.com/Remilulz91/MazeCraft/issues"
+  },
+  "license": "MIT",
+  "icon": "assets/mazecraft/icon.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "fr.mazecraft.MazeCraft"
+    ],
+    "client": [
+      "fr.mazecraft.client.MazeCraftClient"
+    ],
+    "modmenu": [
+      "fr.mazecraft.client.config.ModMenuIntegration"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": "*",
+    "minecraft": "${minecraft_version}",
+    "java": ">=21"
+  },
+  "recommends": {
+    "cloth-config": "*",
+    "modmenu": "*"
+  }
+}

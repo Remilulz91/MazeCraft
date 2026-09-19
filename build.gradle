@@ -1,0 +1,140 @@
+plugins {
+    id 'fabric-loom' version '1.7-SNAPSHOT'
+    id 'maven-publish'
+    id 'me.modmuss50.mod-publish-plugin' version '0.7.4'
+}
+
+group = project.maven_group
+
+// Build type: 'public' (default, debug commands OFF) or 'debug' (debug commands ON)
+// Usage: ./gradlew build                   → public build
+//        ./gradlew build -PbuildType=debug → debug build (separate JAR with -debug version suffix)
+def buildType = project.findProperty('buildType') ?: 'public'
+
+// Adding "-debug" to the version forces Gradle/Loom to produce a different filename:
+//   - public: mazecraft-0.1.0-alpha.1.jar
+//   - debug:  mazecraft-0.1.0-alpha.1-debug.jar
+version = buildType == 'debug'
+        ? "${project.mod_version}-debug"
+        : project.mod_version
+
+base {
+    archivesName = project.archives_base_name
+}
+
+println "==> Building MazeCraft v${version} (type: ${buildType})"
+
+repositories {
+    maven {
+        name = "Terraformers"
+        url = "https://maven.terraformersmc.com/"
+    }
+    maven {
+        name = "Shedaniel"
+        url = "https://maven.shedaniel.me/"
+    }
+    mavenCentral()
+}
+
+dependencies {
+    // Minecraft & Fabric
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+    // Fabric API
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_version}"
+
+    // Cloth Config - configuration screens
+    modImplementation("me.shedaniel.cloth:cloth-config-fabric:${project.cloth_config_version}") {
+        exclude(group: "net.fabricmc.fabric-api")
+    }
+
+    // Mod Menu - in-game mod list
+    modImplementation "com.terraformersmc:modmenu:${project.mod_menu_version}"
+}
+
+processResources {
+    inputs.property "version", project.version
+    inputs.property "minecraft_version", project.minecraft_version
+    inputs.property "loader_version", project.loader_version
+    inputs.property "buildType", buildType
+
+    filesMatching("fabric.mod.json") {
+        expand "version": project.version,
+                "minecraft_version": project.minecraft_version,
+                "loader_version": project.loader_version
+    }
+
+    filesMatching("mazecraft.build.properties") {
+        expand "build_type": buildType,
+                "version": project.version
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+java {
+    withSourcesJar()
+
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+    from("LICENSE") {
+        rename { "${it}_${project.archives_base_name}" }
+    }
+}
+
+// configure the maven publication
+publishing {
+    publications {
+        create("mavenJava", MavenPublication) {
+            artifactId = project.archives_base_name
+            from components.java
+        }
+    }
+
+    repositories {
+        // Add repositories to publish to here if needed
+    }
+}
+
+// Modrinth publishing (via mod-publish-plugin).
+// Only runs when the MODRINTH_TOKEN env var is present (i.e. in CI on tag push).
+// Release channel is derived from the version string: alpha/beta/stable.
+publishMods {
+    file = remapJar.archiveFile
+    changelog = providers.fileContents(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
+            .asText.orElse("See CHANGELOG.md")
+    modLoaders.add("fabric")
+
+    def v = project.mod_version.toString()
+    if (v.contains("alpha")) {
+        type = ALPHA
+    } else if (v.contains("beta")) {
+        type = BETA
+    } else {
+        type = STABLE
+    }
+
+    modrinth {
+        accessToken = providers.environmentVariable("MODRINTH_TOKEN")
+        // TODO: replace with the real Modrinth project ID once the project is created
+        // (Modrinth → project settings → "Copy ID"). https://modrinth.com/mod/mazecraft
+        projectId = "REPLACE_ME"
+        minecraftVersions.add(project.minecraft_version) // exact 1.21.1 only
+        requires {
+            slug = "fabric-api"
+        }
+        optional {
+            slug = "cloth-config"
+        }
+        optional {
+            slug = "modmenu"
+        }
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "mazecraft.command.reloaded": "MazeCraft configuration reloaded.",
+
+  "config.mazecraft.title": "MazeCraft Configuration",
+  "config.mazecraft.category.debug": "Debug",
+  "config.mazecraft.enableDebugCommands": "Enable debug commands",
+  "config.mazecraft.enableDebugCommands.tooltip": "Only available in the DEBUG build. Ignored in the public build.",
+  "config.mazecraft.publicBuildNotice": "Debug options are only available in the DEBUG build."
+}
