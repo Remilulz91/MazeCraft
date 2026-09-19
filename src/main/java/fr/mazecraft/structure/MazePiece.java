@@ -5,6 +5,9 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ChestBlock;
+import net.minecraft.block.HorizontalConnectingBlock;
+import net.minecraft.block.LeverBlock;
+import net.minecraft.block.enums.BlockFace;
 import net.minecraft.block.entity.BlockEntity;
 import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.loot.LootTable;
@@ -22,6 +25,9 @@ import net.minecraft.world.StructureWorldAccess;
 import net.minecraft.world.gen.StructureAccessor;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * The whole maze as a single structure piece.
  *
@@ -33,8 +39,8 @@ import net.minecraft.world.gen.chunk.ChunkGenerator;
  * The bounding box includes a flattened {@link #MARGIN}-block ring around the maze, so the
  * entrance is never buried in a slope and no tree grows against the hedges.
  *
- * The structure is generated at the LAST decoration step (top_layer_modification), after
- * trees and plants of the same chunk: anything they put inside the box is cleared.
+ * The structure is generated at the surface_structures step, BEFORE trees and plants: its
+ * dirt-path floor (maze + ring) is not a valid soil, so nothing can grow on or next to it.
  */
 public class MazePiece extends StructurePiece {
 
@@ -49,6 +55,8 @@ public class MazePiece extends StructurePiece {
      * so no tree can grow close enough for its canopy to spill into the corridors.
      */
     public static final int MARGIN = 5;
+    /** Height of the levers above the floor. */
+    public static final int LEVER_DY = 2;
 
     private final MazeStyle style;
     private final MazeSize size;
@@ -89,8 +97,13 @@ public class MazePiece extends StructurePiece {
         int minX = centerX - half - MARGIN;
         int minZ = centerZ - half - MARGIN;
         int side = size.span() + 2 * MARGIN;
+        // The box starts AT the floor on purpose: with terrain_adaptation "beard_thin", Minecraft
+        // raises the ground up to the box bottom and clears above it, with a smooth slope around
+        // the box (like villages). A box starting below the floor made it carve a huge flat
+        // cavern around the maze. The foundation below the floor is still written (inside the
+        // chunk), it just isn't part of the box.
         return new BlockBox(
-                minX, floorY - FOUNDATION_DEPTH, minZ,
+                minX, floorY, minZ,
                 minX + side - 1, floorY + CLEAR_HEIGHT, minZ + side - 1);
     }
 
@@ -105,7 +118,7 @@ public class MazePiece extends StructurePiece {
 
     public MazeLayout layout() {
         if (layout == null) {
-            layout = MazeLayout.generate(size.cells(), seed, entranceSide);
+            layout = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates());
         }
         return layout;
     }
@@ -129,6 +142,38 @@ public class MazePiece extends StructurePiece {
     public BlockPos entranceOutsidePos() {
         int[] l = layout().entranceOutside(2);
         return new BlockPos(originX() + l[0], floorY + 1, originZ() + l[1]);
+    }
+
+    /** World positions of all blocks of gate {@code index} (3 wide × WALL_HEIGHT high). */
+    public List<BlockPos> gateBlocks(int index) {
+        List<BlockPos> list = new ArrayList<>();
+        MazeLayout.Gate gate = layout().gates().get(index);
+        for (int x = gate.x0(); x <= gate.x1(); x++) {
+            for (int z = gate.z0(); z <= gate.z1(); z++) {
+                for (int dy = 1; dy <= WALL_HEIGHT; dy++) {
+                    list.add(new BlockPos(originX() + x, floorY + dy, originZ() + z));
+                }
+            }
+        }
+        return list;
+    }
+
+    public int gateCount() {
+        return layout().gates().size();
+    }
+
+    /** World position of lever {@code index}. */
+    public BlockPos leverPos(int index) {
+        MazeLayout.Lever lever = layout().levers().get(index);
+        return new BlockPos(originX() + lever.x(), floorY + LEVER_DY, originZ() + lever.z());
+    }
+
+    /** Index of the lever at this position, or -1. */
+    public int leverIndexAt(BlockPos pos) {
+        for (int i = 0; i < layout().levers().size(); i++) {
+            if (leverPos(i).equals(pos)) return i;
+        }
+        return -1;
     }
 
     /** True if (x, z) is inside the maze proper (not the margin). */
@@ -205,7 +250,38 @@ public class MazePiece extends StructurePiece {
             }
         }
 
-        // 4. Central chest
+        // 4. Gates (closed) — bars connected along the opening so nobody squeezes through
+        for (MazeLayout.Gate gate : layout.gates()) {
+            BlockState bars = style.gate;
+            if (bars.contains(HorizontalConnectingBlock.NORTH)) {
+                bars = gate.alongX()
+                        ? bars.with(HorizontalConnectingBlock.EAST, true).with(HorizontalConnectingBlock.WEST, true)
+                        : bars.with(HorizontalConnectingBlock.NORTH, true).with(HorizontalConnectingBlock.SOUTH, true);
+            }
+            for (int gx = gate.x0(); gx <= gate.x1(); gx++) {
+                for (int gz = gate.z0(); gz <= gate.z1(); gz++) {
+                    for (int dy = 1; dy <= WALL_HEIGHT; dy++) {
+                        pos.set(originX() + gx, floorY + dy, originZ() + gz);
+                        if (chunkBox.contains(pos)) world.setBlockState(pos, bars, Block.NOTIFY_LISTENERS);
+                    }
+                }
+            }
+        }
+
+        // 5. Levers, each hanging on a log set into the hedge (leaves can't hold a lever)
+        Direction[] facings = {Direction.NORTH, Direction.SOUTH, Direction.WEST, Direction.EAST};
+        for (MazeLayout.Lever lever : layout.levers()) {
+            pos.set(originX() + lever.supportX(), floorY + LEVER_DY, originZ() + lever.supportZ());
+            if (chunkBox.contains(pos)) world.setBlockState(pos, style.pillar, Block.NOTIFY_LISTENERS);
+            pos.set(originX() + lever.x(), floorY + LEVER_DY, originZ() + lever.z());
+            if (chunkBox.contains(pos)) {
+                world.setBlockState(pos, Blocks.LEVER.getDefaultState()
+                        .with(LeverBlock.FACE, BlockFace.WALL)
+                        .with(LeverBlock.FACING, facings[lever.facing()]), Block.NOTIFY_LISTENERS);
+            }
+        }
+
+        // 6. Central chest
         BlockPos chest = chestPos();
         if (chunkBox.contains(chest)) {
             world.setBlockState(chest,

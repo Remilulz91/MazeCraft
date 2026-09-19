@@ -23,5 +23,11 @@
   "advancements.mazecraft.conquer_maze.title": "Le Labyrinthe",
   "advancements.mazecraft.conquer_maze.description": "Atteindre le centre d'un labyrinthe et ouvrir son coffre",
   "advancements.mazecraft.conquer_colossal.title": "Le cauchemar du Minotaure",
-  "advancements.mazecraft.conquer_colossal.description": "Vaincre un labyrinthe colossal"
+  "advancements.mazecraft.conquer_colossal.description": "Vaincre un labyrinthe colossal",
+  "mazecraft.gate.opened": "Un mécanisme cliquette au loin... une herse s'est ouverte.",
+  "mazecraft.gate.opened_last": "La dernière herse s'ouvre : le cœur du labyrinthe vous attend !",
+  "mazecraft.protection.forbidden_item": "Cet objet est inutilisable dans ou près du labyrinthe tant que son trésor n'est pas récupéré.",
+  "mazecraft.protection.no_pearl": "Le labyrinthe engloutit votre perle de l'Ender...",
+  "advancements.mazecraft.pull_lever.title": "Tire la chevillette",
+  "advancements.mazecraft.pull_lever.description": "Actionner un levier de labyrinthe pour ouvrir une herse"
 }

@@ -48,7 +48,7 @@ src/main/
 │   ├── config/MazeCraftConfig.java  (config/mazecraft.json)
 │   ├── commands/                    (MazeCommand, DebugCommand)
 │   ├── protection/                  (MazeProtection, MazeState — anti-cheat until the chest is opened)
-│   ├── mixin/                       (BlockItemMixin — no block placement in unconquered mazes)
+│   ├── mixin/                       (BlockItemMixin, EnderPearlEntityMixin, ExplosionMixin — anti-cheat)
 │   ├── structure/                   (MazeStructure, MazePiece, MazeLayout, MazeSize, MazeStyle, ModStructures)
 │   └── client/                      (MazeCraftClient, ModMenuIntegration, MazeCraftConfigScreen)
 └── resources/
@@ -60,7 +60,7 @@ src/main/
         ├── worldgen/structure_set/  (mazes.json — spacing 40 / separation 16 chunks)
         ├── tags/worldgen/biome/has_structure/  (biomes per style)
         ├── tags/worldgen/structure/ (mazes.json — every maze structure)
-        ├── advancement/             (root, enter_hedge, conquer_maze, conquer_colossal)
+        ├── advancement/             (root, enter_hedge, pull_lever, conquer_maze, conquer_colossal)
         └── loot_table/chests/       (maze_small/medium/large/colossal.json)
 ```
 
@@ -89,7 +89,8 @@ src/main/
 | `/maze debug info` | Print runtime debug info |
 | `/maze debug place <size> [style]` | Build a maze centered on you (sizes: small, medium, large, colossal). Not a real structure: no protection, no advancements |
 | `/maze debug where` | Info about the natural maze you're in (size, conquered or not, chest, entrance) |
-| `/maze debug unlock` / `relock` | Mark the natural maze you're in as conquered / not conquered |
+| `/maze debug levers` | Position of every lever and state of every gate of the maze you're in |
+| `/maze debug unlock` / `relock` | Mark the natural maze you're in as conquered / not conquered (relock also marks gates closed, but doesn't rebuild them) |
 
 ## Testing world generation
 

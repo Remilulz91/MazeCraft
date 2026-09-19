@@ -23,5 +23,11 @@
   "advancements.mazecraft.conquer_maze.title": "Maze Runner",
   "advancements.mazecraft.conquer_maze.description": "Reach the center of a maze and open its chest",
   "advancements.mazecraft.conquer_colossal.title": "Minotaur's Nightmare",
-  "advancements.mazecraft.conquer_colossal.description": "Conquer a colossal maze"
+  "advancements.mazecraft.conquer_colossal.description": "Conquer a colossal maze",
+  "mazecraft.gate.opened": "A mechanism clanks in the distance... a gate has opened.",
+  "mazecraft.gate.opened_last": "The last gate opens: the heart of the maze awaits!",
+  "mazecraft.protection.forbidden_item": "This item can't be used in or near the maze until its treasure is claimed.",
+  "mazecraft.protection.no_pearl": "The maze swallows your ender pearl...",
+  "advancements.mazecraft.pull_lever.title": "Pull the Bobbin",
+  "advancements.mazecraft.pull_lever.description": "Pull a maze lever to open a gate"
 }

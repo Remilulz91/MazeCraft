@@ -1,5 +1,7 @@
 package fr.mazecraft.protection;
 
+import it.unimi.dsi.fastutil.longs.Long2IntMap;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongSet;
 import net.minecraft.datafixer.DataFixTypes;
@@ -9,7 +11,8 @@ import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.PersistentState;
 
 /**
- * Per-dimension saved data: which mazes have been conquered (central chest opened).
+ * Per-dimension saved data: which mazes have been conquered (central chest opened) and
+ * which gates of each maze have been opened (bitmask, bit i = gate i).
  * Saved in {@code <world>/<dimension>/data/mazecraft_mazes.dat}.
  * A maze is identified by its structure start chunk.
  */
@@ -18,6 +21,7 @@ public class MazeState extends PersistentState {
     private static final String STATE_KEY = "mazecraft_mazes";
 
     private final LongSet solved = new LongOpenHashSet();
+    private final Long2IntOpenHashMap openedGates = new Long2IntOpenHashMap();
 
     private static final PersistentState.Type<MazeState> TYPE = new PersistentState.Type<>(
             MazeState::new,
@@ -40,6 +44,24 @@ public class MazeState extends PersistentState {
         return added;
     }
 
+    public boolean isGateOpen(long mazeKey, int gate) {
+        return (openedGates.get(mazeKey) & (1 << gate)) != 0;
+    }
+
+    /** @return true if the gate was closed before */
+    public boolean openGate(long mazeKey, int gate) {
+        int mask = openedGates.get(mazeKey);
+        if ((mask & (1 << gate)) != 0) return false;
+        openedGates.put(mazeKey, mask | (1 << gate));
+        markDirty();
+        return true;
+    }
+
+    /** DEBUG: mark every gate of a maze as closed again (blocks are not rebuilt). */
+    public void resetGates(long mazeKey) {
+        if (openedGates.remove(mazeKey) != 0) markDirty();
+    }
+
     /** DEBUG: forget that a maze was solved. */
     public boolean reset(long mazeKey) {
         boolean removed = solved.remove(mazeKey);
@@ -50,6 +72,11 @@ public class MazeState extends PersistentState {
     @Override
     public NbtCompound writeNbt(NbtCompound nbt, RegistryWrapper.WrapperLookup registryLookup) {
         nbt.putLongArray("Solved", solved.toLongArray());
+        NbtCompound gates = new NbtCompound();
+        for (Long2IntMap.Entry e : openedGates.long2IntEntrySet()) {
+            gates.putInt(Long.toString(e.getLongKey()), e.getIntValue());
+        }
+        nbt.put("Gates", gates);
         return nbt;
     }
 
@@ -57,6 +84,12 @@ public class MazeState extends PersistentState {
         MazeState state = new MazeState();
         for (long key : nbt.getLongArray("Solved")) {
             state.solved.add(key);
+        }
+        NbtCompound gates = nbt.getCompound("Gates");
+        for (String k : gates.getKeys()) {
+            try {
+                state.openedGates.put(Long.parseLong(k), gates.getInt(k));
+            } catch (NumberFormatException ignored) { }
         }
         return state;
     }

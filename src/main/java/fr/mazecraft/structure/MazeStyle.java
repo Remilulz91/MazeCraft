@@ -18,6 +18,7 @@ import java.util.Locale;
  *   <li>{@code plaza}     — floor of the central room</li>
  *   <li>{@code light}     — placed on top of some pillars</li>
  *   <li>{@code foundation}— fills the gaps under the maze on uneven ground</li>
+ *   <li>{@code gate}      — bars closing a gate until its lever is pulled (fence / bars: connected on generation)</li>
  * </ul>
  */
 public enum MazeStyle {
@@ -28,7 +29,8 @@ public enum MazeStyle {
             Blocks.DIRT_PATH.getDefaultState(),
             Blocks.STONE_BRICKS.getDefaultState(),
             Blocks.LANTERN.getDefaultState().with(LanternBlock.HANGING, false),
-            Blocks.DIRT.getDefaultState()
+            Blocks.DIRT.getDefaultState(),
+            Blocks.DARK_OAK_FENCE.getDefaultState()
     );
 
     public final BlockState wall;
@@ -38,9 +40,10 @@ public enum MazeStyle {
     public final BlockState plaza;
     public final BlockState light;
     public final BlockState foundation;
+    public final BlockState gate;
 
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
-              BlockState plaza, BlockState light, BlockState foundation) {
+              BlockState plaza, BlockState light, BlockState foundation, BlockState gate) {
         this.wall = wall;
         this.pillar = pillar;
         this.wallBase = wallBase;
@@ -48,6 +51,7 @@ public enum MazeStyle {
         this.plaza = plaza;
         this.light = light;
         this.foundation = foundation;
+        this.gate = gate;
     }
 
     public String id() {

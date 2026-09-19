@@ -29,7 +29,8 @@ import net.minecraft.util.math.random.Random;
  *                                        it is not a real structure)
  *   /maze debug where                  - info about the natural maze you are standing in
  *   /maze debug unlock                 - mark that maze as conquered (protections off)
- *   /maze debug relock                 - mark it as not conquered again
+ *   /maze debug relock                 - mark it as not conquered again (gates are not rebuilt)
+ *   /maze debug levers                 - position of every lever + state of every gate
  */
 public class DebugCommand {
 
@@ -54,6 +55,8 @@ public class DebugCommand {
                         .executes(ctx -> onMazeState(ctx, true)))
                 .then(CommandManager.literal("relock")
                         .executes(ctx -> onMazeState(ctx, false)))
+                .then(CommandManager.literal("levers")
+                        .executes(DebugCommand::onLevers))
                 .then(CommandManager.literal("place")
                         .then(CommandManager.argument("size", StringArgumentType.word())
                                 .suggests(SIZE_SUGGESTIONS)
@@ -124,7 +127,12 @@ public class DebugCommand {
         }
         MazeState state = MazeState.get(world);
         if (solve != null) {
-            if (solve) state.markSolved(hit.key()); else state.reset(hit.key());
+            if (solve) {
+                state.markSolved(hit.key());
+            } else {
+                state.reset(hit.key());
+                state.resetGates(hit.key());
+            }
         }
         MazePiece maze = hit.piece();
         BlockPos chest = maze.chestPos();
@@ -134,6 +142,28 @@ public class DebugCommand {
                 + " maze — " + (solved ? "CONQUERED" : "locked")
                 + " — chest " + chest.toShortString() + " — entrance " + entrance.toShortString())
                 .formatted(Formatting.LIGHT_PURPLE), false);
+        return 1;
+    }
+
+    private static int onLevers(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        ServerWorld world = src.getWorld();
+        MazeFinder.MazeHit hit = MazeFinder.find(world, BlockPos.ofFloored(src.getPosition()), 64);
+        if (hit == null) {
+            src.sendError(Text.literal("[DEBUG] No natural maze here."));
+            return 0;
+        }
+        MazeState state = MazeState.get(world);
+        MazePiece maze = hit.piece();
+        for (int i = 0; i < maze.gateCount(); i++) {
+            final int k = i;
+            boolean open = state.isGateOpen(hit.key(), k);
+            BlockPos gate = maze.gateBlocks(k).get(0);
+            src.sendFeedback(() -> Text.literal("[DEBUG] Gate " + k + (k == maze.gateCount() - 1 ? " (plaza)" : "")
+                    + ": " + (open ? "OPEN" : "closed") + " at " + gate.toShortString()
+                    + " — lever at " + maze.leverPos(k).toShortString())
+                    .formatted(open ? Formatting.GREEN : Formatting.LIGHT_PURPLE), false);
+        }
         return 1;
     }
 }

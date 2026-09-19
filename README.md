@@ -1,6 +1,6 @@
 # MazeCraft
 
-> 🚧 **Work in progress** — early alpha. Currently: hedge mazes (4 sizes), treasure chest at the center, anti-cheat protection and advancements.
+> 🚧 **Work in progress** — early alpha. Currently: hedge mazes (4 sizes), gates & levers, treasure chest at the center, anti-cheat protection and advancements.
 
 A Minecraft 1.21.1 (Fabric) mod that generates **procedural mazes** across the
 Overworld, the Nether and the End. Each maze takes the architectural style of the
@@ -12,7 +12,7 @@ blocking your path, and claim the treasure waiting at the heart of the maze.
 - **Natural world generation** — mazes spawn like vanilla structures (villages, temples…), in new worlds and in not-yet-generated chunks of existing worlds. `/locate structure` works.
 - **Random sizes** — Small, Medium, Large and a very rare Colossal maze. Bigger maze, better loot.
 - **Biome styles** — hedge mazes in plains, sandstone in deserts, mossy ruins in jungles, nether bricks, crimson / warped, basalt, soul sand valley, end stone & purpur in the End…
-- **Levers & gates** — the maze is split into rings; each ring's gate is opened by a lever hidden somewhere in the previous ring.
+- **Levers & gates** — gates block the path to the center (2 to 5 depending on size); each one is opened by a lever hidden in a dead end of the zone before it.
 - **Anti-cheat** — walls can't be broken, blocks can't be placed and ender pearls don't work until the central chest has been opened (configurable).
 - **Treasure** — hand-made loot tables per size and dimension, plus MazeCraft-exclusive items.
 - **Enemies** — biome-themed guardians, ambushes triggered by levers and, later, a Minotaur boss.

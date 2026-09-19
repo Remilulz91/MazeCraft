@@ -38,6 +38,15 @@ public final class MazeFinder {
      *                   (used to catch players walking on / flying over the walls)
      */
     public static MazeHit find(ServerWorld world, BlockPos pos, int extraAbove) {
+        return find(world, pos, extraAbove, false);
+    }
+
+    /** Like {@link #find(ServerWorld, BlockPos, int)} but only checks X/Z (any height). */
+    public static MazeHit findInColumn(ServerWorld world, BlockPos pos) {
+        return find(world, pos, 0, true);
+    }
+
+    private static MazeHit find(ServerWorld world, BlockPos pos, int extraAbove, boolean anyY) {
         StructureAccessor accessor = world.getStructureAccessor();
         Map<Structure, LongSet> references = accessor.getStructureReferences(pos);
         for (Map.Entry<Structure, LongSet> entry : references.entrySet()) {
@@ -53,7 +62,7 @@ public final class MazeFinder {
                 if (start == null || !start.hasChildren()) continue;
 
                 for (StructurePiece piece : start.getChildren()) {
-                    if (piece instanceof MazePiece maze && contains(maze.getBoundingBox(), pos, extraAbove)) {
+                    if (piece instanceof MazePiece maze && contains(maze.getBoundingBox(), pos, extraAbove, anyY)) {
                         return new MazeHit(start, maze);
                     }
                 }
@@ -62,9 +71,9 @@ public final class MazeFinder {
         return null;
     }
 
-    private static boolean contains(BlockBox box, BlockPos pos, int extraAbove) {
+    private static boolean contains(BlockBox box, BlockPos pos, int extraAbove, boolean anyY) {
         return pos.getX() >= box.getMinX() && pos.getX() <= box.getMaxX()
                 && pos.getZ() >= box.getMinZ() && pos.getZ() <= box.getMaxZ()
-                && pos.getY() >= box.getMinY() && pos.getY() <= box.getMaxY() + extraAbove;
+                && (anyY || (pos.getY() >= box.getMinY() && pos.getY() <= box.getMaxY() + extraAbove));
     }
 }

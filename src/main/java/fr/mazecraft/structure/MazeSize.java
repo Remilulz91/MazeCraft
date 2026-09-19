@@ -13,15 +13,22 @@ import java.util.Locale;
  * Cell counts are odd so the maze always has a true center cell.
  */
 public enum MazeSize {
-    SMALL(15),     //  61 ×  61 blocks
-    MEDIUM(25),    // 101 × 101 blocks
-    LARGE(37),     // 149 × 149 blocks
-    COLOSSAL(55);  // 221 × 221 blocks — max: must stay within the 8-chunk structure reach
+    SMALL(15, 2),     //  61 ×  61 blocks, 2 gates
+    MEDIUM(25, 3),    // 101 × 101 blocks, 3 gates
+    LARGE(37, 4),     // 149 × 149 blocks, 4 gates
+    COLOSSAL(55, 5);  // 221 × 221 blocks, 5 gates — max: must stay within the 8-chunk structure reach
 
     private final int cells;
+    private final int gates;
 
-    MazeSize(int cells) {
+    MazeSize(int cells, int gates) {
         this.cells = cells;
+        this.gates = gates;
+    }
+
+    /** Number of gates (and levers) on the way to the center; the last gate is the plaza door. */
+    public int gates() {
+        return gates;
     }
 
     public int cells() {

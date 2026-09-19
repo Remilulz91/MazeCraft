@@ -3,8 +3,11 @@
   "minVersion": "0.8",
   "package": "fr.mazecraft.mixin",
   "compatibilityLevel": "JAVA_21",
+  "refmap": "mazecraft-refmap.json",
   "mixins": [
-    "BlockItemMixin"
+    "BlockItemMixin",
+    "EnderPearlEntityMixin",
+    "ExplosionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

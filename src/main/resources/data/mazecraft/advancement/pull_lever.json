@@ -1,0 +1,23 @@
+{
+  "parent": "mazecraft:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:lever"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.pull_lever.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.pull_lever.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "pulled": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}
