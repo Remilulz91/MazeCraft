@@ -25,12 +25,23 @@ public class MazeCraftConfig {
 
     private static MazeCraftConfig INSTANCE = new MazeCraftConfig();
 
-    // === Maze settings ===
-    // (added step by step as features land: sizes, protection, loot...)
+    // === Maze generation ===
+    // Relative weights of each maze size when a maze is generated in the world.
+    // Example: 45/35/15/5 → 45% small, 35% medium, 15% large, 5% colossal.
+    // Only affects mazes generated AFTER the change (existing mazes keep their size).
 
-    // === DEBUG (disabled by default in public builds, enabled in debug builds) ===
+    public int weightSmall = 45;
+    public int weightMedium = 35;
+    public int weightLarge = 15;
+    public int weightColossal = 5;
 
-    public boolean enableDebugCommands = MazeCraft.isDebugBuild();
+    // === Protection (until the central chest is opened) ===
+
+    /** Walls can't be broken and blocks can't be placed inside an unconquered maze. */
+    public boolean protectUntilSolved = true;
+
+    /** Players standing on / flying over the walls of an unconquered maze are sent back to the entrance. */
+    public boolean preventWallWalking = true;
 
     // === Methods ===
 
@@ -46,6 +57,7 @@ public class MazeCraftConfig {
                 if (loaded != null) {
                     INSTANCE = loaded;
                 }
+                save(); // rewrite so options added in newer versions appear in the file
                 MazeCraft.LOGGER.info("[Config] Configuration loaded from {}", CONFIG_PATH);
             } else {
                 save();
@@ -54,13 +66,6 @@ public class MazeCraftConfig {
         } catch (Exception e) {
             // Catches IOException and malformed JSON: keep defaults instead of crashing
             MazeCraft.LOGGER.error("[Config] Loading error, using defaults: {}", e.getMessage());
-        }
-
-        // SECURITY: PUBLIC builds force debug flags to false regardless of config file.
-        if (!MazeCraft.isDebugBuild() && INSTANCE.enableDebugCommands) {
-            INSTANCE.enableDebugCommands = false;
-            MazeCraft.LOGGER.warn("[Config] ⚠ Debug flags found in config file but this is a PUBLIC build —");
-            MazeCraft.LOGGER.warn("[Config] ⚠ they are IGNORED. To use debug features, install the DEBUG build.");
         }
     }
 

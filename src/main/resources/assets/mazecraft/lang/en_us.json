@@ -1,9 +1,27 @@
 {
   "mazecraft.command.reloaded": "MazeCraft configuration reloaded.",
-
   "config.mazecraft.title": "MazeCraft Configuration",
-  "config.mazecraft.category.debug": "Debug",
-  "config.mazecraft.enableDebugCommands": "Enable debug commands",
-  "config.mazecraft.enableDebugCommands.tooltip": "Only available in the DEBUG build. Ignored in the public build.",
-  "config.mazecraft.publicBuildNotice": "Debug options are only available in the DEBUG build."
+  "config.mazecraft.category.generation": "Generation",
+  "config.mazecraft.weights.description": "Relative chance of each maze size. Only affects mazes generated after the change.",
+  "config.mazecraft.weightSmall": "Weight: Small (61×61)",
+  "config.mazecraft.weightMedium": "Weight: Medium (101×101)",
+  "config.mazecraft.weightLarge": "Weight: Large (149×149)",
+  "config.mazecraft.weightColossal": "Weight: Colossal (221×221)",
+  "config.mazecraft.category.protection": "Protection",
+  "config.mazecraft.protectUntilSolved": "Protect unconquered mazes",
+  "config.mazecraft.protectUntilSolved.tooltip": "Until its central chest is opened, blocks can't be broken or placed inside a maze (survival/adventure).",
+  "config.mazecraft.preventWallWalking": "No walking on the walls",
+  "config.mazecraft.preventWallWalking.tooltip": "Players standing on or flying over the walls of an unconquered maze are sent back to its entrance.",
+  "mazecraft.protection.cant_break": "The maze resists... reach its center first!",
+  "mazecraft.protection.cant_place": "You can't build inside the maze until its treasure is claimed.",
+  "mazecraft.protection.no_climbing": "No shortcuts! Back to the entrance.",
+  "mazecraft.maze.conquered": "Maze conquered! Its protections are lifted.",
+  "advancements.mazecraft.root.title": "MazeCraft",
+  "advancements.mazecraft.root.description": "Step into a maze",
+  "advancements.mazecraft.enter_hedge.title": "Hedge Your Bets",
+  "advancements.mazecraft.enter_hedge.description": "Enter a hedge maze",
+  "advancements.mazecraft.conquer_maze.title": "Maze Runner",
+  "advancements.mazecraft.conquer_maze.description": "Reach the center of a maze and open its chest",
+  "advancements.mazecraft.conquer_colossal.title": "Minotaur's Nightmare",
+  "advancements.mazecraft.conquer_colossal.description": "Conquer a colossal maze"
 }

@@ -2,6 +2,8 @@ package fr.mazecraft;
 
 import fr.mazecraft.commands.MazeCommand;
 import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.protection.MazeProtection;
+import fr.mazecraft.structure.ModStructures;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.minecraft.util.Identifier;
@@ -60,12 +62,17 @@ public class MazeCraft implements ModInitializer {
         MazeCraftConfig.load();
         LOGGER.info("[MazeCraft] Configuration loaded");
 
-        // 2. Register commands (/maze version, /maze reload, /maze debug ...)
+        // 2. Register the maze structure type + piece type (before datapacks load)
+        ModStructures.register();
+
+        // 3. Register commands (/maze version, /maze reload, /maze debug ...)
         CommandRegistrationCallback.EVENT.register(MazeCommand::register);
         LOGGER.info("[MazeCraft] Commands registered");
 
-        // Next steps (v0.1): register the maze structure type, its pieces,
-        // the lever / gate blocks and the anti-cheat protection handlers here.
+        // 4. Anti-cheat protection + "maze conquered" detection (central chest)
+        MazeProtection.register();
+
+        // Next step: lever / gate blocks.
 
         LOGGER.info("[MazeCraft] Mod loaded successfully!");
     }

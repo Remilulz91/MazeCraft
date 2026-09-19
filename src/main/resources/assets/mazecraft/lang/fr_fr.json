@@ -1,9 +1,27 @@
 {
   "mazecraft.command.reloaded": "Configuration de MazeCraft rechargée.",
-
   "config.mazecraft.title": "Configuration de MazeCraft",
-  "config.mazecraft.category.debug": "Débogage",
-  "config.mazecraft.enableDebugCommands": "Activer les commandes de débogage",
-  "config.mazecraft.enableDebugCommands.tooltip": "Disponible uniquement dans le build DEBUG. Ignoré dans le build public.",
-  "config.mazecraft.publicBuildNotice": "Les options de débogage ne sont disponibles que dans le build DEBUG."
+  "config.mazecraft.category.generation": "Génération",
+  "config.mazecraft.weights.description": "Chance relative de chaque taille de labyrinthe. S'applique uniquement aux labyrinthes générés après la modification.",
+  "config.mazecraft.weightSmall": "Poids : Petit (61×61)",
+  "config.mazecraft.weightMedium": "Poids : Moyen (101×101)",
+  "config.mazecraft.weightLarge": "Poids : Grand (149×149)",
+  "config.mazecraft.weightColossal": "Poids : Colossal (221×221)",
+  "config.mazecraft.category.protection": "Protection",
+  "config.mazecraft.protectUntilSolved": "Protéger les labyrinthes non vaincus",
+  "config.mazecraft.protectUntilSolved.tooltip": "Tant que le coffre central n'est pas ouvert, impossible de casser ou poser des blocs dans le labyrinthe (survie/aventure).",
+  "config.mazecraft.preventWallWalking": "Interdire de marcher sur les murs",
+  "config.mazecraft.preventWallWalking.tooltip": "Les joueurs debout sur les murs ou qui survolent un labyrinthe non vaincu sont renvoyés à son entrée.",
+  "mazecraft.protection.cant_break": "Le labyrinthe résiste... atteignez d'abord son centre !",
+  "mazecraft.protection.cant_place": "Impossible de construire dans le labyrinthe tant que son trésor n'est pas récupéré.",
+  "mazecraft.protection.no_climbing": "Pas de raccourci ! Retour à l'entrée.",
+  "mazecraft.maze.conquered": "Labyrinthe vaincu ! Ses protections sont levées.",
+  "advancements.mazecraft.root.title": "MazeCraft",
+  "advancements.mazecraft.root.description": "Entrer dans un labyrinthe",
+  "advancements.mazecraft.enter_hedge.title": "Haie ou jamais",
+  "advancements.mazecraft.enter_hedge.description": "Entrer dans un labyrinthe de haies",
+  "advancements.mazecraft.conquer_maze.title": "Le Labyrinthe",
+  "advancements.mazecraft.conquer_maze.description": "Atteindre le centre d'un labyrinthe et ouvrir son coffre",
+  "advancements.mazecraft.conquer_colossal.title": "Le cauchemar du Minotaure",
+  "advancements.mazecraft.conquer_colossal.description": "Vaincre un labyrinthe colossal"
 }

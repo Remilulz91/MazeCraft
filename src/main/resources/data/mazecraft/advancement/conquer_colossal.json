@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_maze",
+  "display": {
+    "icon": {
+      "id": "minecraft:netherite_ingot"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_colossal.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_colossal.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 500
+  }
+}

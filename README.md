@@ -1,6 +1,6 @@
 # MazeCraft
 
-> 🚧 **Work in progress** — early development, nothing is generated in the world yet.
+> 🚧 **Work in progress** — early alpha. Currently: hedge mazes (4 sizes), treasure chest at the center, anti-cheat protection and advancements.
 
 A Minecraft 1.21.1 (Fabric) mod that generates **procedural mazes** across the
 Overworld, the Nether and the End. Each maze takes the architectural style of the
@@ -36,6 +36,7 @@ blocking your path, and claim the treasure waiting at the heart of the maze.
 |---|---|---|
 | `/maze version` | no | Show mod version + build type |
 | `/maze reload` | yes | Reload `mazecraft.json` |
+| `/locate structure mazecraft:maze_hedge` | yes | Find the nearest hedge maze (vanilla command) |
 
 ## Building from source
 

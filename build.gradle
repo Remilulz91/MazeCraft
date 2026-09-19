@@ -8,8 +8,11 @@ group = project.maven_group
 
 // Build type: 'public' (default, debug commands OFF) or 'debug' (debug commands ON)
 // Usage: ./gradlew build                   → public build
+//        ./gradlew runClient               → debug (dev runs default to debug)
 //        ./gradlew build -PbuildType=debug → debug build (separate JAR with -debug version suffix)
-def buildType = project.findProperty('buildType') ?: 'public'
+// Dev runs (runClient / runServer) default to 'debug' so /maze debug is available in-game.
+def isDevRun = gradle.startParameter.taskNames.any { it.toLowerCase().contains('run') }
+def buildType = project.findProperty('buildType') ?: (isDevRun ? 'debug' : 'public')
 
 // Adding "-debug" to the version forces Gradle/Loom to produce a different filename:
 //   - public: mazecraft-0.1.0-alpha.1.jar

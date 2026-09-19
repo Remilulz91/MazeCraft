@@ -26,6 +26,9 @@
       "fr.mazecraft.client.config.ModMenuIntegration"
     ]
   },
+  "mixins": [
+    "mazecraft.mixins.json"
+  ],
   "depends": {
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",

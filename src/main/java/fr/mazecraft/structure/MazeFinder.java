@@ -1,0 +1,70 @@
+package fr.mazecraft.structure;
+
+import it.unimi.dsi.fastutil.longs.LongIterator;
+import it.unimi.dsi.fastutil.longs.LongSet;
+import net.minecraft.server.world.ServerWorld;
+import net.minecraft.structure.StructurePiece;
+import net.minecraft.structure.StructureStart;
+import net.minecraft.util.math.BlockBox;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.ChunkSectionPos;
+import net.minecraft.world.chunk.ChunkStatus;
+import net.minecraft.world.gen.StructureAccessor;
+import net.minecraft.world.gen.structure.Structure;
+
+import java.util.Map;
+
+/**
+ * Finds the naturally generated maze at a position (same lookup vanilla uses for
+ * "is this player inside a structure": structure references of the chunk → starts).
+ *
+ * Mazes built with {@code /maze debug place} are not real structures and are not found.
+ */
+public final class MazeFinder {
+
+    private MazeFinder() { }
+
+    /** A maze found at a position: its structure start (unique id = start chunk) and its piece. */
+    public record MazeHit(StructureStart start, MazePiece piece) {
+        /** Unique key of this maze in its dimension. */
+        public long key() {
+            return start.getPos().toLong();
+        }
+    }
+
+    /**
+     * @param extraAbove how many blocks above the piece bounding box still count as "in the maze"
+     *                   (used to catch players walking on / flying over the walls)
+     */
+    public static MazeHit find(ServerWorld world, BlockPos pos, int extraAbove) {
+        StructureAccessor accessor = world.getStructureAccessor();
+        Map<Structure, LongSet> references = accessor.getStructureReferences(pos);
+        for (Map.Entry<Structure, LongSet> entry : references.entrySet()) {
+            Structure structure = entry.getKey();
+            if (structure.getType() != ModStructures.MAZE) continue;
+
+            LongIterator it = entry.getValue().iterator();
+            while (it.hasNext()) {
+                ChunkPos startChunk = new ChunkPos(it.nextLong());
+                StructureStart start = accessor.getStructureStart(
+                        ChunkSectionPos.from(startChunk, 0), structure,
+                        world.getChunk(startChunk.x, startChunk.z, ChunkStatus.STRUCTURE_STARTS));
+                if (start == null || !start.hasChildren()) continue;
+
+                for (StructurePiece piece : start.getChildren()) {
+                    if (piece instanceof MazePiece maze && contains(maze.getBoundingBox(), pos, extraAbove)) {
+                        return new MazeHit(start, maze);
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    private static boolean contains(BlockBox box, BlockPos pos, int extraAbove) {
+        return pos.getX() >= box.getMinX() && pos.getX() <= box.getMaxX()
+                && pos.getZ() >= box.getMinZ() && pos.getZ() <= box.getMaxZ()
+                && pos.getY() >= box.getMinY() && pos.getY() <= box.getMaxY() + extraAbove;
+    }
+}

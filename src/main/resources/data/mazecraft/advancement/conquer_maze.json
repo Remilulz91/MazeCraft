@@ -1,0 +1,23 @@
+{
+  "parent": "mazecraft:root",
+  "display": {
+    "icon": {
+      "id": "minecraft:chest"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_maze.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_maze.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

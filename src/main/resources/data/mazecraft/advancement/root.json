@@ -1,0 +1,36 @@
+{
+  "display": {
+    "icon": {
+      "id": "minecraft:oak_leaves"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.root.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.root.description"
+    },
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false,
+    "background": "minecraft:textures/gui/advancements/backgrounds/adventure.png"
+  },
+  "criteria": {
+    "entered": {
+      "trigger": "minecraft:location",
+      "conditions": {
+        "player": [
+          {
+            "condition": "minecraft:entity_properties",
+            "entity": "this",
+            "predicate": {
+              "location": {
+                "structures": "#mazecraft:mazes"
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}
