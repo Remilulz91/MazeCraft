@@ -227,7 +227,9 @@ public class MazePiece extends StructurePiece {
                 // 2. Floor
                 BlockState floor;
                 if (!inside) {
-                    floor = style.floor; // margin ring: no dirt/grass → no trees next to the hedges
+                    // Ring: varied mix of non-soil blocks; the approach to the entrance stays plain,
+                    // like a path leading to the door
+                    floor = layout.isApproach(lx, lz) ? style.floor : style.ring.pick(x, z);
                 } else if (isWall) {
                     floor = style.wallBase;
                 } else {

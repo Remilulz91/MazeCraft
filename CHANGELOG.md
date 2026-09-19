@@ -11,6 +11,7 @@ New biome styles.
 - **Snow maze** (`mazecraft:maze_snow`, snowy plains & snowy taiga): packed ice walls, spruce posts, snow floor, spruce plaza, spruce gates.
 - **Jungle maze** (`mazecraft:maze_jungle`, jungle, sparse & bamboo jungle): mossy cobblestone walls, jungle log posts, mossy stone brick floor, bamboo gates, and a wider 8-block ring (jungle trees are huge).
 - Advancements *Lost in the Dunes*, *Frozen Paths* and *Overgrown Ruins* (enter each maze type).
+- **Varied ring floor**: the ring around each maze is now a weighted mix of blocks per style (hedge: dirt path, gravel, packed mud, mossy cobblestone; desert: smooth, regular, cut and chiseled sandstone; jungle: mossy / cracked / plain stone bricks, cobblestones, andesite; snow: snow, packed ice, spruce planks). The pattern is derived from block positions, so it's identical across chunks and reloads. The approach path in front of the entrance stays plain.
 - Maze structures now take a `"style"` field in their worldgen JSON; all styles share the `mazecraft:mazes` structure set (one maze per ~640 blocks, whichever style fits the biome).
 
 ## [0.1.0-alpha.1] — Unreleased

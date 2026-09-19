@@ -4,6 +4,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.LanternBlock;
 import net.minecraft.block.LeavesBlock;
+import net.minecraft.util.math.MathHelper;
 
 import java.util.Locale;
 
@@ -21,6 +22,8 @@ import java.util.Locale;
  *   <li>{@code foundation}— fills the gaps under the maze on uneven ground</li>
  *   <li>{@code gate}      — bars closing a gate until its lever is pulled (fence / bars: connected on generation)</li>
  *   <li>{@code margin}    — width of the flattened ring around the maze (wider where trees are big)</li>
+ *   <li>{@code ring}      — weighted mix of blocks for the ring floor. Same rule as {@code floor}: no soil
+ *                           (no dirt/grass/moss/sand/terracotta), otherwise trees, cacti or dead bushes grow there</li>
  * </ul>
  */
 public enum MazeStyle {
@@ -34,7 +37,11 @@ public enum MazeStyle {
             lantern(),
             Blocks.DIRT.getDefaultState(),
             Blocks.DARK_OAK_FENCE.getDefaultState(),
-            5
+            5,
+            Mix.of(Blocks.DIRT_PATH.getDefaultState(), 55,
+                    Blocks.GRAVEL.getDefaultState(), 20,
+                    Blocks.PACKED_MUD.getDefaultState(), 15,
+                    Blocks.MOSSY_COBBLESTONE.getDefaultState(), 10)
     ),
     /** Deserts: carved sandstone, iron bars, terracotta plaza. */
     DESERT(
@@ -46,7 +53,11 @@ public enum MazeStyle {
             lantern(),
             Blocks.SANDSTONE.getDefaultState(),
             Blocks.IRON_BARS.getDefaultState(),
-            5
+            5,
+            Mix.of(Blocks.SMOOTH_SANDSTONE.getDefaultState(), 55,
+                    Blocks.SANDSTONE.getDefaultState(), 25,
+                    Blocks.CUT_SANDSTONE.getDefaultState(), 15,
+                    Blocks.CHISELED_SANDSTONE.getDefaultState(), 5)
     ),
     /** Snowy plains / snowy taiga: packed ice walls, spruce posts, snow floor. */
     SNOW(
@@ -58,7 +69,11 @@ public enum MazeStyle {
             lantern(),
             Blocks.SNOW_BLOCK.getDefaultState(),
             Blocks.SPRUCE_FENCE.getDefaultState(),
-            5
+            5,
+            // Mostly hidden under the natural snow layer, but visible where it melts / gets dug
+            Mix.of(Blocks.SNOW_BLOCK.getDefaultState(), 70,
+                    Blocks.PACKED_ICE.getDefaultState(), 20,
+                    Blocks.SPRUCE_PLANKS.getDefaultState(), 10)
     ),
     /** Jungles: mossy ruins, jungle posts, bamboo gates. Wider ring: jungle trees are huge. */
     JUNGLE(
@@ -70,7 +85,13 @@ public enum MazeStyle {
             lantern(),
             Blocks.DIRT.getDefaultState(),
             Blocks.BAMBOO_FENCE.getDefaultState(),
-            8
+            8,
+            Mix.of(Blocks.MOSSY_STONE_BRICKS.getDefaultState(), 35,
+                    Blocks.CRACKED_STONE_BRICKS.getDefaultState(), 20,
+                    Blocks.STONE_BRICKS.getDefaultState(), 15,
+                    Blocks.MOSSY_COBBLESTONE.getDefaultState(), 15,
+                    Blocks.COBBLESTONE.getDefaultState(), 10,
+                    Blocks.ANDESITE.getDefaultState(), 5)
     );
 
     public final BlockState wall;
@@ -82,9 +103,10 @@ public enum MazeStyle {
     public final BlockState foundation;
     public final BlockState gate;
     public final int margin;
+    public final Mix ring;
 
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
-              BlockState plaza, BlockState light, BlockState foundation, BlockState gate, int margin) {
+              BlockState plaza, BlockState light, BlockState foundation, BlockState gate, int margin, Mix ring) {
         this.wall = wall;
         this.pillar = pillar;
         this.wallBase = wallBase;
@@ -94,10 +116,50 @@ public enum MazeStyle {
         this.foundation = foundation;
         this.gate = gate;
         this.margin = margin;
+        this.ring = ring;
     }
 
     private static BlockState lantern() {
         return Blocks.LANTERN.getDefaultState().with(LanternBlock.HANGING, false);
+    }
+
+    /**
+     * Weighted block mix. The block at (x, z) is chosen from a hash of the position, so it is
+     * the same in every chunk and on every reload (no randomness to keep in sync).
+     */
+    public static final class Mix {
+        private final BlockState[] states;
+        private final int[] weights;
+        private final int total;
+
+        private Mix(BlockState[] states, int[] weights) {
+            this.states = states;
+            this.weights = weights;
+            int t = 0;
+            for (int w : weights) t += w;
+            this.total = t;
+        }
+
+        /** Pairs of (BlockState, weight). */
+        public static Mix of(Object... pairs) {
+            BlockState[] states = new BlockState[pairs.length / 2];
+            int[] weights = new int[pairs.length / 2];
+            for (int i = 0; i < states.length; i++) {
+                states[i] = (BlockState) pairs[2 * i];
+                weights[i] = (Integer) pairs[2 * i + 1];
+            }
+            return new Mix(states, weights);
+        }
+
+        public BlockState pick(int x, int z) {
+            long hash = MathHelper.hashCode(x, 0, z);
+            int r = (int) Math.floorMod(hash >>> 16, (long) total);
+            for (int i = 0; i < states.length; i++) {
+                r -= weights[i];
+                if (r < 0) return states[i];
+            }
+            return states[0];
+        }
     }
 
     /** Widest ring of all styles (used to budget the structure reach). */
