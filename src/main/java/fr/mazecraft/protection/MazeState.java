@@ -22,6 +22,16 @@ public class MazeState extends PersistentState {
 
     private final LongSet solved = new LongOpenHashSet();
     private final Long2IntOpenHashMap openedGates = new Long2IntOpenHashMap();
+    /** Chunks already repaired once after full generation (see MazeRepair). */
+    private final LongSet repairedChunks = new LongOpenHashSet();
+
+    public boolean isRepaired(long chunk) {
+        return repairedChunks.contains(chunk);
+    }
+
+    public void markRepaired(long chunk) {
+        if (repairedChunks.add(chunk)) markDirty();
+    }
 
     private static final PersistentState.Type<MazeState> TYPE = new PersistentState.Type<>(
             MazeState::new,
@@ -77,6 +87,7 @@ public class MazeState extends PersistentState {
             gates.putInt(Long.toString(e.getLongKey()), e.getIntValue());
         }
         nbt.put("Gates", gates);
+        nbt.putLongArray("Repaired", repairedChunks.toLongArray());
         return nbt;
     }
 
@@ -84,6 +95,9 @@ public class MazeState extends PersistentState {
         MazeState state = new MazeState();
         for (long key : nbt.getLongArray("Solved")) {
             state.solved.add(key);
+        }
+        for (long chunk : nbt.getLongArray("Repaired")) {
+            state.repairedChunks.add(chunk);
         }
         NbtCompound gates = nbt.getCompound("Gates");
         for (String k : gates.getKeys()) {

@@ -1,6 +1,6 @@
 # MazeCraft
 
-> 🚧 **Work in progress** — early alpha. Currently: 10 Overworld maze styles (hedge, desert, snow, jungle, badlands, dark forest, cherry, swamp, savanna, taiga) in 4 sizes, gates & levers, treasure chest at the center, anti-cheat protection and advancements.
+> 🚧 **Work in progress** — early alpha. Currently: 10 Overworld maze styles (hedge, desert, snow, jungle, badlands, dark forest, cherry, swamp, savanna, taiga) and 5 enclosed Nether styles (fortress, crimson, warped, soul, basalt) in 4 sizes, gates & levers, treasure chest at the center, anti-cheat protection and advancements.
 
 A Minecraft 1.21.1 (Fabric) mod that generates **procedural mazes** across the
 Overworld, the Nether and the End. Each maze takes the architectural style of the

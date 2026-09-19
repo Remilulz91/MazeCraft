@@ -47,5 +47,15 @@
   "advancements.mazecraft.enter_savanna.title": "Savanna Stroll",
   "advancements.mazecraft.enter_savanna.description": "Enter a savanna maze",
   "advancements.mazecraft.enter_taiga.title": "Needle in a Maze",
-  "advancements.mazecraft.enter_taiga.description": "Enter a taiga maze"
+  "advancements.mazecraft.enter_taiga.description": "Enter a taiga maze",
+  "advancements.mazecraft.enter_fortress.title": "Brick by Brick",
+  "advancements.mazecraft.enter_fortress.description": "Enter a nether fortress maze",
+  "advancements.mazecraft.enter_crimson.title": "Seeing Red",
+  "advancements.mazecraft.enter_crimson.description": "Enter a crimson maze",
+  "advancements.mazecraft.enter_warped.title": "Warped Perspective",
+  "advancements.mazecraft.enter_warped.description": "Enter a warped maze",
+  "advancements.mazecraft.enter_soul.title": "Lost Souls",
+  "advancements.mazecraft.enter_soul.description": "Enter a soul sand valley maze",
+  "advancements.mazecraft.enter_basalt.title": "Delta Force",
+  "advancements.mazecraft.enter_basalt.description": "Enter a basalt maze"
 }

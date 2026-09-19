@@ -1,0 +1,30 @@
+{
+  "structures": [
+    {
+      "structure": "mazecraft:maze_fortress",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_crimson",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_warped",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_soul",
+      "weight": 1
+    },
+    {
+      "structure": "mazecraft:maze_basalt",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 32,
+    "separation": 12,
+    "salt": 1350915092
+  }
+}

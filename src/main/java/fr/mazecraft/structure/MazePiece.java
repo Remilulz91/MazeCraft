@@ -27,6 +27,7 @@ import net.minecraft.world.gen.chunk.ChunkGenerator;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 /**
  * The whole maze as a single structure piece.
@@ -48,6 +49,8 @@ public class MazePiece extends StructurePiece {
     public static final int WALL_HEIGHT = 4;
     /** Blocks cleared above the floor (removes hills / overhangs inside the maze). */
     public static final int CLEAR_HEIGHT = 10;
+    /** Enclosed mazes (Nether): the roof sits right on top of the walls. */
+    public static final int ROOF_DY = WALL_HEIGHT + 1;
     /** Maximum depth filled with foundation under the floor on uneven ground. */
     public static final int FOUNDATION_DEPTH = 12;
     /** Height of the levers above the floor. */
@@ -100,7 +103,7 @@ public class MazePiece extends StructurePiece {
         // (see isProtected / MazeFinder), they just aren't part of the box.
         return new BlockBox(
                 minX, floorY + 1, minZ,
-                minX + side - 1, floorY + CLEAR_HEIGHT, minZ + side - 1);
+                minX + side - 1, floorY + (style.enclosed ? ROOF_DY : CLEAR_HEIGHT), minZ + side - 1);
     }
 
     @Override
@@ -185,14 +188,30 @@ public class MazePiece extends StructurePiece {
     }
 
     /** Loot table of the central chest for this maze size. */
-    public static RegistryKey<LootTable> lootTableFor(MazeSize size) {
-        return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/maze_" + size.id()));
+    public static RegistryKey<LootTable> lootTableFor(MazeStyle style, MazeSize size) {
+        return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/" + style.lootPrefix + "_" + size.id()));
     }
 
     @Override
     public void generate(StructureWorldAccess world, StructureAccessor structureAccessor,
                          ChunkGenerator chunkGenerator, Random random, BlockBox chunkBox,
                          ChunkPos chunkPos, BlockPos pivot) {
+        build(world, chunkBox, random, gate -> false, true, false);
+    }
+
+    /**
+     * Rebuilds the maze inside one loaded chunk, removing anything that neighbouring chunks'
+     * decorations put in it after it was generated (basalt columns, lava deltas, tree leaves...).
+     * Opened gates stay open, the chest is left untouched, snow layers are kept.
+     */
+    public void repair(StructureWorldAccess world, ChunkPos chunk, IntPredicate gateOpen) {
+        BlockBox chunkBox = new BlockBox(chunk.getStartX(), world.getBottomY(), chunk.getStartZ(),
+                chunk.getEndX(), world.getTopY() - 1, chunk.getEndZ());
+        build(world, chunkBox, Random.create(seed ^ chunk.toLong()), gateOpen, false, true);
+    }
+
+    private void build(StructureWorldAccess world, BlockBox chunkBox, Random random,
+                       IntPredicate gateOpen, boolean placeChest, boolean repairing) {
         MazeLayout layout = layout();
         BlockBox box = this.boundingBox;
 
@@ -204,6 +223,8 @@ public class MazePiece extends StructurePiece {
 
         BlockPos.Mutable pos = new BlockPos.Mutable();
         BlockState air = Blocks.AIR.getDefaultState();
+        // When repairing, the chest (and its loot) must not be touched
+        BlockPos keep = repairing ? chestPos() : null;
 
         for (int x = x0; x <= x1; x++) {
             for (int z = z0; z <= z1; z++) {
@@ -214,8 +235,12 @@ public class MazePiece extends StructurePiece {
                 boolean isPillar = inside && layout.isPillar(lx, lz);
                 boolean isPlaza = inside && layout.isPlaza(lx, lz);
 
-                // 1. Foundation: fill air / fluids / plants under the floor until solid ground
-                for (int y = floorY - 1; y >= floorY - FOUNDATION_DEPTH; y--) {
+                // 1. Foundation. Enclosed (Nether): a clean underside slab + fortress-like support
+                //    pillars down to the ground or into the lava. Overworld: fill gaps until solid ground.
+                if (style.enclosed) {
+                    buildUnderside(world, pos, x, z);
+                }
+                for (int y = floorY - 1; !style.enclosed && y >= floorY - FOUNDATION_DEPTH; y--) {
                     pos.set(x, y, z);
                     BlockState current = world.getBlockState(pos);
                     if (!current.isAir() && !current.isReplaceable() && current.getFluidState().isEmpty()) {
@@ -238,6 +263,10 @@ public class MazePiece extends StructurePiece {
                 world.setBlockState(pos.set(x, floorY, z), floor, Block.NOTIFY_LISTENERS);
 
                 // 3. Walls, pillars, and clearing above
+                if (style.enclosed) {
+                    buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
+                    continue;
+                }
                 for (int dy = 1; dy <= CLEAR_HEIGHT; dy++) {
                     pos.set(x, floorY + dy, z);
                     BlockState target;
@@ -248,7 +277,9 @@ public class MazePiece extends StructurePiece {
                     } else {
                         target = air;
                     }
-                    if (world.getBlockState(pos) != target) {
+                    if (pos.equals(keep)) continue;
+                    BlockState current = world.getBlockState(pos);
+                    if (current != target && !(repairing && current.isOf(Blocks.SNOW) && target.isAir())) {
                         world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
                     }
                 }
@@ -256,7 +287,9 @@ public class MazePiece extends StructurePiece {
         }
 
         // 4. Gates (closed) — bars connected along the opening so nobody squeezes through
-        for (MazeLayout.Gate gate : layout.gates()) {
+        for (int gateIndex = 0; gateIndex < layout.gates().size(); gateIndex++) {
+            MazeLayout.Gate gate = layout.gates().get(gateIndex);
+            if (gateOpen.test(gateIndex)) continue; // opened for good: leave the passage clear
             BlockState bars = style.gate;
             if (bars.contains(HorizontalConnectingBlock.NORTH)) {
                 bars = gate.alongX()
@@ -288,12 +321,81 @@ public class MazePiece extends StructurePiece {
 
         // 6. Central chest
         BlockPos chest = chestPos();
-        if (chunkBox.contains(chest)) {
+        if (placeChest && chunkBox.contains(chest)) {
             world.setBlockState(chest,
                     Blocks.CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
             BlockEntity be = world.getBlockEntity(chest);
             if (be instanceof ChestBlockEntity chestEntity) {
-                chestEntity.setLootTable(lootTableFor(size), random.nextLong());
+                chestEntity.setLootTable(lootTableFor(style, size), random.nextLong());
+            }
+        }
+    }
+
+    /** Spacing of the support pillars under enclosed mazes (2×2 pillars). */
+    private static final int SUPPORT_SPACING = 12;
+    /** Maximum pillar length (blocks below the underside slab). */
+    private static final int SUPPORT_MAX_DEPTH = 80;
+
+    /** True on a 2-wide band every SUPPORT_SPACING blocks, and along the far edge. */
+    private static boolean supportBand(int v, int side) {
+        return Math.floorMod(v, SUPPORT_SPACING) < 2 || v >= side - 2;
+    }
+
+    /**
+     * Enclosed mazes: underside slab (styled, replaces the old netherrack blob) and, on a grid,
+     * 2×2 support pillars going down through air and lava until they reach solid ground.
+     */
+    private void buildUnderside(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
+        BlockBox box = this.boundingBox;
+        pos.set(x, floorY - 1, z);
+        if (world.getBlockState(pos) != style.ceiling) {
+            world.setBlockState(pos, style.ceiling, Block.NOTIFY_LISTENERS);
+        }
+        int side = box.getMaxX() - box.getMinX() + 1;
+        if (!supportBand(x - box.getMinX(), side) || !supportBand(z - box.getMinZ(), side)) return;
+        int bottom = Math.max(world.getBottomY() + 1, floorY - 1 - SUPPORT_MAX_DEPTH);
+        for (int y = floorY - 2; y >= bottom; y--) {
+            pos.set(x, y, z);
+            BlockState current = world.getBlockState(pos);
+            boolean solid = !current.isAir() && !current.isReplaceable() && current.getFluidState().isEmpty();
+            if (solid) break;
+            world.setBlockState(pos, style.pillar, Block.NOTIFY_LISTENERS);
+        }
+    }
+
+    /**
+     * One column of an enclosed (Nether) maze: walls up to the roof, a sealed outer wall around
+     * the whole box (except the doorway in front of the entrance), and a roof with lights.
+     */
+    private void buildEnclosedColumn(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z, int lx, int lz,
+                                     boolean inside, boolean isWall, boolean isPillar, BlockState air, BlockPos keep) {
+        BlockBox box = this.boundingBox;
+        boolean perimeter = x == box.getMinX() || x == box.getMaxX() || z == box.getMinZ() || z == box.getMaxZ();
+        boolean doorway = perimeter && layout().isApproach(lx, lz);
+        // Light spots: centre of every other cell, inside the maze and in the ring
+        int mx = Math.floorMod(lx, MazeLayout.CELL * 2), mz = Math.floorMod(lz, MazeLayout.CELL * 2);
+        boolean lightSpot = mx == 2 && mz == 2 && !isWall;
+
+        for (int dy = 1; dy <= ROOF_DY; dy++) {
+            pos.set(x, floorY + dy, z);
+            BlockState target;
+            if (dy == ROOF_DY) {
+                // Cornice: the roof edge is outlined with the pillar block
+                target = perimeter ? style.pillar
+                        : lightSpot && style.hangingLight == null ? style.ceilingLight : style.ceiling;
+            } else if (perimeter && !doorway) {
+                // Plinth: bottom course of the outer wall in the pillar block
+                target = dy == 1 ? style.pillar : style.wallAt(dy);
+            } else if (isWall) {
+                target = isPillar ? style.pillar : style.wallAt(dy);
+            } else if (lightSpot && style.hangingLight != null && dy == WALL_HEIGHT) {
+                target = style.hangingLight;
+            } else {
+                target = air;
+            }
+            if (pos.equals(keep)) continue;
+            if (world.getBlockState(pos) != target) {
+                world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
             }
         }
     }

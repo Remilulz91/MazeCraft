@@ -203,6 +203,98 @@ public enum MazeStyle {
                     Blocks.MOSSY_COBBLESTONE.getDefaultState(), 15,
                     Blocks.COBBLESTONE.getDefaultState(), 15,
                     Blocks.PACKED_MUD.getDefaultState(), 10)
+    ),
+
+    // =====================================================================
+    // NETHER — enclosed mazes carved into the rock: sealed outer wall, roof with lights
+    // =====================================================================
+
+    /** Nether wastes: fortress-like nether bricks. */
+    FORTRESS(
+            Blocks.NETHER_BRICKS.getDefaultState(),
+            Blocks.RED_NETHER_BRICKS.getDefaultState(),
+            Blocks.NETHER_BRICKS.getDefaultState(),
+            Blocks.CRACKED_NETHER_BRICKS.getDefaultState(),
+            Blocks.CHISELED_NETHER_BRICKS.getDefaultState(),
+            Blocks.NETHERRACK.getDefaultState(),
+            Blocks.NETHER_BRICK_FENCE.getDefaultState(),
+            Mix.of(Blocks.CRACKED_NETHER_BRICKS.getDefaultState(), 40,
+                    Blocks.NETHER_BRICKS.getDefaultState(), 30,
+                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
+                    Blocks.RED_NETHER_BRICKS.getDefaultState(), 10),
+            Blocks.NETHER_BRICKS.getDefaultState(),
+            Blocks.GLOWSTONE.getDefaultState(),
+            null
+    ),
+    /** Crimson forest: nether wart walls, crimson wood, shroomlights. */
+    CRIMSON(
+            Blocks.NETHER_WART_BLOCK.getDefaultState(),
+            Blocks.CRIMSON_STEM.getDefaultState(),
+            Blocks.CRIMSON_PLANKS.getDefaultState(),
+            Blocks.CRIMSON_PLANKS.getDefaultState(),
+            Blocks.RED_NETHER_BRICKS.getDefaultState(),
+            Blocks.NETHERRACK.getDefaultState(),
+            Blocks.CRIMSON_FENCE.getDefaultState(),
+            Mix.of(Blocks.CRIMSON_PLANKS.getDefaultState(), 45,
+                    Blocks.CRIMSON_HYPHAE.getDefaultState(), 20,
+                    Blocks.RED_NETHER_BRICKS.getDefaultState(), 20,
+                    Blocks.NETHER_BRICKS.getDefaultState(), 15),
+            // Roof NOT netherrack / nether wart: weeping vines would hang from it into the corridors
+            Blocks.CRIMSON_PLANKS.getDefaultState(),
+            Blocks.SHROOMLIGHT.getDefaultState(),
+            null
+    ),
+    /** Warped forest: warped wart walls, warped wood, shroomlights. */
+    WARPED(
+            Blocks.WARPED_WART_BLOCK.getDefaultState(),
+            Blocks.WARPED_STEM.getDefaultState(),
+            Blocks.WARPED_PLANKS.getDefaultState(),
+            Blocks.WARPED_PLANKS.getDefaultState(),
+            Blocks.WARPED_HYPHAE.getDefaultState(),
+            Blocks.NETHERRACK.getDefaultState(),
+            Blocks.WARPED_FENCE.getDefaultState(),
+            Mix.of(Blocks.WARPED_PLANKS.getDefaultState(), 45,
+                    Blocks.WARPED_HYPHAE.getDefaultState(), 20,
+                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
+                    Blocks.NETHER_BRICKS.getDefaultState(), 15),
+            Blocks.WARPED_PLANKS.getDefaultState(),
+            Blocks.SHROOMLIGHT.getDefaultState(),
+            null
+    ),
+    /** Soul sand valley: bone walls, blackstone, soul soil floor, hanging soul lanterns. */
+    SOUL(
+            Blocks.BONE_BLOCK.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
+            Blocks.SOUL_SOIL.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
+            Blocks.SOUL_SOIL.getDefaultState(),
+            Blocks.IRON_BARS.getDefaultState(),
+            Mix.of(Blocks.SOUL_SOIL.getDefaultState(), 45,
+                    Blocks.POLISHED_BLACKSTONE.getDefaultState(), 25,
+                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
+                    Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 10),
+            // Roof NOT blackstone / basalt / netherrack: glowstone blobs would grow under it
+            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
+            Blocks.SOUL_LANTERN.getDefaultState().with(LanternBlock.HANGING, true)
+    ),
+    /** Basalt deltas: polished basalt walls, blackstone, gilded plaza. */
+    BASALT(
+            Blocks.POLISHED_BASALT.getDefaultState(),
+            Blocks.BLACKSTONE.getDefaultState(),
+            Blocks.BASALT.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
+            Blocks.GILDED_BLACKSTONE.getDefaultState(),
+            Blocks.BASALT.getDefaultState(),
+            Blocks.IRON_BARS.getDefaultState(),
+            Mix.of(Blocks.POLISHED_BLACKSTONE.getDefaultState(), 40,
+                    Blocks.POLISHED_BASALT.getDefaultState(), 20,
+                    Blocks.SMOOTH_BASALT.getDefaultState(), 20,
+                    Blocks.BLACKSTONE.getDefaultState(), 20),
+            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
+            Blocks.GLOWSTONE.getDefaultState(),
+            null
     );
 
     public final BlockState wall;
@@ -215,6 +307,17 @@ public enum MazeStyle {
     public final BlockState gate;
     public final int margin;
     public final Mix ring;
+    /** Enclosed maze (Nether): sealed outer wall + roof, no sky. */
+    public final boolean enclosed;
+    /** Roof block (enclosed mazes only). */
+    public final BlockState ceiling;
+    /** Light block set into the roof (enclosed mazes only). */
+    public final BlockState ceilingLight;
+    /** Optional lantern hanging under the roof instead of a light block in it (enclosed mazes only). */
+    public final BlockState hangingLight;
+    /** Loot table prefix: chests/<prefix>_<size>. */
+    public final String lootPrefix;
+
     /** Optional horizontal bands: wall block per height above the floor (1 = lowest). Null = plain {@link #wall}. */
     private final BlockState[] wallBands;
 
@@ -231,6 +334,11 @@ public enum MazeStyle {
         this.margin = margin;
         this.ring = ring;
         this.wallBands = null;
+        this.enclosed = false;
+        this.ceiling = null;
+        this.ceilingLight = null;
+        this.hangingLight = null;
+        this.lootPrefix = "maze";
     }
 
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
@@ -247,6 +355,33 @@ public enum MazeStyle {
         this.margin = margin;
         this.ring = ring;
         this.wallBands = wallBands;
+        this.enclosed = false;
+        this.ceiling = null;
+        this.ceilingLight = null;
+        this.hangingLight = null;
+        this.lootPrefix = "maze";
+    }
+
+    /** Enclosed (Nether) style. */
+    MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor, BlockState plaza,
+              BlockState foundation, BlockState gate, Mix ring,
+              BlockState ceiling, BlockState ceilingLight, BlockState hangingLight) {
+        this.wall = wall;
+        this.pillar = pillar;
+        this.wallBase = wallBase;
+        this.floor = floor;
+        this.plaza = plaza;
+        this.light = ceilingLight;
+        this.foundation = foundation;
+        this.gate = gate;
+        this.margin = 4;
+        this.ring = ring;
+        this.wallBands = null;
+        this.enclosed = true;
+        this.ceiling = ceiling;
+        this.ceilingLight = ceilingLight;
+        this.hangingLight = hangingLight;
+        this.lootPrefix = "nether_maze";
     }
 
     /** Wall block at {@code dy} blocks above the floor (1..WALL_HEIGHT). */

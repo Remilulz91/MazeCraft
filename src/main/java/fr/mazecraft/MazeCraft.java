@@ -3,6 +3,7 @@ package fr.mazecraft;
 import fr.mazecraft.commands.MazeCommand;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.protection.MazeProtection;
+import fr.mazecraft.protection.MazeRepair;
 import fr.mazecraft.structure.ModStructures;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
@@ -71,6 +72,9 @@ public class MazeCraft implements ModInitializer {
 
         // 4. Anti-cheat protection + "maze conquered" detection (central chest)
         MazeProtection.register();
+
+        // 5. One-time clean-up of maze chunks once their neighbours are decorated
+        MazeRepair.register();
 
         // Next step: lever / gate blocks.
 

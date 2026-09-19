@@ -13,6 +13,8 @@ import net.minecraft.world.chunk.ChunkStatus;
 import net.minecraft.world.gen.StructureAccessor;
 import net.minecraft.world.gen.structure.Structure;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -78,5 +80,31 @@ public final class MazeFinder {
         return pos.getX() >= box.getMinX() && pos.getX() <= box.getMaxX()
                 && pos.getZ() >= box.getMinZ() && pos.getZ() <= box.getMaxZ()
                 && (anyY || (pos.getY() >= box.getMinY() - BELOW && pos.getY() <= box.getMaxY() + extraAbove));
+    }
+
+    /** Every natural maze whose box overlaps this (loaded) chunk. */
+    public static List<MazeHit> findInChunk(ServerWorld world, ChunkPos chunkPos) {
+        List<MazeHit> hits = new ArrayList<>();
+        StructureAccessor accessor = world.getStructureAccessor();
+        Map<Structure, LongSet> references = world.getChunk(chunkPos.x, chunkPos.z).getStructureReferences();
+        for (Map.Entry<Structure, LongSet> entry : references.entrySet()) {
+            Structure structure = entry.getKey();
+            if (structure.getType() != ModStructures.MAZE) continue;
+            LongIterator it = entry.getValue().iterator();
+            while (it.hasNext()) {
+                ChunkPos startChunk = new ChunkPos(it.nextLong());
+                StructureStart start = accessor.getStructureStart(
+                        ChunkSectionPos.from(startChunk, 0), structure,
+                        world.getChunk(startChunk.x, startChunk.z, ChunkStatus.STRUCTURE_STARTS));
+                if (start == null || !start.hasChildren()) continue;
+                for (StructurePiece piece : start.getChildren()) {
+                    if (piece instanceof MazePiece maze && maze.getBoundingBox().intersectsXZ(
+                            chunkPos.getStartX(), chunkPos.getStartZ(), chunkPos.getEndX(), chunkPos.getEndZ())) {
+                        hits.add(new MazeHit(start, maze));
+                    }
+                }
+            }
+        }
+        return hits;
     }
 }

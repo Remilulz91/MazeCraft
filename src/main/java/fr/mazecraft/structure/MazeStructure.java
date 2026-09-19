@@ -35,6 +35,10 @@ public class MazeStructure extends Structure {
 
     private final MazeStyle style;
 
+    /** Floor height range of enclosed (Nether) mazes. Lava sea is at Y=31, bedrock roof from Y=123. */
+    private static final int NETHER_MIN_FLOOR = 40;
+    private static final int NETHER_MAX_FLOOR = 80;
+
     /** Rejects the spot if the terrain height varies more than this across the footprint. */
     private static final int MAX_HEIGHT_DIFFERENCE = 12;
 
@@ -55,6 +59,24 @@ public class MazeStructure extends Structure {
         long mazeSeed = context.random().nextLong();
         int centerX = chunkPos.getCenterX();
         int centerZ = chunkPos.getCenterZ();
+
+        if (style.enclosed) {
+            // Nether: buried in the rock like a fortress, at the height where the rock is the most
+            // solid (never hanging over the lava sea); smaller sizes are tried if nothing fits.
+            // No colossal mazes in the Nether: too big for its caverns
+            MazeSize netherSize = rolled == MazeSize.COLOSSAL ? MazeSize.LARGE : rolled;
+            for (MazeSize size = netherSize; size != null; size = size.smaller()) {
+                OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size);
+                if (floorY.isPresent()) {
+                    final MazeSize finalSize = size;
+                    final int y = floorY.getAsInt();
+                    final int entrance = mostOpenSide(context, centerX, centerZ, finalSize, y);
+                    return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
+                            collector.addPiece(new MazePiece(style, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
+                }
+            }
+            return Optional.empty();
+        }
 
         // Big mazes need a big flat area: if the rolled size doesn't fit, try the smaller ones.
         for (MazeSize size = rolled; size != null; size = size.smaller()) {
@@ -129,6 +151,80 @@ public class MazeStructure extends Structure {
             }
             if (score < bestScore) {
                 bestScore = score;
+                best = side;
+            }
+        }
+        return best;
+    }
+
+    /** Minimum share of solid rock around an enclosed maze (samples below, inside and above it). */
+    private static final float MIN_SOLID_RATIO = 0.6f;
+
+    /**
+     * Enclosed mazes: samples the terrain on a 5×5 grid over the footprint and returns the floor
+     * height (between NETHER_MIN_FLOOR and NETHER_MAX_FLOOR) where the maze would be the most
+     * buried in solid rock. Rejects heights with lava around the maze, and returns empty if even
+     * the best height is not solid enough (the maze would float in a cavern).
+     */
+    private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ, MazeSize size) {
+        ChunkGenerator gen = context.chunkGenerator();
+        int half = size.span() / 2 + 4;
+        var columns = new java.util.ArrayList<net.minecraft.world.gen.chunk.VerticalBlockSample>();
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                columns.add(gen.getColumnSample(centerX + i * half / 2, centerZ + j * half / 2,
+                        context.world(), context.noiseConfig()));
+            }
+        }
+        // Relative to the floor. No lava allowed at maze level; lava far below is fine (pillars).
+        int[] probes = {-3, -1, 1, 3, MazePiece.ROOF_DY + 1, MazePiece.ROOF_DY + 3};
+        int bestY = -1;
+        float bestRatio = -1f;
+        int offset = context.random().nextInt(2); // vary the parity between mazes
+        for (int y = NETHER_MIN_FLOOR + offset; y <= NETHER_MAX_FLOOR; y += 2) {
+            int solid = 0, total = 0;
+            boolean lava = false;
+            for (var column : columns) {
+                for (int dy : probes) {
+                    var state = column.getState(y + dy);
+                    if (!state.getFluidState().isEmpty()) lava = true;
+                    if (!state.isAir() && state.getFluidState().isEmpty()) solid++;
+                    total++;
+                }
+            }
+            if (lava) continue;
+            float ratio = (float) solid / total;
+            if (ratio > bestRatio) {
+                bestRatio = ratio;
+                bestY = y;
+            }
+        }
+        return bestRatio >= MIN_SOLID_RATIO ? OptionalInt.of(bestY) : OptionalInt.empty();
+    }
+
+    /**
+     * Enclosed mazes: the entrance goes on the side where the rock just outside the maze is the
+     * most open (air at walking height), so the doorway tends to open onto a cave.
+     */
+    private static int mostOpenSide(Context context, int centerX, int centerZ, MazeSize size, int floorY) {
+        ChunkGenerator gen = context.chunkGenerator();
+        int dist = size.span() / 2 + 4 + 3; // just past the sealed outer wall (enclosed margin = 4)
+        int[][] sideDirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}; // N, S, W, E
+        int best = context.random().nextInt(4);
+        int bestAir = -1;
+        for (int side = 0; side < 4; side++) {
+            int air = 0;
+            for (int k = -2; k <= 2; k++) {
+                int along = k * size.span() / 6;
+                int x = centerX + sideDirs[side][0] * dist + (sideDirs[side][0] == 0 ? along : 0);
+                int z = centerZ + sideDirs[side][1] * dist + (sideDirs[side][1] == 0 ? along : 0);
+                var column = gen.getColumnSample(x, z, context.world(), context.noiseConfig());
+                for (int dy = 1; dy <= 3; dy++) {
+                    if (column.getState(floorY + dy).isAir()) air++;
+                }
+            }
+            if (air > bestAir) {
+                bestAir = air;
                 best = side;
             }
         }

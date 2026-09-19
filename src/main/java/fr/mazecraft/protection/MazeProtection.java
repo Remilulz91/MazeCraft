@@ -201,6 +201,7 @@ public final class MazeProtection {
         MazeFinder.MazeHit hit = lockedMazeAt(world, pos, ABOVE_MARGIN);
         if (hit == null) return;
         MazePiece maze = hit.piece();
+        if (maze.getStyle().enclosed) return;                            // roofed maze: nothing to walk on
         if (!maze.isInsideMaze(pos.getX(), pos.getZ())) return;          // margin ring is fine
         if (pos.getY() <= maze.getFloorY() + MazePiece.WALL_HEIGHT) return; // inside the corridors
 

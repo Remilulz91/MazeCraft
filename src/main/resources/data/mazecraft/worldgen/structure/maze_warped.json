@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "warped",
+  "biomes": "#mazecraft:has_structure/maze_warped",
+  "step": "top_layer_modification",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

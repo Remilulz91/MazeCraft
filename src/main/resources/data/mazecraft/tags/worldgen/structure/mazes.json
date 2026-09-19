@@ -10,6 +10,11 @@
     "mazecraft:maze_cherry",
     "mazecraft:maze_swamp",
     "mazecraft:maze_savanna",
-    "mazecraft:maze_taiga"
+    "mazecraft:maze_taiga",
+    "mazecraft:maze_fortress",
+    "mazecraft:maze_crimson",
+    "mazecraft:maze_warped",
+    "mazecraft:maze_soul",
+    "mazecraft:maze_basalt"
   ]
 }

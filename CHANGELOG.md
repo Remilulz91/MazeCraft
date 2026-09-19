@@ -2,6 +2,23 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [0.3.0-alpha.1] — Unreleased
+
+The Nether.
+
+### Added
+- **Nether mazes**, buried in the rock like a fortress between Y=40 and Y=80, at the height where the surrounding rock is the most solid (never hanging over the lava sea or in the middle of a cavern; smaller sizes are tried if nothing fits): a sealed outer wall keeps lava and netherrack out, a roof covers the whole maze with lights set into it, and a single doorway opens on the side where the surrounding rock is the most open (usually a cave). Found with `/locate structure #mazecraft:mazes` or by exploring, like fortresses. Own structure set (one maze per ~512 blocks).
+  - **Fortress** (nether wastes): nether bricks, red nether brick posts, cracked brick floor, glowstone, nether brick fence gates.
+  - **Crimson** (crimson forest): nether wart walls, crimson stems and planks, shroomlights.
+  - **Warped** (warped forest): warped wart walls, warped stems and planks, shroomlights.
+  - **Soul** (soul sand valley): bone walls, polished blackstone, soul soil floor, hanging soul lanterns (darker: more mobs).
+  - **Basalt** (basalt deltas): polished basalt walls, blackstone, gilded blackstone plaza, glowstone.
+- Nether loot tables per size (`mazecraft:chests/nether_maze_<size>`): ancient debris, netherite scraps, gold blocks, ghast tears; netherite upgrade template in large and colossal mazes, 2 netherite ingots in colossal ones.
+- **Fortress look for Nether mazes**: no more netherrack blob under the maze — a styled underside slab, 2×2 support pillars every 12 blocks going down through air and lava to the ground (like vanilla fortresses), and an outer wall with a plinth and cornice in the post block. No colossal mazes in the Nether (a colossal roll becomes large).
+- **One-time clean-up of every maze chunk** (all dimensions) the first time it is fully loaded: anything neighbouring chunks' decorations spilled into the maze afterwards (basalt columns, lava deltas, tree branches...) is removed. Opened gates, the chest and snow layers are kept; conquered mazes are never touched.
+- Advancements *Brick by Brick*, *Seeing Red*, *Warped Perspective*, *Lost Souls*, *Delta Force*.
+- Nether mazes are built at the last decoration step: basalt columns, deltas, mushrooms or soul fire generated in the same chunk are cleared by the maze. Roofs are never netherrack, nether wart, blackstone or basalt, so no weeping vines or glowstone grow under them.
+
 ## [0.2.0-alpha.1] — Unreleased
 
 New biome styles.

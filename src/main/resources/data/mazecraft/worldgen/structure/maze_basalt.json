@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "basalt",
+  "biomes": "#mazecraft:has_structure/maze_basalt",
+  "step": "top_layer_modification",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

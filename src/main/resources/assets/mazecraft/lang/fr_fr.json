@@ -47,5 +47,15 @@
   "advancements.mazecraft.enter_savanna.title": "Balade dans la savane",
   "advancements.mazecraft.enter_savanna.description": "Entrer dans un labyrinthe de la savane",
   "advancements.mazecraft.enter_taiga.title": "Aiguille dans un labyrinthe",
-  "advancements.mazecraft.enter_taiga.description": "Entrer dans un labyrinthe de la taïga"
+  "advancements.mazecraft.enter_taiga.description": "Entrer dans un labyrinthe de la taïga",
+  "advancements.mazecraft.enter_fortress.title": "Brique par brique",
+  "advancements.mazecraft.enter_fortress.description": "Entrer dans un labyrinthe forteresse du Nether",
+  "advancements.mazecraft.enter_crimson.title": "Voir rouge",
+  "advancements.mazecraft.enter_crimson.description": "Entrer dans un labyrinthe carmin",
+  "advancements.mazecraft.enter_warped.title": "Perspective biscornue",
+  "advancements.mazecraft.enter_warped.description": "Entrer dans un labyrinthe biscornu",
+  "advancements.mazecraft.enter_soul.title": "Âmes perdues",
+  "advancements.mazecraft.enter_soul.description": "Entrer dans un labyrinthe de la vallée des âmes",
+  "advancements.mazecraft.enter_basalt.title": "Delta Force",
+  "advancements.mazecraft.enter_basalt.description": "Entrer dans un labyrinthe de basalte"
 }
