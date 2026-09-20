@@ -2,7 +2,7 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
-## [0.5.0-alpha.1] — Unreleased
+## [0.5.0-alpha.1] — 2026-09-20
 
 Enemies.
 
@@ -17,7 +17,7 @@ Enemies.
 - No enemies in peaceful. Config: `enableGuardians`, `enableAmbushes`, `enableChampion`, `enemyMultiplier` (0–5), in Mod Menu under "Enemies".
 - Advancement *Champion Slayer* (defeat a Maze Champion).
 
-## [0.4.0-alpha.1] — Unreleased
+## [0.4.0-alpha.1] — 2026-09-20
 
 The End.
 
@@ -28,7 +28,7 @@ The End.
 - **Mazes avoid other structures** (all dimensions, vanilla and modded): a maze doesn't generate where an end city, village, temple, igloo, mansion, outpost, fortress or bastion could start within ~5 chunks of its footprint — a smaller size is tried first. Ruined portals and beached shipwrecks are avoided too, with a tighter radius. Not avoided: mineshafts, strongholds, ancient cities, trial chambers, buried treasures (underground, never reached by a maze), ocean ruins (mazes never generate over water) and nether fossils (one every 2 chunks in soul sand valleys: avoiding them would remove every soul maze).
 - Advancements *The End of the Line* (enter an End maze) and *Master of the Labyrinth* (conquer a colossal End maze, challenge, 1000 XP).
 
-## [0.3.0-alpha.1] — Unreleased
+## [0.3.0-alpha.1] — 2026-09-20
 
 The Nether.
 
@@ -45,7 +45,7 @@ The Nether.
 - Advancements *Brick by Brick*, *Seeing Red*, *Warped Perspective*, *Lost Souls*, *Delta Force*.
 - Nether mazes are built at the last decoration step: basalt columns, deltas, mushrooms or soul fire generated in the same chunk are cleared by the maze. Roofs are never netherrack, nether wart, blackstone or basalt, so no weeping vines or glowstone grow under them.
 
-## [0.2.0-alpha.1] — Unreleased
+## [0.2.0-alpha.1] — 2026-09-19
 
 New biome styles.
 
@@ -64,7 +64,7 @@ New biome styles.
 - **Varied ring floor**: the ring around each maze is now a weighted mix of blocks per style (hedge: dirt path, gravel, packed mud, mossy cobblestone; desert: smooth, regular, cut and chiseled sandstone; jungle: mossy / cracked / plain stone bricks, cobblestones, andesite; snow: snow, packed ice, spruce planks). The pattern is derived from block positions, so it's identical across chunks and reloads. The approach path in front of the entrance stays plain.
 - Maze structures now take a `"style"` field in their worldgen JSON; all styles share the `mazecraft:mazes` structure set (one maze per ~640 blocks, whichever style fits the biome).
 
-## [0.1.0-alpha.1] — Unreleased
+## [0.1.0-alpha.1] — 2026-09-19
 
 First mazes in the world: the hedge maze.
 

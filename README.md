@@ -1,6 +1,6 @@
 # MazeCraft
 
-> 🚧 **Work in progress** — early alpha. Currently: 10 Overworld maze styles (hedge, desert, snow, jungle, badlands, dark forest, cherry, swamp, savanna, taiga) 5 enclosed Nether styles (fortress, crimson, warped, soul, basalt) and an End style, in 4 sizes, gates & levers, treasure chest at the center, anti-cheat protection and advancements.
+> 🚧 **Work in progress** — alpha. Currently: 10 Overworld maze styles (hedge, desert, snow, jungle, badlands, dark forest, cherry, swamp, savanna, taiga) 5 enclosed Nether styles (fortress, crimson, warped, soul, basalt) and an End style, in 4 sizes, gates & levers, treasure chest at the center, anti-cheat protection and advancements.
 
 A Minecraft 1.21.1 (Fabric) mod that generates **procedural mazes** across the
 Overworld, the Nether and the End. Each maze takes the architectural style of the
@@ -15,7 +15,7 @@ blocking your path, and claim the treasure waiting at the heart of the maze.
 - **Levers & gates** — gates block the path to the center (2 to 5 depending on size); each one is opened by a lever hidden in a dead end of the zone before it.
 - **Anti-cheat** — walls can't be broken, blocks can't be placed and ender pearls don't work until the central chest has been opened (configurable).
 - **Treasure** — hand-made loot tables per size and dimension, plus MazeCraft-exclusive items.
-- **Enemies** — biome-themed guardians, ambushes triggered by levers and, later, a Minotaur boss.
+- **Enemies** — biome-themed guardians, patrols appearing out of sight while you explore, ambushes triggered by levers, and a Maze Champion guarding the treasure (the chest stays locked until it dies). A Minotaur boss is planned.
 
 ## Requirements
 

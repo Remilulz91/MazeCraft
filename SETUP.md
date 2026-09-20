@@ -47,9 +47,10 @@ src/main/
 │   ├── MazeCraft.java               (main entry, build detection)
 │   ├── config/MazeCraftConfig.java  (config/mazecraft.json)
 │   ├── commands/                    (MazeCommand, DebugCommand)
-│   ├── protection/                  (MazeProtection, MazeState — anti-cheat until the chest is opened)
+│   ├── enemy/                       (MazeEnemies, MazeAmbush, MazePatrols, ChampionTracker)
+│   ├── protection/                  (MazeProtection, MazeState, MazeRepair — anti-cheat, saved maze state, one-time chunk clean-up)
 │   ├── mixin/                       (BlockItemMixin, EnderPearlEntityMixin, ExplosionMixin — anti-cheat)
-│   ├── structure/                   (MazeStructure, MazePiece, MazeLayout, MazeSize, MazeStyle, ModStructures)
+│   ├── structure/                   (MazeStructure, MazePiece, MazeLayout, MazeSize, MazeStyle, MazeFinder, StructureAvoidance, ModStructures)
 │   └── client/                      (MazeCraftClient, ModMenuIntegration, MazeCraftConfigScreen)
 └── resources/
     ├── fabric.mod.json
@@ -60,7 +61,7 @@ src/main/
         ├── worldgen/structure_set/  (mazes.json — spacing 40 / separation 16 chunks)
         ├── tags/worldgen/biome/has_structure/  (biomes per style)
         ├── tags/worldgen/structure/ (mazes.json — every maze structure)
-        ├── advancement/             (root, enter_hedge, pull_lever, conquer_maze, conquer_colossal)
+        ├── advancement/             (root, enter_<style>, pull_lever, defeat_champion, conquer_maze, conquer_colossal, conquer_end_colossal)
         └── loot_table/chests/       (maze_small/medium/large/colossal.json)
 ```
 
