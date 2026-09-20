@@ -2,6 +2,16 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [0.6.0-alpha.1] — Unreleased
+
+Ariadne's Thread.
+
+### Added
+- **Ariadne's Thread** (`mazecraft:ariadne_thread`, Tools tab): 8 uses, 5 s cooldown, a golden particle thread visible only to its user for 8 seconds.
+  - **Inside a maze**: traces the shortest way along the corridors (48 blocks shown) to the current objective — the lever of the next closed gate, then the chest once every gate is open. Closed gates are taken into account.
+  - **Outside**: points toward the nearest maze of the current dimension (search radius 64 chunks, like explorer maps), with its distance and direction in the action bar.
+- Found in maze chests (50% in small, 25% in medium mazes, every dimension) and in vanilla chests to find a first maze: dungeons 15%, mineshafts 8%, desert pyramids 15%, jungle temples 20%, shipwreck map chests 20%, stronghold corridors 15%, nether fortresses 15%, bastions 10%, end cities 15% (added through the Fabric loot event, datapack-friendly).
+
 ## [0.5.0-alpha.1] — 2026-09-20
 
 Enemies.

@@ -187,6 +187,67 @@ public class MazePiece extends StructurePiece {
                 && pos.getY() >= floorY - FOUNDATION_DEPTH && pos.getY() <= boundingBox.getMaxY();
     }
 
+    /**
+     * Ariadne's thread: shortest path through the corridors (block by block, at feet height)
+     * from {@code from} to the current objective — the lever of the first closed gate, or the
+     * chest once every gate is open. Closed gates block the way. Returns an empty list if
+     * {@code from} is not inside the maze proper.
+     */
+    public List<BlockPos> threadPath(BlockPos from, IntPredicate gateOpen) {
+        MazeLayout layout = layout();
+        int span = layout.span();
+        int sx = from.getX() - originX(), sz = from.getZ() - originZ();
+        if (!layout.isInside(sx, sz)) return List.of();
+
+        boolean[] blocked = new boolean[span * span];
+        int target = -1;
+        for (int g = 0; g < layout.gates().size(); g++) {
+            if (gateOpen.test(g)) continue;
+            MazeLayout.Gate gate = layout.gates().get(g);
+            for (int x = gate.x0(); x <= gate.x1(); x++)
+                for (int z = gate.z0(); z <= gate.z1(); z++) blocked[x * span + z] = true;
+            if (target < 0) {
+                MazeLayout.Lever lever = layout.levers().get(g);
+                target = lever.x() * span + lever.z();
+            }
+        }
+        if (target < 0) target = layout.center() * span + layout.center();
+
+        int start = sx * span + sz;
+        if (layout.isWall(sx, sz)) return List.of();
+        int[] prev = new int[span * span];
+        java.util.Arrays.fill(prev, -2);
+        prev[start] = -1;
+        java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
+        queue.add(start);
+        int[][] dirs = {{1, 0}, {-1, 0}, {0, 1}, {0, -1}};
+        while (!queue.isEmpty()) {
+            int cur = queue.poll();
+            if (cur == target) break;
+            int cx = cur / span, cz = cur % span;
+            for (int[] d : dirs) {
+                int nx = cx + d[0], nz = cz + d[1];
+                if (!layout.isInside(nx, nz) || layout.isWall(nx, nz)) continue;
+                int ni = nx * span + nz;
+                if (blocked[ni] || prev[ni] != -2) continue;
+                prev[ni] = cur;
+                queue.add(ni);
+            }
+        }
+        if (prev[target] == -2) return List.of();
+        List<BlockPos> path = new ArrayList<>();
+        for (int c = target; c != -1; c = prev[c]) {
+            path.add(new BlockPos(originX() + c / span, floorY + 1, originZ() + c % span));
+        }
+        java.util.Collections.reverse(path);
+        return path;
+    }
+
+    /** Centre of the maze, at feet height (for the thread's direction outside the maze). */
+    public BlockPos centerPos() {
+        return chestPos();
+    }
+
     /** Progress (0 = first zone, 1 = last zone) of the corridor at (x, z). */
     public double zoneProgress(int x, int z) {
         int lx = x - originX(), lz = z - originZ();

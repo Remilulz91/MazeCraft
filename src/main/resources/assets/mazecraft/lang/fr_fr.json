@@ -80,5 +80,20 @@
   "config.mazecraft.enablePatrols.tooltip": "Pendant l'exploration d'un labyrinthe non vaincu, des mobs apparaissent hors de vue (jour et nuit, dans toutes les dimensions).",
   "config.mazecraft.patrolIntervalSeconds": "Intervalle des patrouilles (s)",
   "config.mazecraft.patrolIntervalSeconds.tooltip": "Secondes entre deux mobs de patrouille dans un petit labyrinthe (moyen ×0,75, grand ×0,6, colossal ×0,5).",
-  "mazecraft.champion.guarding": "Le Champion du labyrinthe garde encore le trésor !"
+  "mazecraft.champion.guarding": "Le Champion du labyrinthe garde encore le trésor !",
+  "item.mazecraft.ariadne_thread": "Fil d'Ariane",
+  "item.mazecraft.ariadne_thread.tooltip1": "Hors d'un labyrinthe : indique le plus proche",
+  "item.mazecraft.ariadne_thread.tooltip2": "À l'intérieur : trace le chemin vers le prochain levier",
+  "mazecraft.thread.follow": "Suivez le fil doré (%s blocs)",
+  "mazecraft.thread.here": "Le fil s'arrête ici : votre objectif est juste devant vous",
+  "mazecraft.thread.distance": "Labyrinthe le plus proche : %s blocs, %s",
+  "mazecraft.thread.none": "Le fil se détend... aucun labyrinthe à proximité",
+  "mazecraft.thread.dir.n": "nord",
+  "mazecraft.thread.dir.ne": "nord-est",
+  "mazecraft.thread.dir.e": "est",
+  "mazecraft.thread.dir.se": "sud-est",
+  "mazecraft.thread.dir.s": "sud",
+  "mazecraft.thread.dir.sw": "sud-ouest",
+  "mazecraft.thread.dir.w": "ouest",
+  "mazecraft.thread.dir.nw": "nord-ouest"
 }

@@ -80,5 +80,20 @@
   "config.mazecraft.enablePatrols.tooltip": "While you explore an unconquered maze, mobs keep appearing out of sight (day and night, every dimension).",
   "config.mazecraft.patrolIntervalSeconds": "Patrol interval (s)",
   "config.mazecraft.patrolIntervalSeconds.tooltip": "Seconds between two patrol mobs in a small maze (medium ×0.75, large ×0.6, colossal ×0.5).",
-  "mazecraft.champion.guarding": "The Maze Champion still guards the treasure!"
+  "mazecraft.champion.guarding": "The Maze Champion still guards the treasure!",
+  "item.mazecraft.ariadne_thread": "Ariadne's Thread",
+  "item.mazecraft.ariadne_thread.tooltip1": "Outside a maze: points to the nearest one",
+  "item.mazecraft.ariadne_thread.tooltip2": "Inside: traces the way to the next lever",
+  "mazecraft.thread.follow": "Follow the golden thread (%s blocks)",
+  "mazecraft.thread.here": "The thread stops here: your objective is right in front of you",
+  "mazecraft.thread.distance": "Nearest maze: %s blocks, %s",
+  "mazecraft.thread.none": "The thread goes slack... no maze nearby",
+  "mazecraft.thread.dir.n": "north",
+  "mazecraft.thread.dir.ne": "north-east",
+  "mazecraft.thread.dir.e": "east",
+  "mazecraft.thread.dir.se": "south-east",
+  "mazecraft.thread.dir.s": "south",
+  "mazecraft.thread.dir.sw": "south-west",
+  "mazecraft.thread.dir.w": "west",
+  "mazecraft.thread.dir.nw": "north-west"
 }
