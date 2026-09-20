@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "mazecraft:maze_end",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "spacing": 32,
+    "separation": 12,
+    "salt": 1350915093
+  }
+}

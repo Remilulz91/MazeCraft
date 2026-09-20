@@ -229,6 +229,9 @@ public final class MazeProtection {
         grant(player, "conquer_maze");
         if (maze.getSize() == MazeSize.COLOSSAL) {
             grant(player, "conquer_colossal");
+            if (maze.getStyle().isEnd()) {
+                grant(player, "conquer_end_colossal");
+            }
         }
     }
 

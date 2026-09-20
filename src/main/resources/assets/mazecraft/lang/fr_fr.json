@@ -57,5 +57,9 @@
   "advancements.mazecraft.enter_soul.title": "Âmes perdues",
   "advancements.mazecraft.enter_soul.description": "Entrer dans un labyrinthe de la vallée des âmes",
   "advancements.mazecraft.enter_basalt.title": "Delta Force",
-  "advancements.mazecraft.enter_basalt.description": "Entrer dans un labyrinthe de basalte"
+  "advancements.mazecraft.enter_basalt.description": "Entrer dans un labyrinthe de basalte",
+  "advancements.mazecraft.enter_end.title": "Au bout du labyrinthe",
+  "advancements.mazecraft.enter_end.description": "Entrer dans un labyrinthe de l'End",
+  "advancements.mazecraft.conquer_end_colossal.title": "Maître du labyrinthe",
+  "advancements.mazecraft.conquer_end_colossal.description": "Vaincre un labyrinthe colossal de l'End"
 }

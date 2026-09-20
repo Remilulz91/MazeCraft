@@ -189,7 +189,7 @@ public class MazePiece extends StructurePiece {
 
     /** Loot table of the central chest for this maze size. */
     public static RegistryKey<LootTable> lootTableFor(MazeStyle style, MazeSize size) {
-        return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/" + style.lootPrefix + "_" + size.id()));
+        return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/" + style.lootPrefix() + "_" + size.id()));
     }
 
     @Override

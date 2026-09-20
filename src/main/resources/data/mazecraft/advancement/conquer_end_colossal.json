@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_colossal",
+  "display": {
+    "icon": {
+      "id": "minecraft:elytra"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_end_colossal.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_end_colossal.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 1000
+  }
+}

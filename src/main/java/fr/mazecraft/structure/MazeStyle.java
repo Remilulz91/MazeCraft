@@ -206,6 +206,28 @@ public enum MazeStyle {
     ),
 
     // =====================================================================
+    // END — open-air mazes on the outer islands (same system as the Overworld)
+    // =====================================================================
+
+    /** End highlands / midlands: end stone brick walls, purpur, end rods. Floor never end stone (chorus). */
+    END(
+            Blocks.END_STONE_BRICKS.getDefaultState(),
+            Blocks.PURPUR_PILLAR.getDefaultState(),
+            Blocks.END_STONE_BRICKS.getDefaultState(),
+            Blocks.PURPUR_BLOCK.getDefaultState(),
+            Blocks.OBSIDIAN.getDefaultState(),
+            Blocks.END_ROD.getDefaultState(),
+            Blocks.END_STONE.getDefaultState(),
+            Blocks.IRON_BARS.getDefaultState(),
+            6,
+            // No end stone in the ring: chorus plants grow on it
+            Mix.of(Blocks.PURPUR_BLOCK.getDefaultState(), 45,
+                    Blocks.END_STONE_BRICKS.getDefaultState(), 30,
+                    Blocks.PURPUR_PILLAR.getDefaultState(), 15,
+                    Blocks.OBSIDIAN.getDefaultState(), 10)
+    ),
+
+    // =====================================================================
     // NETHER — enclosed mazes carved into the rock: sealed outer wall, roof with lights
     // =====================================================================
 
@@ -316,7 +338,15 @@ public enum MazeStyle {
     /** Optional lantern hanging under the roof instead of a light block in it (enclosed mazes only). */
     public final BlockState hangingLight;
     /** Loot table prefix: chests/<prefix>_<size>. */
-    public final String lootPrefix;
+    public String lootPrefix() {
+        if (enclosed) return "nether_maze";
+        return this == END ? "end_maze" : "maze";
+    }
+
+    /** True for End styles (own size weights: bigger mazes). */
+    public boolean isEnd() {
+        return this == END;
+    }
 
     /** Optional horizontal bands: wall block per height above the floor (1 = lowest). Null = plain {@link #wall}. */
     private final BlockState[] wallBands;
@@ -338,7 +368,6 @@ public enum MazeStyle {
         this.ceiling = null;
         this.ceilingLight = null;
         this.hangingLight = null;
-        this.lootPrefix = "maze";
     }
 
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor,
@@ -359,7 +388,6 @@ public enum MazeStyle {
         this.ceiling = null;
         this.ceilingLight = null;
         this.hangingLight = null;
-        this.lootPrefix = "maze";
     }
 
     /** Enclosed (Nether) style. */
@@ -381,7 +409,6 @@ public enum MazeStyle {
         this.ceiling = ceiling;
         this.ceilingLight = ceilingLight;
         this.hangingLight = hangingLight;
-        this.lootPrefix = "nether_maze";
     }
 
     /** Wall block at {@code dy} blocks above the floor (1..WALL_HEIGHT). */

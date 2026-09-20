@@ -68,6 +68,15 @@ public enum MazeSize {
     }
 
     /** Rolls a random size using the configured weights (falls back to SMALL if all weights are 0). */
+    /** End: the ultimate mazes, bigger on average (small 20 / medium 30 / large 30 / colossal 20). */
+    public static MazeSize rollEnd(Random random) {
+        int r = random.nextInt(100);
+        if (r < 20) return SMALL;
+        if (r < 50) return MEDIUM;
+        if (r < 80) return LARGE;
+        return COLOSSAL;
+    }
+
     public static MazeSize roll(Random random) {
         int total = 0;
         for (MazeSize s : values()) total += s.weight();

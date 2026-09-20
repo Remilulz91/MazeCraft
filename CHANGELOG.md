@@ -2,6 +2,17 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [0.4.0-alpha.1] — Unreleased
+
+The End.
+
+### Added
+- **End maze** (`mazecraft:maze_end`, end highlands & midlands — the outer islands): open-air, like Overworld mazes. End stone brick walls, purpur pillar posts, purpur floor, obsidian plaza, end rods on the posts, iron-bar gates, 6-block ring (purpur, end stone bricks, purpur pillars, obsidian — never end stone, so no chorus grows in or next to the maze). Mazes never generate over the void.
+- **Bigger mazes in the End**: 20% small, 30% medium, 30% large, 20% colossal (a size that doesn't fit the island falls back to a smaller one). Own structure set (one maze per ~512 blocks).
+- **End loot** (`mazecraft:chests/end_maze_<size>`): ender pearls, diamonds, shulker shells, end crystals, top-tier enchanted gear; dragon head in large and colossal mazes; **elytra**, netherite upgrade template and 4–6 shulker shells guaranteed in colossal ones.
+- **Mazes avoid other structures** (all dimensions, vanilla and modded): a maze doesn't generate where an end city, village, temple, igloo, mansion, outpost, fortress or bastion could start within ~5 chunks of its footprint — a smaller size is tried first. Mineshafts, strongholds, ancient cities, trial chambers, buried treasures, ruined portals, shipwrecks, ocean ruins and nether fossils are not avoided (underground, tiny or too frequent).
+- Advancements *The End of the Line* (enter an End maze) and *Master of the Labyrinth* (conquer a colossal End maze, challenge, 1000 XP).
+
 ## [0.3.0-alpha.1] — Unreleased
 
 The Nether.

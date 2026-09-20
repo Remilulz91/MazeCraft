@@ -57,5 +57,9 @@
   "advancements.mazecraft.enter_soul.title": "Lost Souls",
   "advancements.mazecraft.enter_soul.description": "Enter a soul sand valley maze",
   "advancements.mazecraft.enter_basalt.title": "Delta Force",
-  "advancements.mazecraft.enter_basalt.description": "Enter a basalt maze"
+  "advancements.mazecraft.enter_basalt.description": "Enter a basalt maze",
+  "advancements.mazecraft.enter_end.title": "The End of the Line",
+  "advancements.mazecraft.enter_end.description": "Enter an End maze",
+  "advancements.mazecraft.conquer_end_colossal.title": "Master of the Labyrinth",
+  "advancements.mazecraft.conquer_end_colossal.description": "Conquer a colossal End maze"
 }

@@ -55,7 +55,7 @@ public class MazeStructure extends Structure {
     @Override
     protected Optional<StructurePosition> getStructurePosition(Context context) {
         ChunkPos chunkPos = context.chunkPos();
-        MazeSize rolled = MazeSize.roll(context.random());
+        MazeSize rolled = style.isEnd() ? MazeSize.rollEnd(context.random()) : MazeSize.roll(context.random());
         long mazeSeed = context.random().nextLong();
         int centerX = chunkPos.getCenterX();
         int centerZ = chunkPos.getCenterZ();
@@ -66,6 +66,7 @@ public class MazeStructure extends Structure {
             // No colossal mazes in the Nether: too big for its caverns
             MazeSize netherSize = rolled == MazeSize.COLOSSAL ? MazeSize.LARGE : rolled;
             for (MazeSize size = netherSize; size != null; size = size.smaller()) {
+                if (StructureAvoidance.isNearOtherStructure(context, size, style)) continue;
                 OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size);
                 if (floorY.isPresent()) {
                     final MazeSize finalSize = size;
@@ -80,6 +81,7 @@ public class MazeStructure extends Structure {
 
         // Big mazes need a big flat area: if the rolled size doesn't fit, try the smaller ones.
         for (MazeSize size = rolled; size != null; size = size.smaller()) {
+            if (StructureAvoidance.isNearOtherStructure(context, size, style)) continue;
             OptionalInt floorY = findFloorY(context, centerX, centerZ, size);
             if (floorY.isPresent()) {
                 final MazeSize finalSize = size;

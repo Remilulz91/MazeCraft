@@ -1,0 +1,8 @@
+{
+  "type": "mazecraft:maze",
+  "style": "end",
+  "biomes": "#mazecraft:has_structure/maze_end",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}
