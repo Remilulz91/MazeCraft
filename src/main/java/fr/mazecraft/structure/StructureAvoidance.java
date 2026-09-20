@@ -41,10 +41,18 @@ public final class StructureAvoidance {
             Identifier.ofVanilla("buried_treasures"),
             Identifier.ofVanilla("ancient_cities"),
             Identifier.ofVanilla("trial_chambers"),
-            Identifier.ofVanilla("ruined_portals"),
             Identifier.ofVanilla("nether_fossils"),
-            Identifier.ofVanilla("shipwrecks"),
             Identifier.ofVanilla("ocean_ruins")
+    );
+
+    /**
+     * Small structures: avoided with a tighter radius (they fit in ~1 chunk), so they don't
+     * block too many mazes. Shipwrecks only matter on beaches (the biome check drops ocean ones:
+     * mazes never generate over water anyway).
+     */
+    private static final Map<Identifier, Integer> SMALL_RADIUS = Map.of(
+            Identifier.ofVanilla("ruined_portals"), 1,
+            Identifier.ofVanilla("shipwrecks"), 1
     );
 
     private StructureAvoidance() { }
@@ -53,7 +61,6 @@ public final class StructureAvoidance {
     public static boolean isNearOtherStructure(Structure.Context context, MazeSize size, MazeStyle style) {
         ChunkPos center = context.chunkPos();
         int mazeRadius = (size.span() / 2 + style.margin) / 16 + 1;
-        int radius = mazeRadius + OTHER_RADIUS_CHUNKS;
         long seed = context.seed();
 
         Registry<StructureSet> sets = context.dynamicRegistryManager().get(RegistryKeys.STRUCTURE_SET);
@@ -62,6 +69,7 @@ public final class StructureAvoidance {
             if (id.getNamespace().equals(MazeCraft.MOD_ID) || IGNORED.contains(id)) continue;
             StructureSet set = entry.getValue();
             if (!(set.placement() instanceof RandomSpreadStructurePlacement placement)) continue;
+            int radius = mazeRadius + SMALL_RADIUS.getOrDefault(id, OTHER_RADIUS_CHUNKS);
 
             int spacing = placement.getSpacing();
             int rx0 = Math.floorDiv(center.x - radius, spacing), rx1 = Math.floorDiv(center.x + radius, spacing);
