@@ -1,0 +1,109 @@
+{
+  "entity.minotaur.ambient": {
+    "subtitle": "subtitles.mazecraft.minotaur.ambient",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.ambient",
+        "type": "event",
+        "pitch": 0.7,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.hurt": {
+    "subtitle": "subtitles.mazecraft.minotaur.hurt",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.hurt",
+        "type": "event",
+        "pitch": 0.7,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.death": {
+    "subtitle": "subtitles.mazecraft.minotaur.death",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.death",
+        "type": "event",
+        "pitch": 0.6,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.step": {
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.step",
+        "type": "event",
+        "pitch": 0.8,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.roar": {
+    "subtitle": "subtitles.mazecraft.minotaur.roar",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.roar",
+        "type": "event",
+        "pitch": 0.6,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.charge_hit": {
+    "subtitle": "subtitles.mazecraft.minotaur.charge_hit",
+    "sounds": [
+      {
+        "name": "minecraft:entity.ravager.attack",
+        "type": "event",
+        "pitch": 0.6,
+        "volume": 1.0
+      },
+      {
+        "name": "minecraft:entity.player.attack.knockback",
+        "type": "event",
+        "pitch": 0.7,
+        "volume": 1.0
+      }
+    ]
+  },
+  "entity.minotaur.stunned": {
+    "subtitle": "subtitles.mazecraft.minotaur.stunned",
+    "sounds": [
+      {
+        "name": "minecraft:block.anvil.land",
+        "type": "event",
+        "pitch": 0.5,
+        "volume": 1.0
+      },
+      {
+        "name": "minecraft:entity.ravager.stunned",
+        "type": "event",
+        "pitch": 0.8,
+        "volume": 1.0
+      }
+    ]
+  },
+  "item.minotaur_horn.use": {
+    "subtitle": "subtitles.mazecraft.minotaur_horn",
+    "sounds": [
+      {
+        "name": "minecraft:item.goat_horn.sound.0",
+        "type": "event",
+        "pitch": 0.7,
+        "volume": 1.0
+      }
+    ]
+  },
+  "music.minotaur": {
+    "sounds": [
+      {
+        "name": "minecraft:music_disc.5",
+        "type": "event"
+      }
+    ]
+  }
+}

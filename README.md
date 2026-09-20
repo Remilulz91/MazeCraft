@@ -16,7 +16,7 @@ blocking your path, and claim the treasure waiting at the heart of the maze.
 - **Anti-cheat** — walls can't be broken, blocks can't be placed and ender pearls don't work until the central chest has been opened (configurable).
 - **Treasure** — hand-made loot tables per size and dimension, plus MazeCraft-exclusive items.
 - **Ariadne's Thread** — points to the nearest maze, and inside one traces the way to the next lever. Found in maze chests and in some vanilla chests (dungeons, temples, fortresses...).
-- **Enemies** — biome-themed guardians, patrols appearing out of sight while you explore, ambushes triggered by levers, and a Maze Champion guarding the treasure (the chest stays locked until it dies). A Minotaur boss is planned.
+- **Enemies** — biome-themed guardians, patrols appearing out of sight while you explore, ambushes triggered by levers, and a Maze Champion guarding the treasure (the chest stays locked until it dies). Large and colossal mazes are guarded by the **Minotaur** instead: charges down the corridors, gets stunned when it hits a wall, enrages under 50% health, and drops the Minotaur Horn.
 
 ## Requirements
 

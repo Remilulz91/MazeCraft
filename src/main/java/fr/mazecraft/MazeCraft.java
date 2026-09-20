@@ -4,6 +4,8 @@ import fr.mazecraft.commands.MazeCommand;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.ChampionTracker;
 import fr.mazecraft.enemy.MazePatrols;
+import fr.mazecraft.entity.ModEntities;
+import fr.mazecraft.entity.ModSounds;
 import fr.mazecraft.item.ModItems;
 import fr.mazecraft.item.ThreadTrails;
 import fr.mazecraft.item.ThreadLoot;
@@ -69,6 +71,8 @@ public class MazeCraft implements ModInitializer {
         LOGGER.info("[MazeCraft] Configuration loaded");
 
         // 1b. Items (Ariadne's Thread) + its trail renderer + loot in vanilla chests
+        ModSounds.register();
+        ModEntities.register();
         ModItems.register();
         ThreadTrails.register();
         ThreadLoot.register();

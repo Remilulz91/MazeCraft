@@ -2,6 +2,20 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [0.7.0-alpha.1] — Unreleased
+
+The Minotaur.
+
+### Added
+- **Minotaur** (`mazecraft:minotaur`): guards the central plaza of **large and colossal** mazes — summoned by the last lever instead of the Maze Champion (small and medium mazes keep the Champion). 150 HP in large mazes, 250 in colossal ones; armor 8, heavy knockback-resistant melee with strong knockback, purple boss bar, chest locked until it dies.
+  - **Charge**: roars for 1 s (rears up, arms raised), then rushes in a straight line without turning. Hitting the player deals 16 damage with strong knockback; hitting a wall **stuns** it for 3 s (head spinning, crit particles, +50% damage taken).
+  - **Rage** under 50% health: +30% speed, charges twice as often, faster blows.
+  - Custom model (bull head, horns, axe) and placeholder texture; walk, attack, wind-up, charge and stun animations.
+- Minotaur spawn egg (Spawn Eggs tab), for testing.
+- **Minotaur sounds** (`mazecraft:entity.minotaur.*`: ambient, hurt, death, step, roar, charge hit, stun) with subtitles, and **boss music** (`mazecraft:music.minotaur`, currently music disc "5") played to players within 48 blocks while it lives, on the Music volume slider, stopped when you leave or it dies. All sounds are defined in `sounds.json` on top of vanilla sounds, so a resource pack can replace them with custom audio.
+- **Minotaur Horn** (`mazecraft:minotaur_horn`, epic): always dropped by the Minotaur. Blowing it gives Strength I and Speed I for 30 s to every player within 16 blocks; 2 min cooldown. The Minotaur also drops 4–8 beef (cooked if it burns) and 3–6 leather; 100 XP (200 in colossal mazes).
+- Advancement **Theseus** (*Thésée*): slay the Minotaur (challenge, 500 XP).
+
 ## [0.6.0-alpha.1] — 2026-09-20
 
 Ariadne's Thread.

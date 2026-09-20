@@ -95,5 +95,19 @@
   "mazecraft.thread.dir.s": "south",
   "mazecraft.thread.dir.sw": "south-west",
   "mazecraft.thread.dir.w": "west",
-  "mazecraft.thread.dir.nw": "north-west"
+  "mazecraft.thread.dir.nw": "north-west",
+  "entity.mazecraft.minotaur": "Minotaur",
+  "item.mazecraft.minotaur_spawn_egg": "Minotaur Spawn Egg",
+  "mazecraft.minotaur.appears": "The ground shakes... the Minotaur awakens to guard the treasure!",
+  "item.mazecraft.minotaur_horn": "Minotaur Horn",
+  "item.mazecraft.minotaur_horn.tooltip": "Blow it: Strength & Speed for nearby players (30 s)",
+  "advancements.mazecraft.defeat_minotaur.title": "Theseus",
+  "advancements.mazecraft.defeat_minotaur.description": "Slay the Minotaur",
+  "subtitles.mazecraft.minotaur.ambient": "Minotaur snorts",
+  "subtitles.mazecraft.minotaur.hurt": "Minotaur hurts",
+  "subtitles.mazecraft.minotaur.death": "Minotaur dies",
+  "subtitles.mazecraft.minotaur.roar": "Minotaur roars",
+  "subtitles.mazecraft.minotaur.charge_hit": "Minotaur rams",
+  "subtitles.mazecraft.minotaur.stunned": "Minotaur crashes into a wall",
+  "subtitles.mazecraft.minotaur_horn": "Minotaur Horn blows"
 }

@@ -95,5 +95,19 @@
   "mazecraft.thread.dir.s": "sud",
   "mazecraft.thread.dir.sw": "sud-ouest",
   "mazecraft.thread.dir.w": "ouest",
-  "mazecraft.thread.dir.nw": "nord-ouest"
+  "mazecraft.thread.dir.nw": "nord-ouest",
+  "entity.mazecraft.minotaur": "Minotaure",
+  "item.mazecraft.minotaur_spawn_egg": "Œuf d'apparition de Minotaure",
+  "mazecraft.minotaur.appears": "Le sol tremble... le Minotaure s'éveille pour garder le trésor !",
+  "item.mazecraft.minotaur_horn": "Corne de Minotaure",
+  "item.mazecraft.minotaur_horn.tooltip": "Soufflez : Force et Vitesse aux joueurs proches (30 s)",
+  "advancements.mazecraft.defeat_minotaur.title": "Thésée",
+  "advancements.mazecraft.defeat_minotaur.description": "Terrasser le Minotaure",
+  "subtitles.mazecraft.minotaur.ambient": "Le Minotaure renâcle",
+  "subtitles.mazecraft.minotaur.hurt": "Le Minotaure est blessé",
+  "subtitles.mazecraft.minotaur.death": "Le Minotaure meurt",
+  "subtitles.mazecraft.minotaur.roar": "Le Minotaure rugit",
+  "subtitles.mazecraft.minotaur.charge_hit": "Le Minotaure encorne",
+  "subtitles.mazecraft.minotaur.stunned": "Le Minotaure percute un mur",
+  "subtitles.mazecraft.minotaur_horn": "Une corne de Minotaure résonne"
 }

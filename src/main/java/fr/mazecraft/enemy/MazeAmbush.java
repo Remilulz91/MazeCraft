@@ -1,6 +1,9 @@
 package fr.mazecraft.enemy;
 
 import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.entity.MinotaurEntity;
+import fr.mazecraft.entity.ModEntities;
+import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazePiece;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.SpawnReason;
@@ -56,19 +59,29 @@ public final class MazeAmbush {
 
         if (last && cfg.enableChampion) {
             BlockPos pos = plazaSpot(world, maze);
-            if (pos != null) {
-                MobEntity champion = MazeEnemies.spawn(world, MazeEnemies.championType(maze.getStyle()), pos, 0, true, SpawnReason.EVENT);
-                if (champion != null) {
-                    MazeEnemies.makeChampion(world, champion, maze.getSize());
-                    // Saved in the maze state: the chest stays locked until this champion dies,
-                    // even if it wanders into unloaded chunks or the server restarts
-                    champion.addCommandTag(MazeEnemies.MAZE_TAG_PREFIX + mazeKey);
-                    fr.mazecraft.protection.MazeState.get(world).setChampion(mazeKey, true);
-                    ChampionTracker.track(world, champion);
-                    champion.setTarget(player);
-                    poof(world, pos);
-                    spawned++;
-                    player.sendMessage(Text.translatable("mazecraft.champion.appears").formatted(Formatting.DARK_RED, Formatting.BOLD), false);
+            boolean minotaur = maze.getSize() == MazeSize.LARGE || maze.getSize() == MazeSize.COLOSSAL;
+            MobEntity boss = minotaur
+                    ? MazeEnemies.spawn(world, ModEntities.MINOTAUR, pos, 0, true, SpawnReason.EVENT)
+                    : MazeEnemies.spawn(world, MazeEnemies.championType(maze.getStyle()), pos, 0, true, SpawnReason.EVENT);
+            if (boss != null) {
+                if (boss instanceof MinotaurEntity m) {
+                    m.setupForMaze(maze.getSize());
+                    boss.addCommandTag(MazeEnemies.CHAMPION_TAG);
+                } else {
+                    MazeEnemies.makeChampion(world, boss, maze.getSize());
+                }
+                // Saved in the maze state: the chest stays locked until this boss dies,
+                // even if it wanders into unloaded chunks or the server restarts
+                boss.addCommandTag(MazeEnemies.MAZE_TAG_PREFIX + mazeKey);
+                fr.mazecraft.protection.MazeState.get(world).setChampion(mazeKey, true);
+                ChampionTracker.track(world, boss);
+                boss.setTarget(player);
+                poof(world, pos);
+                spawned++;
+                player.sendMessage(Text.translatable(minotaur ? "mazecraft.minotaur.appears" : "mazecraft.champion.appears")
+                        .formatted(Formatting.DARK_RED, Formatting.BOLD), false);
+                if (minotaur) {
+                    world.playSound(null, pos, fr.mazecraft.entity.ModSounds.MINOTAUR_ROAR, SoundCategory.HOSTILE, 3.0f, 0.5f);
                 }
             }
         }
