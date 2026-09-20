@@ -22,6 +22,17 @@ public class MazeState extends PersistentState {
 
     private final LongSet solved = new LongOpenHashSet();
     private final Long2IntOpenHashMap openedGates = new Long2IntOpenHashMap();
+    /** Mazes whose champion has been summoned and not killed yet (saved: survives chunk unloads and restarts). */
+    private final LongSet championAlive = new LongOpenHashSet();
+
+    public boolean hasChampion(long mazeKey) {
+        return championAlive.contains(mazeKey);
+    }
+
+    public void setChampion(long mazeKey, boolean alive) {
+        if (alive ? championAlive.add(mazeKey) : championAlive.remove(mazeKey)) markDirty();
+    }
+
     /** Chunks already repaired once after full generation (see MazeRepair). */
     private final LongSet repairedChunks = new LongOpenHashSet();
 
@@ -70,6 +81,7 @@ public class MazeState extends PersistentState {
     /** DEBUG: mark every gate of a maze as closed again (blocks are not rebuilt). */
     public void resetGates(long mazeKey) {
         if (openedGates.remove(mazeKey) != 0) markDirty();
+        setChampion(mazeKey, false);
     }
 
     /** DEBUG: forget that a maze was solved. */
@@ -88,6 +100,7 @@ public class MazeState extends PersistentState {
         }
         nbt.put("Gates", gates);
         nbt.putLongArray("Repaired", repairedChunks.toLongArray());
+        nbt.putLongArray("Champions", championAlive.toLongArray());
         return nbt;
     }
 
@@ -95,6 +108,9 @@ public class MazeState extends PersistentState {
         MazeState state = new MazeState();
         for (long key : nbt.getLongArray("Solved")) {
             state.solved.add(key);
+        }
+        for (long key : nbt.getLongArray("Champions")) {
+            state.championAlive.add(key);
         }
         for (long chunk : nbt.getLongArray("Repaired")) {
             state.repairedChunks.add(chunk);

@@ -432,4 +432,49 @@ public final class MazeLayout {
         int[] mid = wallMiddle(cx, cz, dir);
         return mid[0] >= 0 && mid[1] >= 0 && mid[0] < span && mid[1] < span && wall[mid[0] * span + mid[1]];
     }
+
+    // =====================================================================
+    // Guardians
+    // =====================================================================
+
+    /**
+     * Picks guardian cells: {@code min..max} per zone, dead ends first (where levers and
+     * treasure-hunters go), never the entrance cell, the plaza or a lever cell.
+     *
+     * @return list of {cellX, cellZ, zone}
+     */
+    public List<int[]> guardianCells(Random rng, int min, int max) {
+        List<int[]> result = new ArrayList<>();
+        if (component == null) return result;
+        int zones = levers.size();
+        int entrance = entranceCellIndex();
+        boolean[] leverCell = new boolean[cells * cells];
+        for (Lever l : levers) leverCell[(l.x() / CELL) * cells + (l.z() / CELL)] = true;
+
+        for (int zone = 0; zone < zones; zone++) {
+            List<Integer> deadEnds = new ArrayList<>();
+            List<Integer> others = new ArrayList<>();
+            for (int c = 0; c < cells * cells; c++) {
+                if (component[c] != zone || c == entrance || leverCell[c]) continue;
+                int cx = c / cells, cz = c % cells;
+                int degree = 0;
+                for (int d = 0; d < 4; d++) if (isOpenBetween(cx, cz, d)) degree++;
+                (degree == 1 ? deadEnds : others).add(c);
+            }
+            Collections.shuffle(deadEnds, rng);
+            Collections.shuffle(others, rng);
+            deadEnds.addAll(others);
+            int count = Math.min(deadEnds.size(), min + rng.nextInt(max - min + 1));
+            for (int k = 0; k < count; k++) {
+                int c = deadEnds.get(k);
+                result.add(new int[]{c / cells, c % cells, zone});
+            }
+        }
+        return result;
+    }
+
+    /** Number of zones (= number of levers). */
+    public int zoneCount() {
+        return levers.size();
+    }
 }

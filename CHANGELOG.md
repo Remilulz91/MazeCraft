@@ -2,6 +2,21 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [0.5.0-alpha.1] — Unreleased
+
+Enemies.
+
+### Added
+- **Guardians**: 2–4 persistent mobs per zone, placed when the maze generates, dead ends first (never on the plaza, the entrance cell or a lever cell). Deeper zones get better armor, capped by maze size: small none → leather, medium none → iron, large leather → iron, colossal iron → diamond.
+- **Lever ambushes**: pulling a lever spawns a wave in the corridors 6–14 blocks around the player (small 1 → 3 mobs, medium 2 → 4, large 2 → 5, colossal 3 → 6; always at least a leather helmet so they don't burn in daylight), with smoke and an evoker sound. The mobs target the player.
+- **Maze Champion**: the last lever (plaza gate) also summons a named champion — small: 2× health, iron gear (enchant 5); medium: 2.5×, diamond (12); large: 3×, diamond (20); colossal: 4×, diamond (30) — boss bar within 48 blocks.
+- **Patrols**: while a survival/adventure player is inside an unconquered maze, a mob of the maze's style appears in a corridor 12–24 blocks away, out of the player's line of sight — day and night, in every dimension. Every 30 s in a small maze (medium ×0.75, large ×0.6, colossal ×0.5), capped at 3/4/5/6 patrol mobs alive around the player; stops once the maze is conquered. Config: `enablePatrols`, `patrolIntervalSeconds`.
+- Guardians and patrol mobs without armor still get a leather helmet: zombies and skeletons no longer burn in daylight.
+- The champion appears **on the central plaza**, next to the chest, and **the chest stays locked while it is alive** — saved with the maze, so it holds even if the champion wanders into unloaded chunks or the server restarts (`/maze debug relock` resets it).
+- Mob pools per style: zombies / skeletons / spiders (hedge, cherry, savanna, taiga), + witches (dark forest), husks (desert, badlands), strays (snow), cave spiders (jungle), bogged & slimes (swamp), wither skeletons & blazes (fortress), hoglins & piglin brutes (crimson), endermen & wither skeletons (warped), wither skeletons & skeletons (soul), magma cubes & blazes (basalt), endermites, shulkers & endermen (End).
+- No enemies in peaceful. Config: `enableGuardians`, `enableAmbushes`, `enableChampion`, `enemyMultiplier` (0–5), in Mod Menu under "Enemies".
+- Advancement *Champion Slayer* (defeat a Maze Champion).
+
 ## [0.4.0-alpha.1] — Unreleased
 
 The End.

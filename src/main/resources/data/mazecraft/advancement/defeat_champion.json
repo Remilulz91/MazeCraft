@@ -1,0 +1,23 @@
+{
+  "parent": "mazecraft:pull_lever",
+  "display": {
+    "icon": {
+      "id": "minecraft:diamond_sword"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.defeat_champion.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.defeat_champion.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "defeated": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

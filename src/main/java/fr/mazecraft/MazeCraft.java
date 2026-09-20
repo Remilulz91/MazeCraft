@@ -2,6 +2,8 @@ package fr.mazecraft;
 
 import fr.mazecraft.commands.MazeCommand;
 import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.enemy.ChampionTracker;
+import fr.mazecraft.enemy.MazePatrols;
 import fr.mazecraft.protection.MazeProtection;
 import fr.mazecraft.protection.MazeRepair;
 import fr.mazecraft.structure.ModStructures;
@@ -75,6 +77,12 @@ public class MazeCraft implements ModInitializer {
 
         // 5. One-time clean-up of maze chunks once their neighbours are decorated
         MazeRepair.register();
+
+        // 6. Champions: boss bar + "defeat a champion" advancement
+        ChampionTracker.register();
+
+        // 7. Patrols: mobs keep appearing out of sight while a player explores a maze
+        MazePatrols.register();
 
         // Next step: lever / gate blocks.
 

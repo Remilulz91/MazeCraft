@@ -1,6 +1,11 @@
 package fr.mazecraft.structure;
 
 import fr.mazecraft.MazeCraft;
+import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.enemy.MazeEnemies;
+import net.minecraft.entity.EntityType;
+import net.minecraft.entity.SpawnReason;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
@@ -182,6 +187,21 @@ public class MazePiece extends StructurePiece {
                 && pos.getY() >= floorY - FOUNDATION_DEPTH && pos.getY() <= boundingBox.getMaxY();
     }
 
+    /** Progress (0 = first zone, 1 = last zone) of the corridor at (x, z). */
+    public double zoneProgress(int x, int z) {
+        int lx = x - originX(), lz = z - originZ();
+        int zone = layout().componentOf(Math.floorDiv(lx, MazeLayout.CELL), Math.floorDiv(lz, MazeLayout.CELL));
+        int zones = layout().zoneCount();
+        if (zone < 0) return 1.0;
+        return zones <= 1 ? 1.0 : (double) zone / (zones - 1);
+    }
+
+    /** True if (x, z) is a corridor block of the maze (not a wall, not the plaza, not the ring). */
+    public boolean isCorridor(int x, int z) {
+        int lx = x - originX(), lz = z - originZ();
+        return layout().isInside(lx, lz) && !layout().isWall(lx, lz) && !layout().isPlaza(lx, lz);
+    }
+
     /** True if (x, z) is inside the maze proper (not the margin). */
     public boolean isInsideMaze(int x, int z) {
         return layout().isInside(x - originX(), z - originZ());
@@ -320,6 +340,11 @@ public class MazePiece extends StructurePiece {
         }
 
         // 6. Central chest
+        // 6b. Guardians (generation only, never on repair)
+        if (!repairing && MazeCraftConfig.get().enableGuardians) {
+            spawnGuardians(world, chunkBox);
+        }
+
         BlockPos chest = chestPos();
         if (placeChest && chunkBox.contains(chest)) {
             world.setBlockState(chest,
@@ -397,6 +422,32 @@ public class MazePiece extends StructurePiece {
             if (world.getBlockState(pos) != target) {
                 world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
             }
+        }
+    }
+
+    /**
+     * Guardians: 2–4 per zone (x config multiplier), dead ends first, in the centre of their
+     * cell. Deeper zones get better armor. Only the ones whose cell is in this chunk spawn,
+     * so each guardian is spawned exactly once.
+     */
+    private void spawnGuardians(StructureWorldAccess world, BlockBox chunkBox) {
+        MazeLayout layout = layout();
+        double mult = MazeCraftConfig.get().enemyMultiplier;
+        int min = Math.max(0, (int) Math.round(2 * mult));
+        int max = Math.max(min, (int) Math.round(4 * mult));
+        if (max == 0) return;
+        java.util.Random rng = new java.util.Random(seed ^ 0x6A09E667F3BCC909L);
+        List<int[]> cells = layout.guardianCells(rng, min, max);
+        List<EntityType<? extends MobEntity>> pool = MazeEnemies.pool(style);
+        int zones = Math.max(1, layout.zoneCount());
+        for (int[] cell : cells) {
+            BlockPos pos = new BlockPos(originX() + MazeLayout.CELL * cell[0] + 2, floorY + 1,
+                    originZ() + MazeLayout.CELL * cell[1] + 2);
+            if (!chunkBox.contains(pos)) continue;
+            double progress = zones <= 1 ? 1.0 : (double) cell[2] / (zones - 1);
+            int tier = size.enemyTier(progress); // scales with the maze size (small: none → leather)
+            EntityType<? extends MobEntity> type = pool.get(rng.nextInt(pool.size()));
+            MazeEnemies.spawn(world, type, pos, tier, true, SpawnReason.STRUCTURE);
         }
     }
 

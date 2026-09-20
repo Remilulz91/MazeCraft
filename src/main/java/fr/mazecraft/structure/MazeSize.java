@@ -44,6 +44,36 @@ public enum MazeSize {
         return name().toLowerCase(Locale.ROOT);
     }
 
+    // === Difficulty (enemies) ===
+
+    /** Armor tier of enemies, from the first zone (progress 0) to the last one (progress 1). 0 none, 1 leather, 2 iron, 3 diamond. */
+    public int enemyTier(double progress) {
+        int min = switch (this) { case SMALL, MEDIUM -> 0; case LARGE -> 1; case COLOSSAL -> 2; };
+        int max = switch (this) { case SMALL -> 1; case MEDIUM, LARGE -> 2; case COLOSSAL -> 3; };
+        return min + (int) Math.round((max - min) * progress);
+    }
+
+    /** Ambush size (before the config multiplier) from the first lever (progress 0) to the last one. */
+    public int ambushCount(double progress) {
+        int min = switch (this) { case SMALL -> 1; case MEDIUM, LARGE -> 2; case COLOSSAL -> 3; };
+        int max = switch (this) { case SMALL -> 3; case MEDIUM -> 4; case LARGE -> 5; case COLOSSAL -> 6; };
+        return min + (int) Math.round((max - min) * progress);
+    }
+
+    /** Champion health multiplier. */
+    public double championHealth() {
+        return switch (this) { case SMALL -> 2.0; case MEDIUM -> 2.5; case LARGE -> 3.0; case COLOSSAL -> 4.0; };
+    }
+
+    /** Champion gear: iron in small mazes, diamond otherwise; enchantment level grows with size. */
+    public boolean championDiamond() {
+        return this != SMALL;
+    }
+
+    public int championEnchantLevel() {
+        return switch (this) { case SMALL -> 5; case MEDIUM -> 12; case LARGE -> 20; case COLOSSAL -> 30; };
+    }
+
     /** Next smaller size, or null for SMALL. Used when the terrain is too uneven for this size. */
     public MazeSize smaller() {
         return ordinal() == 0 ? null : values()[ordinal() - 1];

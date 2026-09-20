@@ -2,6 +2,7 @@ package fr.mazecraft.protection;
 
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.enemy.MazeAmbush;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
@@ -88,7 +89,7 @@ public final class MazeProtection {
                 if (hit != null) {
                     int lever = hit.piece().leverIndexAt(pos);
                     if (lever >= 0 && MazeState.get(serverWorld).openGate(hit.key(), lever)) {
-                        openGate(serverWorld, serverPlayer, hit.piece(), lever);
+                        openGate(serverWorld, serverPlayer, hit.piece(), lever, hit.key());
                     }
                 }
                 return ActionResult.PASS; // the lever still flips normally
@@ -97,6 +98,11 @@ public final class MazeProtection {
             if (!world.getBlockState(pos).isOf(Blocks.CHEST)) return ActionResult.PASS;
             MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, pos, 0);
             if (hit == null || !hit.piece().chestPos().equals(pos)) return ActionResult.PASS;
+
+            if (!MazeState.get(serverWorld).isSolved(hit.key()) && MazeState.get(serverWorld).hasChampion(hit.key())) {
+                deny(serverPlayer, "mazecraft.champion.guarding");
+                return ActionResult.FAIL;
+            }
 
             if (MazeState.get(serverWorld).markSolved(hit.key())) {
                 onConquered(serverWorld, serverPlayer, hit.piece());
@@ -185,7 +191,7 @@ public final class MazeProtection {
         player.currentScreenHandler.syncState();
     }
 
-    private static void openGate(ServerWorld world, ServerPlayerEntity player, MazePiece maze, int gate) {
+    private static void openGate(ServerWorld world, ServerPlayerEntity player, MazePiece maze, int gate, long mazeKey) {
         for (BlockPos p : maze.gateBlocks(gate)) {
             world.breakBlock(p, false); // sound + particles, no drop
         }
@@ -194,6 +200,7 @@ public final class MazeProtection {
                 .formatted(Formatting.GREEN), false);
         world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_PISTON_CONTRACT, SoundCategory.BLOCKS, 1.0f, 0.6f);
         grant(player, "pull_lever");
+        MazeAmbush.trigger(world, player, maze, gate, mazeKey);
     }
 
     private static void checkAboveWalls(ServerWorld world, ServerPlayerEntity player) {

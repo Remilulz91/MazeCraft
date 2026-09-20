@@ -43,6 +43,26 @@ public class MazeCraftConfig {
     /** Players standing on / flying over the walls of an unconquered maze are sent back to the entrance. */
     public boolean preventWallWalking = true;
 
+    // === Enemies ===
+
+    /** Mobs placed in the maze when it generates (persistent). */
+    public boolean enableGuardians = true;
+
+    /** Pulling a lever spawns a wave of mobs around the player. */
+    public boolean enableAmbushes = true;
+
+    /** The last lever also spawns a champion (named, 4x health, enchanted gear, boss bar). */
+    public boolean enableChampion = true;
+
+    /** Patrols: while a player explores an unconquered maze, mobs keep appearing out of sight (day and night). */
+    public boolean enablePatrols = true;
+
+    /** Seconds between two patrol mobs in a small maze (medium ×0.75, large ×0.6, colossal ×0.5). */
+    public int patrolIntervalSeconds = 30;
+
+    /** Multiplier on the number of guardians and ambush mobs (0 = none, 1 = default, 2 = double). */
+    public double enemyMultiplier = 1.0;
+
     // === Methods ===
 
     public static MazeCraftConfig get() {
