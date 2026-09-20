@@ -2,7 +2,7 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
-## [0.6.0-alpha.1] — Unreleased
+## [0.6.0-alpha.1] — 2026-09-20
 
 Ariadne's Thread.
 
