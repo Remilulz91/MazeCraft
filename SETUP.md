@@ -47,22 +47,25 @@ src/main/
 │   ├── MazeCraft.java               (main entry, build detection)
 │   ├── config/MazeCraftConfig.java  (config/mazecraft.json)
 │   ├── commands/                    (MazeCommand, DebugCommand)
+│   ├── entity/                      (MinotaurEntity, ModEntities, ModSounds)
+│   ├── item/                        (ModItems, AriadneThreadItem, ThreadTrails, ThreadLoot, MinotaurHornItem)
 │   ├── enemy/                       (MazeEnemies, MazeAmbush, MazePatrols, ChampionTracker)
 │   ├── protection/                  (MazeProtection, MazeState, MazeRepair — anti-cheat, saved maze state, one-time chunk clean-up)
 │   ├── mixin/                       (BlockItemMixin, EnderPearlEntityMixin, ExplosionMixin — anti-cheat)
 │   ├── structure/                   (MazeStructure, MazePiece, MazeLayout, MazeSize, MazeStyle, MazeFinder, StructureAvoidance, ModStructures)
-│   └── client/                      (MazeCraftClient, ModMenuIntegration, MazeCraftConfigScreen)
+│   └── client/                      (MazeCraftClient, ModMenuIntegration, MazeCraftConfigScreen, render/MinotaurModel + MinotaurRenderer)
 └── resources/
     ├── fabric.mod.json
     ├── mazecraft.build.properties
-    ├── assets/mazecraft/            (icon.png, lang/en_us.json, lang/fr_fr.json)
+    ├── assets/mazecraft/            (icon.png, lang/, sounds.json, models/item/, textures/item/, textures/entity/minotaur.png)
     └── data/mazecraft/
         ├── worldgen/structure/      (maze_hedge.json — style + biome tag + terrain adaptation)
         ├── worldgen/structure_set/  (mazes.json — spacing 40 / separation 16 chunks)
         ├── tags/worldgen/biome/has_structure/  (biomes per style)
         ├── tags/worldgen/structure/ (mazes.json — every maze structure)
-        ├── advancement/             (root, enter_<style>, pull_lever, defeat_champion, conquer_maze, conquer_colossal, conquer_end_colossal)
-        └── loot_table/chests/       (maze_small/medium/large/colossal.json)
+        ├── advancement/             (root, enter_<style>, pull_lever, defeat_champion, defeat_minotaur, conquer_maze, conquer_colossal, conquer_end_colossal)
+        ├── loot_table/chests/       (maze_, nether_maze_, end_maze_ × small/medium/large/colossal)
+        └── loot_table/entities/     (minotaur.json)
 ```
 
 ## Releasing a new version

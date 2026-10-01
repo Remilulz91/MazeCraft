@@ -27,76 +27,99 @@ import java.util.OptionalInt;
  */
 public class MazeStructure extends Structure {
 
-    /** JSON: the usual structure fields + {@code "style": "hedge" | "desert" | "snow" | "jungle"...}. */
+    /**
+     * JSON: the usual structure fields, plus
+     * {@code "style": "hedge" | "desert" | "snow" | "jungle"...} and
+     * {@code "size": "small" | "medium" | "large"}.
+     *
+     * Since 0.8.0 the size is fixed by the structure instead of being rolled: the progression
+     * (small → medium → large, per style) needs each step to be a findable structure of its own.
+     * Legacy {@code maze_<style>.json} entries have no size field and default to medium; they are
+     * no longer referenced by any structure set, they only keep pre-0.8.0 worlds loading.
+     */
     public static final MapCodec<MazeStructure> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Structure.configCodecBuilder(instance),
-            Codec.STRING.optionalFieldOf("style", "hedge").forGetter(s -> s.style.id())
+            Codec.STRING.optionalFieldOf("style", "hedge").forGetter(s -> s.style.id()),
+            Codec.STRING.optionalFieldOf("size", "medium").forGetter(s -> s.size.id())
     ).apply(instance, MazeStructure::new));
 
     private final MazeStyle style;
+    private final MazeSize size;
 
     /** Floor height range of enclosed (Nether) mazes. Lava sea is at Y=31, bedrock roof from Y=123. */
     private static final int NETHER_MIN_FLOOR = 40;
     private static final int NETHER_MAX_FLOOR = 80;
 
-    /** Rejects the spot if the terrain height varies more than this across the footprint. */
-    private static final int MAX_HEIGHT_DIFFERENCE = 12;
-
-    public MazeStructure(Structure.Config config, String styleId) {
+    public MazeStructure(Structure.Config config, String styleId, String sizeId) {
         super(config);
-        MazeStyle parsed = MazeStyle.fromId(styleId);
-        if (parsed == null) {
+        MazeStyle parsedStyle = MazeStyle.fromId(styleId);
+        if (parsedStyle == null) {
             MazeCraft.LOGGER.warn("[MazeCraft] Unknown maze style '{}' in worldgen JSON, using hedge", styleId);
-            parsed = MazeStyle.HEDGE;
+            parsedStyle = MazeStyle.HEDGE;
         }
-        this.style = parsed;
+        this.style = parsedStyle;
+
+        MazeSize parsedSize = MazeSize.fromId(sizeId);
+        if (parsedSize == null || parsedSize == MazeSize.COLOSSAL) {
+            MazeCraft.LOGGER.warn("[MazeCraft] Invalid maze size '{}' in worldgen JSON, using medium", sizeId);
+            parsedSize = MazeSize.MEDIUM;
+        }
+        this.size = parsedSize;
+    }
+
+    public MazeStyle getStyle() {
+        return style;
+    }
+
+    /** The progression step this structure generates (never COLOSSAL — that is a LARGE variant). */
+    public MazeSize getSize() {
+        return size;
     }
 
     @Override
     protected Optional<StructurePosition> getStructurePosition(Context context) {
         ChunkPos chunkPos = context.chunkPos();
-        MazeSize rolled = style.isEnd() ? MazeSize.rollEnd(context.random()) : MazeSize.roll(context.random());
         long mazeSeed = context.random().nextLong();
         int centerX = chunkPos.getCenterX();
         int centerZ = chunkPos.getCenterZ();
 
+        // The size is fixed by the structure. It is never downgraded when the terrain is poor:
+        // a "medium" structure that quietly generated a small maze would hand the player the
+        // wrong progression step. A spot that doesn't fit simply gets no maze.
         if (style.enclosed) {
-            // Nether: buried in the rock like a fortress, at the height where the rock is the most
-            // solid (never hanging over the lava sea); smaller sizes are tried if nothing fits.
-            // No colossal mazes in the Nether: too big for its caverns
-            MazeSize netherSize = rolled == MazeSize.COLOSSAL ? MazeSize.LARGE : rolled;
-            for (MazeSize size = netherSize; size != null; size = size.smaller()) {
-                if (StructureAvoidance.isNearOtherStructure(context, size, style)) continue;
-                OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size);
-                if (floorY.isPresent()) {
-                    final MazeSize finalSize = size;
-                    final int y = floorY.getAsInt();
-                    final int entrance = mostOpenSide(context, centerX, centerZ, finalSize, y);
-                    return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
-                            collector.addPiece(new MazePiece(style, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
-                }
-            }
-            return Optional.empty();
+            // Nether: buried in the rock like a fortress, at the height where the rock is the
+            // most solid (never hanging over the lava sea). No colossal mazes down here.
+            if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
+            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size);
+            if (floorY.isEmpty()) return Optional.empty();
+            int y = floorY.getAsInt();
+            int entrance = mostOpenSide(context, centerX, centerZ, size, y);
+            return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
+                    collector.addPiece(new MazePiece(style, size, mazeSeed, centerX, y, centerZ, entrance))));
         }
 
-        // Big mazes need a big flat area: if the rolled size doesn't fit, try the smaller ones.
-        for (MazeSize size = rolled; size != null; size = size.smaller()) {
-            if (StructureAvoidance.isNearOtherStructure(context, size, style)) continue;
-            OptionalInt floorY = findFloorY(context, centerX, centerZ, size);
-            if (floorY.isPresent()) {
-                final MazeSize finalSize = size;
-                final int y = floorY.getAsInt();
-                final int entrance = bestEntranceSide(context, centerX, centerZ, finalSize, y, style);
-                return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
-                        collector.addPiece(new MazePiece(style, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
-            }
+        // Overworld / End: one large maze in COLOSSAL_CHANCE becomes a colossal one. It is the
+        // same progression step, just bigger and richer — so it needs the flat area to match.
+        MazeSize actual = size;
+        if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
+                && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
+                && findFloorY(context, centerX, centerZ, MazeSize.COLOSSAL).isPresent()) {
+            actual = MazeSize.COLOSSAL;
         }
-        return Optional.empty();
+
+        if (StructureAvoidance.isNearOtherStructure(context, actual, style)) return Optional.empty();
+        OptionalInt floorY = findFloorY(context, centerX, centerZ, actual);
+        if (floorY.isEmpty()) return Optional.empty();
+        final MazeSize finalSize = actual;
+        int y = floorY.getAsInt();
+        int entrance = bestEntranceSide(context, centerX, centerZ, finalSize, y, style);
+        return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
+                collector.addPiece(new MazePiece(style, finalSize, mazeSeed, centerX, y, centerZ, entrance))));
     }
 
     /**
      * Samples the terrain on a 5×5 grid over the footprint. Returns the floor Y, or empty
-     * if there is water or more than {@link #MAX_HEIGHT_DIFFERENCE} blocks of relief.
+     * if there is water or more relief than {@link MazeSize#maxRelief()} allows.
      */
     private static OptionalInt findFloorY(Context context, int centerX, int centerZ, MazeSize size) {
         ChunkGenerator gen = context.chunkGenerator();
@@ -117,7 +140,7 @@ public class MazeStructure extends Structure {
                 n++;
             }
         }
-        if (max - min > MAX_HEIGHT_DIFFERENCE) {
+        if (max - min > size.maxRelief()) {
             return OptionalInt.empty(); // too hilly
         }
         // getHeight returns the first air block → the floor replaces the surface block below it

@@ -74,8 +74,6 @@ public class DebugCommand {
         src.sendFeedback(() -> Text.literal("Build type: DEBUG").formatted(Formatting.GRAY), false);
         src.sendFeedback(() -> Text.literal("protectUntilSolved: " + cfg.protectUntilSolved
                 + ", preventWallWalking: " + cfg.preventWallWalking).formatted(Formatting.GRAY), false);
-        src.sendFeedback(() -> Text.literal("Size weights (S/M/L/C): " + cfg.weightSmall + "/" + cfg.weightMedium
-                + "/" + cfg.weightLarge + "/" + cfg.weightColossal).formatted(Formatting.GRAY), false);
         return 1;
     }
 

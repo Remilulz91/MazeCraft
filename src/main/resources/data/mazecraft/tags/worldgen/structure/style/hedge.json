@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_hedge",
+    "mazecraft:maze_hedge_small",
+    "mazecraft:maze_hedge_medium",
+    "mazecraft:maze_hedge_large"
+  ]
+}

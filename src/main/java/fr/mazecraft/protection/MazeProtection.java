@@ -3,6 +3,7 @@ package fr.mazecraft.protection;
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.MazeAmbush;
+import fr.mazecraft.progression.MazeProgress;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
@@ -10,7 +11,6 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.fabricmc.fabric.api.event.player.UseItemCallback;
-import net.minecraft.advancement.AdvancementEntry;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.BucketItem;
@@ -19,7 +19,6 @@ import net.minecraft.item.FireChargeItem;
 import net.minecraft.item.FlintAndSteelItem;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -240,16 +239,36 @@ public final class MazeProtection {
                 grant(player, "conquer_end_colossal");
             }
         }
+
+        // Progression step: clears this style's current step and unlocks the next one for
+        // THIS player only. A colossal maze counts as the large step of its style.
+        String step = MazeProgress.advancementId(maze.getStyle(), maze.getSize());
+        if (!MazeProgress.hasAdvancement(player, step)) {
+            MazeProgress.grant(player, step);
+            MazeSize next = nextOf(maze.getSize());
+            if (next != null) {
+                player.sendMessage(Text.translatable("mazecraft.progression.unlocked",
+                        Text.translatable("mazecraft.style." + maze.getStyle().id()),
+                        Text.translatable("mazecraft.size." + next.id())).formatted(Formatting.AQUA), false);
+            } else if (MazeProgress.isStyleComplete(player, maze.getStyle())) {
+                player.sendMessage(Text.translatable("mazecraft.progression.style_complete",
+                        Text.translatable("mazecraft.style." + maze.getStyle().id())).formatted(Formatting.GOLD), false);
+            }
+            if (MazeProgress.isEverythingComplete(player)) {
+                player.sendMessage(Text.translatable("mazecraft.maze.all_done").formatted(Formatting.LIGHT_PURPLE), false);
+            }
+        }
+    }
+
+    private static MazeSize nextOf(MazeSize size) {
+        return switch (size.step()) {
+            case SMALL -> MazeSize.MEDIUM;
+            case MEDIUM -> MazeSize.LARGE;
+            default -> null;
+        };
     }
 
     private static void grant(ServerPlayerEntity player, String advancement) {
-        MinecraftServer server = player.getServer();
-        if (server == null) return;
-        AdvancementEntry entry = server.getAdvancementLoader().get(MazeCraft.id(advancement));
-        if (entry != null) {
-            for (String criterion : player.getAdvancementTracker().getProgress(entry).getUnobtainedCriteria()) {
-                player.getAdvancementTracker().grantCriterion(entry, criterion);
-            }
-        }
+        MazeProgress.grant(player, advancement);
     }
 }

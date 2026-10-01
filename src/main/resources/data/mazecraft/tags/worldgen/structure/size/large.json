@@ -1,0 +1,21 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_hedge_large",
+    "mazecraft:maze_desert_large",
+    "mazecraft:maze_snow_large",
+    "mazecraft:maze_jungle_large",
+    "mazecraft:maze_badlands_large",
+    "mazecraft:maze_dark_forest_large",
+    "mazecraft:maze_cherry_large",
+    "mazecraft:maze_swamp_large",
+    "mazecraft:maze_savanna_large",
+    "mazecraft:maze_taiga_large",
+    "mazecraft:maze_fortress_large",
+    "mazecraft:maze_crimson_large",
+    "mazecraft:maze_warped_large",
+    "mazecraft:maze_soul_large",
+    "mazecraft:maze_basalt_large",
+    "mazecraft:maze_end_large"
+  ]
+}

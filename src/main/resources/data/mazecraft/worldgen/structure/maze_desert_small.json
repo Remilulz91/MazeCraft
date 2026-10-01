@@ -1,0 +1,9 @@
+{
+  "type": "mazecraft:maze",
+  "style": "desert",
+  "size": "small",
+  "biomes": "#mazecraft:has_structure/maze_desert",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

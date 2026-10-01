@@ -1,30 +1,10 @@
 {
-  "structures": [
-    {
-      "structure": "mazecraft:maze_fortress",
-      "weight": 1
-    },
-    {
-      "structure": "mazecraft:maze_crimson",
-      "weight": 1
-    },
-    {
-      "structure": "mazecraft:maze_warped",
-      "weight": 1
-    },
-    {
-      "structure": "mazecraft:maze_soul",
-      "weight": 1
-    },
-    {
-      "structure": "mazecraft:maze_basalt",
-      "weight": 1
-    }
-  ],
+  "_comment": "Legacy (pre-0.8.0) set, intentionally empty: sizes now have their own sets.",
+  "structures": [],
   "placement": {
     "type": "minecraft:random_spread",
-    "spacing": 32,
-    "separation": 12,
+    "spacing": 64,
+    "separation": 32,
     "salt": 1350915092
   }
 }

@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:enter_end",
+  "display": {
+    "icon": {
+      "id": "minecraft:purpur_pillar"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_end_small.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_end_small.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 50
+  }
+}

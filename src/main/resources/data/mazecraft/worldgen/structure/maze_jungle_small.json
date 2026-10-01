@@ -1,0 +1,9 @@
+{
+  "type": "mazecraft:maze",
+  "style": "jungle",
+  "size": "small",
+  "biomes": "#mazecraft:has_structure/maze_jungle",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

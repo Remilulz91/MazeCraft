@@ -16,6 +16,10 @@ public final class ModItems {
     public static final Item ARIADNE_THREAD = Registry.register(Registries.ITEM, MazeCraft.id("ariadne_thread"),
             new AriadneThreadItem(new Item.Settings().maxDamage(AriadneThreadItem.USES).rarity(Rarity.UNCOMMON)));
 
+    /** Ariadne's Compass: locates the maze the holder has to clear next (per-player progression). */
+    public static final Item ARIADNE_COMPASS = Registry.register(Registries.ITEM, MazeCraft.id("ariadne_compass"),
+            new AriadneCompassItem(new Item.Settings().maxCount(1).rarity(Rarity.UNCOMMON)));
+
     /** Minotaur Horn: dropped by the Minotaur, rallies nearby players (Strength + Speed). */
     public static final Item MINOTAUR_HORN = Registry.register(Registries.ITEM, MazeCraft.id("minotaur_horn"),
             new MinotaurHornItem(new Item.Settings().maxCount(1).rarity(Rarity.EPIC)));
@@ -28,6 +32,7 @@ public final class ModItems {
     public static void register() {
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS).register(entries -> {
             entries.add(ARIADNE_THREAD);
+            entries.add(ARIADNE_COMPASS);
             entries.add(MINOTAUR_HORN);
         });
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.SPAWN_EGGS).register(entries -> entries.add(MINOTAUR_SPAWN_EGG));

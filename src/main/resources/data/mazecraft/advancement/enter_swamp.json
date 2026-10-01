@@ -25,7 +25,7 @@
             "entity": "this",
             "predicate": {
               "location": {
-                "structures": "mazecraft:maze_swamp"
+                "structures": "#mazecraft:style/swamp"
               }
             }
           }

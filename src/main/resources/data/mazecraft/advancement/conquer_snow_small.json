@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:enter_snow",
+  "display": {
+    "icon": {
+      "id": "minecraft:packed_ice"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_snow_small.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_snow_small.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 50
+  }
+}

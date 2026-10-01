@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_fortress",
+    "mazecraft:maze_fortress_small",
+    "mazecraft:maze_fortress_medium",
+    "mazecraft:maze_fortress_large"
+  ]
+}

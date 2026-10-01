@@ -1,0 +1,21 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_hedge_medium",
+    "mazecraft:maze_desert_medium",
+    "mazecraft:maze_snow_medium",
+    "mazecraft:maze_jungle_medium",
+    "mazecraft:maze_badlands_medium",
+    "mazecraft:maze_dark_forest_medium",
+    "mazecraft:maze_cherry_medium",
+    "mazecraft:maze_swamp_medium",
+    "mazecraft:maze_savanna_medium",
+    "mazecraft:maze_taiga_medium",
+    "mazecraft:maze_fortress_medium",
+    "mazecraft:maze_crimson_medium",
+    "mazecraft:maze_warped_medium",
+    "mazecraft:maze_soul_medium",
+    "mazecraft:maze_basalt_medium",
+    "mazecraft:maze_end_medium"
+  ]
+}

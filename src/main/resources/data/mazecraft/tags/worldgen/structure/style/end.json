@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_end",
+    "mazecraft:maze_end_small",
+    "mazecraft:maze_end_medium",
+    "mazecraft:maze_end_large"
+  ]
+}

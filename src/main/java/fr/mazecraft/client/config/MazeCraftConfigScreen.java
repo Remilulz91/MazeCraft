@@ -26,18 +26,6 @@ public final class MazeCraftConfigScreen {
         // === Generation category ===
         ConfigCategory gen = builder.getOrCreateCategory(Text.translatable("config.mazecraft.category.generation"));
         gen.addEntry(entry.startTextDescription(Text.translatable("config.mazecraft.weights.description")).build());
-        gen.addEntry(entry.startIntField(Text.translatable("config.mazecraft.weightSmall"), cfg.weightSmall)
-                .setMin(0).setMax(1000).setDefaultValue(45)
-                .setSaveConsumer(v -> cfg.weightSmall = v).build());
-        gen.addEntry(entry.startIntField(Text.translatable("config.mazecraft.weightMedium"), cfg.weightMedium)
-                .setMin(0).setMax(1000).setDefaultValue(35)
-                .setSaveConsumer(v -> cfg.weightMedium = v).build());
-        gen.addEntry(entry.startIntField(Text.translatable("config.mazecraft.weightLarge"), cfg.weightLarge)
-                .setMin(0).setMax(1000).setDefaultValue(15)
-                .setSaveConsumer(v -> cfg.weightLarge = v).build());
-        gen.addEntry(entry.startIntField(Text.translatable("config.mazecraft.weightColossal"), cfg.weightColossal)
-                .setMin(0).setMax(1000).setDefaultValue(5)
-                .setSaveConsumer(v -> cfg.weightColossal = v).build());
 
         // === Protection category ===
         ConfigCategory prot = builder.getOrCreateCategory(Text.translatable("config.mazecraft.category.protection"));

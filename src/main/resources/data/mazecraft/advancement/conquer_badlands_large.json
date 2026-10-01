@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_badlands_medium",
+  "display": {
+    "icon": {
+      "id": "minecraft:red_terracotta"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_badlands_large.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_badlands_large.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 400
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_cherry_small",
+  "display": {
+    "icon": {
+      "id": "minecraft:cherry_leaves"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_cherry_medium.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_cherry_medium.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 150
+  }
+}

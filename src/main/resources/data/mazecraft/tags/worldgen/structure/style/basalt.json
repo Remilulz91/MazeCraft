@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_basalt",
+    "mazecraft:maze_basalt_small",
+    "mazecraft:maze_basalt_medium",
+    "mazecraft:maze_basalt_large"
+  ]
+}

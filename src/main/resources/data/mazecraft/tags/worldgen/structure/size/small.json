@@ -1,0 +1,21 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_hedge_small",
+    "mazecraft:maze_desert_small",
+    "mazecraft:maze_snow_small",
+    "mazecraft:maze_jungle_small",
+    "mazecraft:maze_badlands_small",
+    "mazecraft:maze_dark_forest_small",
+    "mazecraft:maze_cherry_small",
+    "mazecraft:maze_swamp_small",
+    "mazecraft:maze_savanna_small",
+    "mazecraft:maze_taiga_small",
+    "mazecraft:maze_fortress_small",
+    "mazecraft:maze_crimson_small",
+    "mazecraft:maze_warped_small",
+    "mazecraft:maze_soul_small",
+    "mazecraft:maze_basalt_small",
+    "mazecraft:maze_end_small"
+  ]
+}

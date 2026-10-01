@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:enter_taiga",
+  "display": {
+    "icon": {
+      "id": "minecraft:spruce_leaves"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_taiga_small.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_taiga_small.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 50
+  }
+}

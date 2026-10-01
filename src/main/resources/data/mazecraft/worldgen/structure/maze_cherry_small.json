@@ -1,0 +1,9 @@
+{
+  "type": "mazecraft:maze",
+  "style": "cherry",
+  "size": "small",
+  "biomes": "#mazecraft:has_structure/maze_cherry",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

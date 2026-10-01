@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "mazecraft:maze_warped",
+    "mazecraft:maze_warped_small",
+    "mazecraft:maze_warped_medium",
+    "mazecraft:maze_warped_large"
+  ]
+}

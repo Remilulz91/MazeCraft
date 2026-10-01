@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_hedge_small",
+  "display": {
+    "icon": {
+      "id": "minecraft:oak_leaves"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_hedge_medium.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_hedge_medium.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 150
+  }
+}

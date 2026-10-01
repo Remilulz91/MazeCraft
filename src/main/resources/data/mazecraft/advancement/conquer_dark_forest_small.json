@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:enter_dark_forest",
+  "display": {
+    "icon": {
+      "id": "minecraft:dark_oak_leaves"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.conquer_dark_forest_small.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.conquer_dark_forest_small.description"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "conquered": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 50
+  }
+}

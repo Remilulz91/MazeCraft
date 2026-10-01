@@ -2,7 +2,69 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
-## [0.7.0-alpha.1] — Unreleased
+## [0.8.0-alpha.1] — Unreleased
+
+Per-player progression: small → medium → large, one branch per style.
+
+> ⚠️ **Breaks existing alpha worlds.** Mazes already generated keep their blocks and still
+> work (their legacy structure stays registered), but every new maze now comes from a new
+> structure, and progression starts from zero. A fresh world is recommended.
+
+### Added
+- **Progression per style and per player.** Each of the 16 styles has to be cleared one step at
+  a time — small, then medium, then large — and progress is tracked **per player**, not per
+  world: on a server, nobody inherits anyone else's progress. Clearing the forest mazes unlocks
+  nothing in the jungle.
+- **48 new structures and structure sets** (`maze_<style>_<size>`), one spread grid per style
+  *and* per size, so a given style/size pair is always findable instead of depending on a size
+  roll. `/locate structure mazecraft:maze_hedge_medium` now works, as do the tags
+  `#mazecraft:style/<style>`, `#mazecraft:size/<size>` and `#mazecraft:step/<style>_<size>`.
+- **48 advancements** `conquer_<style>_<size>`, forming 16 branches of three steps hanging off
+  each `enter_<style>`. Granted when the central chest is opened; they *are* the progression
+  (same source of truth as the gate checks coming in 0.9.0), so the tree can never disagree
+  with the game state. 50 / 150 / 400 XP per step.
+- **Ariadne's Compass** (`mazecraft:ariadne_compass`, Tools tab): lists the steps you still owe
+  in the dimension you are standing in and locates the one you pick. Right-click to search
+  (coordinates, distance, a line of particles pointing the way; 5 s cooldown, 100-chunk radius),
+  sneak + right-click to switch target. Crafted from a compass, 4 gold ingots and 4 string.
+  With 48 mazes to clear, finding one specific style and size by flying around is not a game —
+  this makes it a decision instead.
+- `/maze progress`: your own progression, 16 lines, cleared / next / locked per step.
+
+### Changed
+- **A maze's size is now fixed by its structure** and is never silently downgraded when the
+  terrain is poor. A "medium" structure that quietly built a small maze would hand the player
+  the wrong progression step; a spot that doesn't fit simply gets no maze.
+- To compensate, the relief a spot may have grows with the size (10 / 14 / 18 / 20 blocks
+  instead of a flat 12), otherwise large mazes would be nearly impossible to place.
+- **Colossal mazes are no longer a step of their own**: one large maze in 8 is upgraded to a
+  colossal one (Overworld and End; never in the Nether), with the same loot tables as before.
+  A colossal maze counts as the large step of its style.
+- The four size-weight config options are gone: how often each size appears is now datapack
+  territory (`spacing` / `separation` per structure set). Spacing is 32 for small, 44 for
+  medium, 52 for large (first in-game `/locate` run put the nearest small hedge maze almost
+  3000 blocks out, which is too far for the entry step of a branch).
+- `enter_<style>` advancements now trigger on the style tag, so any of the three sizes counts.
+
+### Fixed
+- Ambush mobs no longer attack a player in creative or spectator mode: the ambush forced a
+  target on them, which overrode the vanilla rule that hostile mobs ignore creative players.
+  The mobs still spawn, they just behave normally around that player (patrols already did this).
+- Ariadne's Compass can actually be crafted: the recipe was written in the 1.21.2 ingredient
+  format (`"S": "minecraft:string"`), which 1.21.1 does not accept — it needs the object form
+  (`"S": {"item": "minecraft:string"}`), so the recipe silently never loaded. It also had no
+  unlock advancement, so it would not have shown in the recipe book either. Both fixed against
+  vanilla's own `compass.json`.
+
+### Technical
+- New `fr.mazecraft.progression.MazeProgress`: progression is read from the player's own
+  advancement tracker rather than a side table — already per-player, already saved, already
+  synced to the client, and nothing to migrate.
+- The three pre-0.8.0 structure sets (`mazes`, `nether_mazes`, `end_mazes`) are emptied rather
+  than deleted, and the 16 legacy `maze_<style>` structures stay registered: old chunks keep
+  deserializing, but no new maze is ever placed from them.
+
+## [0.7.0-alpha.1] — 2026-09-20
 
 The Minotaur.
 

@@ -36,6 +36,11 @@ public final class MazeAmbush {
         MazeCraftConfig cfg = MazeCraftConfig.get();
         if (!cfg.enableAmbushes || world.getDifficulty() == Difficulty.PEACEFUL) return;
 
+        // Vanilla hostile mobs never target a creative or spectator player; forcing a target
+        // would make them attack anyway. The ambush still spawns (so it can be watched and
+        // tested in creative), the mobs simply behave like any other mob around that player.
+        boolean exempt = player.isCreative() || player.isSpectator();
+
         int gates = maze.gateCount();
         boolean last = gate == gates - 1;
         double progress = gates <= 1 ? 1.0 : (double) gate / (gates - 1);
@@ -51,7 +56,7 @@ public final class MazeAmbush {
             if (pos == null) continue;
             MobEntity mob = MazeEnemies.spawn(world, pool.get(random.nextInt(pool.size())), pos, tier, false, SpawnReason.EVENT);
             if (mob != null) {
-                mob.setTarget(player);
+                if (!exempt) mob.setTarget(player);
                 poof(world, pos);
                 spawned++;
             }
@@ -75,7 +80,7 @@ public final class MazeAmbush {
                 boss.addCommandTag(MazeEnemies.MAZE_TAG_PREFIX + mazeKey);
                 fr.mazecraft.protection.MazeState.get(world).setChampion(mazeKey, true);
                 ChampionTracker.track(world, boss);
-                boss.setTarget(player);
+                if (!exempt) boss.setTarget(player);
                 poof(world, pos);
                 spawned++;
                 player.sendMessage(Text.translatable(minotaur ? "mazecraft.minotaur.appears" : "mazecraft.champion.appears")

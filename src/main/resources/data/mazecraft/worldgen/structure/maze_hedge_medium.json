@@ -1,0 +1,9 @@
+{
+  "type": "mazecraft:maze",
+  "style": "hedge",
+  "size": "medium",
+  "biomes": "#mazecraft:has_structure/maze_hedge",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "beard_thin"
+}

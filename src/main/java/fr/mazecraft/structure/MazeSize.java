@@ -1,8 +1,5 @@
 package fr.mazecraft.structure;
 
-import fr.mazecraft.config.MazeCraftConfig;
-import net.minecraft.util.math.random.Random;
-
 import java.util.Locale;
 
 /**
@@ -86,36 +83,45 @@ public enum MazeSize {
         return null;
     }
 
-    /** Weight of this size in the random roll, read from the config. */
-    private int weight() {
-        MazeCraftConfig cfg = MazeCraftConfig.get();
-        return Math.max(0, switch (this) {
-            case SMALL -> cfg.weightSmall;
-            case MEDIUM -> cfg.weightMedium;
-            case LARGE -> cfg.weightLarge;
-            case COLOSSAL -> cfg.weightColossal;
-        });
+    // === Progression (since 0.8.0) ===
+    //
+    // Each style generates three mazes — one per PROGRESSION step — and each step has its
+    // own structure and its own structure set, so a given style/size pair is always findable
+    // (see data/mazecraft/worldgen/structure[_set]/maze_<style>_<size>.json).
+    // COLOSSAL is not a step of its own: it is a rare variant of LARGE and counts as LARGE.
+
+    /** The three progression steps, in order. COLOSSAL is excluded (it counts as LARGE). */
+    public static final MazeSize[] STEPS = { SMALL, MEDIUM, LARGE };
+
+    /** The step this size belongs to: COLOSSAL counts as LARGE, every other size is its own step. */
+    public MazeSize step() {
+        return this == COLOSSAL ? LARGE : this;
     }
 
-    /** Rolls a random size using the configured weights (falls back to SMALL if all weights are 0). */
-    /** End: the ultimate mazes, bigger on average (small 20 / medium 30 / large 30 / colossal 20). */
-    public static MazeSize rollEnd(Random random) {
-        int r = random.nextInt(100);
-        if (r < 20) return SMALL;
-        if (r < 50) return MEDIUM;
-        if (r < 80) return LARGE;
-        return COLOSSAL;
+    /** The step that must be cleared before this one, or null for the first step. */
+    public MazeSize previousStep() {
+        return switch (step()) {
+            case SMALL -> null;
+            case MEDIUM -> SMALL;
+            default -> MEDIUM;
+        };
     }
 
-    public static MazeSize roll(Random random) {
-        int total = 0;
-        for (MazeSize s : values()) total += s.weight();
-        if (total <= 0) return SMALL;
-        int r = random.nextInt(total);
-        for (MazeSize s : values()) {
-            r -= s.weight();
-            if (r < 0) return s;
-        }
-        return SMALL;
+    /** 1-based index of this size's step (SMALL 1, MEDIUM 2, LARGE/COLOSSAL 3). */
+    public int stepIndex() {
+        return step().ordinal() + 1;
+    }
+
+    /** One LARGE maze in {@code 1/CHANCE} is upgraded to a colossal one (Overworld and End only). */
+    public static final int COLOSSAL_CHANCE = 8;
+
+    /**
+     * Relief the terrain may have across the footprint before the spot is rejected.
+     * Bigger mazes get more tolerance: since 0.8.0 a structure can no longer fall back to a
+     * smaller size (that would break the progression), so a strict limit would make large
+     * mazes nearly impossible to find.
+     */
+    public int maxRelief() {
+        return switch (this) { case SMALL -> 10; case MEDIUM -> 14; case LARGE -> 18; case COLOSSAL -> 20; };
     }
 }

@@ -26,14 +26,9 @@ public class MazeCraftConfig {
     private static MazeCraftConfig INSTANCE = new MazeCraftConfig();
 
     // === Maze generation ===
-    // Relative weights of each maze size when a maze is generated in the world.
-    // Example: 45/35/15/5 → 45% small, 35% medium, 15% large, 5% colossal.
-    // Only affects mazes generated AFTER the change (existing mazes keep their size).
-
-    public int weightSmall = 45;
-    public int weightMedium = 35;
-    public int weightLarge = 15;
-    public int weightColossal = 5;
+    // Since 0.8.0 each size is its own structure with its own structure set, so how often a
+    // given size appears is datapack territory (spacing / separation in
+    // data/mazecraft/worldgen/structure_set/maze_<style>_<size>.json), not a config value.
 
     // === Protection (until the central chest is opened) ===
 
