@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_taiga",
     "mazecraft:maze_taiga_small",
     "mazecraft:maze_taiga_medium",
     "mazecraft:maze_taiga_large"

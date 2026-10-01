@@ -1,8 +1,0 @@
-{
-  "type": "mazecraft:maze",
-  "style": "soul",
-  "biomes": "#mazecraft:has_structure/maze_soul",
-  "step": "top_layer_modification",
-  "spawn_overrides": {},
-  "terrain_adaptation": "none"
-}

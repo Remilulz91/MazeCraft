@@ -1,8 +1,0 @@
-{
-  "type": "mazecraft:maze",
-  "style": "dark_forest",
-  "biomes": "#mazecraft:has_structure/maze_dark_forest",
-  "step": "surface_structures",
-  "spawn_overrides": {},
-  "terrain_adaptation": "beard_thin"
-}

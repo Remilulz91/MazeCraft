@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x,tier=medium": {
+      "model": "mazecraft:block/sealed_gateway_medium_x"
+    },
+    "axis=z,tier=medium": {
+      "model": "mazecraft:block/sealed_gateway_medium_z"
+    },
+    "axis=x,tier=large": {
+      "model": "mazecraft:block/sealed_gateway_large_x"
+    },
+    "axis=z,tier=large": {
+      "model": "mazecraft:block/sealed_gateway_large_z"
+    }
+  }
+}

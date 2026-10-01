@@ -1,5 +1,6 @@
 package fr.mazecraft;
 
+import fr.mazecraft.block.ModBlocks;
 import fr.mazecraft.commands.MazeCommand;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.ChampionTracker;
@@ -9,6 +10,7 @@ import fr.mazecraft.entity.ModSounds;
 import fr.mazecraft.item.ModItems;
 import fr.mazecraft.item.ThreadTrails;
 import fr.mazecraft.item.ThreadLoot;
+import fr.mazecraft.progression.MazeBarrier;
 import fr.mazecraft.protection.MazeProtection;
 import fr.mazecraft.protection.MazeRepair;
 import fr.mazecraft.structure.ModStructures;
@@ -71,6 +73,7 @@ public class MazeCraft implements ModInitializer {
         LOGGER.info("[MazeCraft] Configuration loaded");
 
         // 1b. Items (Ariadne's Thread) + its trail renderer + loot in vanilla chests
+        ModBlocks.register();
         ModSounds.register();
         ModEntities.register();
         ModItems.register();
@@ -96,7 +99,8 @@ public class MazeCraft implements ModInitializer {
         // 7. Patrols: mobs keep appearing out of sight while a player explores a maze
         MazePatrols.register();
 
-        // Next step: lever / gate blocks.
+        // 8. Sealed gateways: per-player progression enforced at the maze entrances
+        MazeBarrier.register();
 
         LOGGER.info("[MazeCraft] Mod loaded successfully!");
     }

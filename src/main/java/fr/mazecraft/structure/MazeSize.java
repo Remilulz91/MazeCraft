@@ -117,11 +117,14 @@ public enum MazeSize {
 
     /**
      * Relief the terrain may have across the footprint before the spot is rejected.
-     * Bigger mazes get more tolerance: since 0.8.0 a structure can no longer fall back to a
-     * smaller size (that would break the progression), so a strict limit would make large
-     * mazes nearly impossible to find.
+     *
+     * <p>0.8.0 pushed this up to 18–20 for the big sizes, because a structure can no longer fall
+     * back to a smaller one and large mazes were getting hard to find. In game that showed: a
+     * flat 149-block platform allowed to sit on 18 blocks of relief cuts a hillside into a
+     * visible escarpment. The tolerance is back near its pre-0.8.0 value and the rarity is paid
+     * for with tighter spacing instead — density is the knob that does not hurt the look.</p>
      */
     public int maxRelief() {
-        return switch (this) { case SMALL -> 10; case MEDIUM -> 14; case LARGE -> 18; case COLOSSAL -> 20; };
+        return switch (this) { case SMALL -> 10; case MEDIUM -> 12; case LARGE -> 14; case COLOSSAL -> 16; };
     }
 }

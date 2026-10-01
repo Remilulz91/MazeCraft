@@ -1,8 +1,0 @@
-{
-  "type": "mazecraft:maze",
-  "style": "snow",
-  "biomes": "#mazecraft:has_structure/maze_snow",
-  "step": "surface_structures",
-  "spawn_overrides": {},
-  "terrain_adaptation": "beard_thin"
-}

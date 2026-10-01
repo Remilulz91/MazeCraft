@@ -210,6 +210,29 @@ public final class MazeLayout {
     }
 
     /** True if local (lx, lz), possibly outside the maze, is on the 3-wide approach path in front of the entrance. */
+    /**
+     * The three (lx, lz) cells of the entrance doorway in the outer wall — the opening carved
+     * in step 4 of {@link #build}. The sealed gateway of a locked maze fills exactly these.
+     */
+    public int[][] entranceGap() {
+        int[][] cells = new int[CELL - 1][];
+        for (int i = 1; i < CELL; i++) {
+            int along = entranceCell * CELL + i;
+            cells[i - 1] = switch (entranceSide) {
+                case NORTH -> new int[]{along, 0};
+                case SOUTH -> new int[]{along, span - 1};
+                case WEST -> new int[]{0, along};
+                default -> new int[]{span - 1, along};
+            };
+        }
+        return cells;
+    }
+
+    /** True when the entrance doorway runs along the X axis (north and south walls). */
+    public boolean entranceAlongX() {
+        return entranceSide == NORTH || entranceSide == SOUTH;
+    }
+
     public boolean isApproach(int lx, int lz) {
         int along = entranceCell * CELL + CELL / 2;
         return switch (entranceSide) {

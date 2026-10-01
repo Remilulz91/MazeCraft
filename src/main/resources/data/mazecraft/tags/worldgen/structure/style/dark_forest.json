@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_dark_forest",
     "mazecraft:maze_dark_forest_small",
     "mazecraft:maze_dark_forest_medium",
     "mazecraft:maze_dark_forest_large"

@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_desert",
     "mazecraft:maze_desert_small",
     "mazecraft:maze_desert_medium",
     "mazecraft:maze_desert_large"

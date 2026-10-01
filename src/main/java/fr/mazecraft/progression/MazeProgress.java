@@ -97,6 +97,15 @@ public final class MazeProgress {
         return done;
     }
 
+    /** How many of the 16 styles this player has fully cleared (one key fragment each). */
+    public static int completedStyles(ServerPlayerEntity player) {
+        int done = 0;
+        for (MazeStyle style : MazeStyle.values()) {
+            if (isStyleComplete(player, style)) done++;
+        }
+        return done;
+    }
+
     /** True once every style of every dimension is complete — the key to Kronos (1.0.0). */
     public static boolean isEverythingComplete(ServerPlayerEntity player) {
         return completedSteps(player) >= TOTAL_STEPS;

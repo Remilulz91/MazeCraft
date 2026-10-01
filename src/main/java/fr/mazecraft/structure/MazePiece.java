@@ -1,5 +1,7 @@
 package fr.mazecraft.structure;
 
+import fr.mazecraft.block.ModBlocks;
+import fr.mazecraft.block.SealedGatewayBlock;
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.MazeEnemies;
@@ -18,6 +20,7 @@ import net.minecraft.block.entity.ChestBlockEntity;
 import net.minecraft.loot.LootTable;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.structure.StructureContext;
 import net.minecraft.structure.StructurePiece;
@@ -146,6 +149,30 @@ public class MazePiece extends StructurePiece {
     public BlockPos entranceOutsidePos() {
         int[] l = layout().entranceOutside(2);
         return new BlockPos(originX() + l[0], floorY + 1, originZ() + l[1]);
+    }
+
+    /**
+     * World positions of the sealed gateway plane filling the entrance doorway
+     * (3 wide × WALL_HEIGHT high). Empty for sizes that are never sealed.
+     */
+    public List<BlockPos> entranceBlocks() {
+        List<BlockPos> list = new ArrayList<>();
+        for (int[] cell : layout().entranceGap()) {
+            for (int dy = 1; dy <= WALL_HEIGHT; dy++) {
+                list.add(new BlockPos(originX() + cell[0], floorY + dy, originZ() + cell[1]));
+            }
+        }
+        return list;
+    }
+
+    /** Logs and leaves: left in place over the ring so overhanging trees stay whole. */
+    private static boolean isTreeMatter(BlockState state) {
+        return state.isIn(BlockTags.LOGS) || state.isIn(BlockTags.LEAVES);
+    }
+
+    /** True when the entrance doorway runs along the X axis. */
+    public boolean entranceAlongX() {
+        return layout().entranceAlongX();
     }
 
     /** World positions of all blocks of gate {@code index} (3 wide × WALL_HEIGHT high). */
@@ -360,6 +387,13 @@ public class MazePiece extends StructurePiece {
                     }
                     if (pos.equals(keep)) continue;
                     BlockState current = world.getBlockState(pos);
+                    // Over the ring, leave trees alone. Nothing can root in the ring (its floor is
+                    // never a soil block) and the maze proper is further from any possible trunk
+                    // than a canopy can reach — so every tree sliced flat along the edge was cut
+                    // by THIS clearing, not grown into the maze. Skipping tree matter here keeps
+                    // overhanging branches whole instead of leaving half a tree, and costs
+                    // nothing: it is outside the walls.
+                    if (!inside && isTreeMatter(current)) continue;
                     if (current != target && !(repairing && current.isOf(Blocks.SNOW) && target.isAir())) {
                         world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
                     }
@@ -383,6 +417,20 @@ public class MazePiece extends StructurePiece {
                         pos.set(originX() + gx, floorY + dy, originZ() + gz);
                         if (chunkBox.contains(pos)) world.setBlockState(pos, bars, Block.NOTIFY_LISTENERS);
                     }
+                }
+            }
+        }
+
+        // 4b. Sealed gateway across the entrance (medium and large mazes only). It is only the
+        // visible signal — who may walk through is decided per player in MazeBarrier.
+        SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(size);
+        if (tier != null) {
+            BlockState gateway = ModBlocks.SEALED_GATEWAY.getDefaultState()
+                    .with(SealedGatewayBlock.AXIS, entranceAlongX() ? Direction.Axis.X : Direction.Axis.Z)
+                    .with(SealedGatewayBlock.TIER, tier);
+            for (BlockPos gatewayPos : entranceBlocks()) {
+                if (chunkBox.contains(gatewayPos)) {
+                    world.setBlockState(gatewayPos, gateway, Block.NOTIFY_LISTENERS);
                 }
             }
         }

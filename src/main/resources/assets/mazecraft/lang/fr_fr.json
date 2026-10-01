@@ -241,5 +241,12 @@
   "mazecraft.command.players_only": "Cette commande ne peut être utilisée que par un joueur.",
   "mazecraft.progression.unlocked": "%s : le labyrinthe %s t'est maintenant ouvert.",
   "mazecraft.progression.style_complete": "%s maîtrisé — toutes les tailles conquises.",
+  "block.mazecraft.sealed_gateway": "Portail scellé",
+  "mazecraft.barrier.locked": "Termine d'abord le labyrinthe %2$s (%1$s)",
+  "item.mazecraft.key_fragment": "Fragment de clé",
+  "item.mazecraft.key_fragment.styled": "Fragment de clé — %s",
+  "item.mazecraft.key_fragment.tooltip": "L'une des seize clés du Labyrinthe de Kronos",
+  "mazecraft.fragment.obtained": "Fragment de clé obtenu — %s/%s styles maîtrisés.",
+  "mazecraft.chest.gates_closed": "Tous les leviers doivent être actionnés avant d'ouvrir le coffre",
   "config.mazecraft.weights.description": "Les tailles de labyrinthe sont désormais des structures distinctes (petit, moyen, grand). Leur fréquence se règle dans le datapack, plus ici."
 }

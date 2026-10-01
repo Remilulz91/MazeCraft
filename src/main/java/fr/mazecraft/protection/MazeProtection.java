@@ -3,10 +3,13 @@ package fr.mazecraft.protection;
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.MazeAmbush;
+import fr.mazecraft.item.KeyFragmentItem;
+import fr.mazecraft.item.ModItems;
 import fr.mazecraft.progression.MazeProgress;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
+import fr.mazecraft.structure.MazeStyle;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents;
 import net.fabricmc.fabric.api.event.player.UseBlockCallback;
@@ -98,12 +101,25 @@ public final class MazeProtection {
             MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, pos, 0);
             if (hit == null || !hit.piece().chestPos().equals(pos)) return ActionResult.PASS;
 
-            if (!MazeState.get(serverWorld).isSolved(hit.key()) && MazeState.get(serverWorld).hasChampion(hit.key())) {
-                deny(serverPlayer, "mazecraft.champion.guarding");
-                return ActionResult.FAIL;
+            MazeState state = MazeState.get(serverWorld);
+            if (!state.isSolved(hit.key())) {
+                // Every lever must have been pulled. Until 0.9.1 the only lock was "a champion
+                // is alive", and the champion only appears on the LAST lever — so anyone who
+                // reached the plaza without pulling levers (flying over in creative, or any
+                // future hole in the walls) opened the chest for free. The rule is now the one
+                // the maze is actually built around: open every gate, then face what guards it.
+                int closed = firstClosedGate(state, hit.key(), hit.piece().gateCount());
+                if (closed >= 0) {
+                    deny(serverPlayer, "mazecraft.chest.gates_closed");
+                    return ActionResult.FAIL;
+                }
+                if (state.hasChampion(hit.key())) {
+                    deny(serverPlayer, "mazecraft.champion.guarding");
+                    return ActionResult.FAIL;
+                }
             }
 
-            if (MazeState.get(serverWorld).markSolved(hit.key())) {
+            if (state.markSolved(hit.key())) {
                 onConquered(serverWorld, serverPlayer, hit.piece());
             }
             return ActionResult.PASS; // let the chest open normally
@@ -253,11 +269,33 @@ public final class MazeProtection {
             } else if (MazeProgress.isStyleComplete(player, maze.getStyle())) {
                 player.sendMessage(Text.translatable("mazecraft.progression.style_complete",
                         Text.translatable("mazecraft.style." + maze.getStyle().id())).formatted(Formatting.GOLD), false);
+                giveKeyFragment(world, player, maze);
             }
             if (MazeProgress.isEverythingComplete(player)) {
                 player.sendMessage(Text.translatable("mazecraft.maze.all_done").formatted(Formatting.LIGHT_PURPLE), false);
             }
         }
+    }
+
+    /** Index of the first gate still closed, or -1 when every lever has been pulled. */
+    private static int firstClosedGate(MazeState state, long mazeKey, int gates) {
+        for (int i = 0; i < gates; i++) {
+            if (!state.isGateOpen(mazeKey, i)) return i;
+        }
+        return -1;
+    }
+
+    /** One fragment per style fully cleared; dropped at the player's feet if the pack is full. */
+    private static void giveKeyFragment(ServerWorld world, ServerPlayerEntity player, MazePiece maze) {
+        ItemStack fragment = KeyFragmentItem.of(ModItems.KEY_FRAGMENT, maze.getStyle());
+        if (!player.getInventory().insertStack(fragment)) {
+            player.dropItem(fragment, false);
+        }
+        world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
+                SoundCategory.PLAYERS, 1.0f, 1.2f);
+        int owned = MazeProgress.completedStyles(player);
+        player.sendMessage(Text.translatable("mazecraft.fragment.obtained",
+                owned, MazeStyle.values().length).formatted(Formatting.LIGHT_PURPLE), false);
     }
 
     private static MazeSize nextOf(MazeSize size) {

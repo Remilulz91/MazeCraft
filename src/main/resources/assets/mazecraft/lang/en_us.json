@@ -241,5 +241,12 @@
   "mazecraft.command.players_only": "This command can only be used by a player.",
   "mazecraft.progression.unlocked": "%s: the %s maze is now open to you.",
   "mazecraft.progression.style_complete": "%s mastered — every size conquered.",
+  "block.mazecraft.sealed_gateway": "Sealed Gateway",
+  "mazecraft.barrier.locked": "Clear the %1$s %2$s maze first",
+  "item.mazecraft.key_fragment": "Key Fragment",
+  "item.mazecraft.key_fragment.styled": "Key Fragment — %s",
+  "item.mazecraft.key_fragment.tooltip": "One of the sixteen keys to the Labyrinth of Kronos",
+  "mazecraft.fragment.obtained": "Key fragment obtained — %s/%s styles mastered.",
+  "mazecraft.chest.gates_closed": "Every lever must be pulled before the chest will open",
   "config.mazecraft.weights.description": "Maze sizes are now separate structures (small, medium, large). How often each one appears is controlled by the datapack, not here."
 }

@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_cherry",
     "mazecraft:maze_cherry_small",
     "mazecraft:maze_cherry_medium",
     "mazecraft:maze_cherry_large"

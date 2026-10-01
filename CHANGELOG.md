@@ -2,7 +2,95 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
-## [0.8.0-alpha.1] — Unreleased
+## [0.9.0-alpha.1] — Unreleased
+
+Sealed gateways: the progression is now enforced, not just tracked.
+
+### Added
+- **Sealed Gateway** (`mazecraft:sealed_gateway`) — the mod's first block. A shimmering
+  membrane closing the entrance of every medium and large maze: amber for the medium step,
+  violet for the large one. Small mazes are the entry step and are never sealed.
+  Indestructible, drops nothing, never obtainable, and it **stays after the maze is
+  conquered** — it still gates the other players on the server.
+- **Per-player passage.** You walk through a gateway only once you have cleared the previous
+  step of that same style. A friend who has not cannot follow you in, and clearing the forest
+  mazes opens nothing in the jungle.
+- **Key fragments** (`mazecraft:key_fragment`): clearing all three steps of a style grants a
+  fragment carrying that style's name. Sixteen of them will open the Labyrinth of Kronos
+  (1.0.0). They are ordinary tradeable items on purpose — a collection, not a credential:
+  the door reads your own progression, so borrowed fragments get nobody in.
+- Existing mazes are **retro-fitted**: a maze generated before 0.9.0 gets its gateway placed
+  the first time a player comes near, so 0.8.0 worlds carry over. No new world needed.
+
+### Fixed
+- **The central chest now requires every lever to have been pulled.** The only lock used to be
+  "a champion is alive", and the champion is summoned by the *last* lever — so reaching the
+  plaza without pulling any lever (flying in, or any future hole in the walls) opened the chest,
+  granted the advancement and cleared the progression step for free. The rule is now the one the
+  maze is built around, and it applies to everyone rather than special-casing a game mode.
+
+- **Mazes no longer cut through villages.** Structure avoidance assumed every other structure
+  fitted within 5 chunks of its start chunk — a big plains village or a nether fortress reaches
+  well past that. Sprawl is now per structure set (fortresses 9, villages and End cities 8,
+  mansions 7, monuments 6) and, in the other direction, compact one-building structures drop to
+  1–3 chunks, so sterilising ground around an igloo no longer costs maze spots.
+- The same check sampled the biome **only at sea level**, while vanilla validates a surface
+  structure at terrain height; on a plateau the two differ, so a village that did generate was
+  read as "no village here". Both heights are now sampled. Every vanilla structure set name used
+  by the check is verified against the game jar, so a typo cannot silently disable an entry.
+
+- **Two mazes could generate on top of each other.** 0.8.0 gave every style and size its own
+  spread grid, but structure avoidance skipped our own namespace wholesale — so nothing stopped
+  a small hedge maze from landing inside a medium one. Mazes now avoid each other, with a rule
+  that lets exactly one of the pair step aside (the bigger footprint wins, ties broken by
+  style); if both backed off, neither would generate. Verified over all 1128 pairs of the 48
+  maze kinds. Two mazes of the *same* kind were never at risk: their shared grid guarantees a
+  gap of 160 / 208 / 256 blocks, wider than the footprint it has to hold.
+- **Trees are no longer sliced flat along the maze edge** — and nothing is removed to achieve it.
+  The cut was self-inflicted: generation forcibly cleared the air above the whole box, margin ring
+  included, which sawed through any canopy leaning over it. Nothing can take root in the ring (its
+  floor is never a soil block) and the maze proper sits further from the nearest possible trunk
+  than a canopy can reach, so no tree ever grew into the maze — generation simply cut the ones
+  that were already there. The clearing now skips logs and leaves over the ring, and overhanging
+  branches stay whole.
+  - Three removal-based attempts were tried and discarded first: clipping the overhang leaves bare
+    poles, flood-filling the connected clump does nothing in a dense forest where every canopy
+    touches its neighbour's, and uprooting whole trunks within a band works but shaves a 10-block
+    bald ring around every maze. Not cutting in the first place beats all three, leaves the
+    surroundings untouched, and deletes code rather than adding it.
+- **The sealed gateway closes itself again.** The check that keeps it whole probed only one
+  corner of the plane, so a hole knocked out of the middle stayed open for good. All of its dozen
+  blocks are checked now. Breaking it in creative is still possible — creative breaks bedrock too
+  — it just seals back up a moment later, and it never granted progression anyway: the chest
+  requires every lever regardless of game mode.
+- **Legacy structure ids removed from the tags.** The pre-0.8.0 `mazecraft:maze_<style>` entries
+  were referenced by no structure set, so `/locate structure mazecraft:maze_snow` searched for
+  something that can never generate and reported nothing nearby. Only `maze_<style>_<size>` is
+  listed now.
+
+- **Large mazes no longer cut hillsides into an escarpment.** The relief a spot may have was
+  raised to 18–20 blocks in 0.8.0 so large mazes would still be findable; a flat 149-block
+  platform on 18 blocks of relief is a mesa. Back to 10 / 12 / 14 / 16, with the rarity paid for
+  by tighter grids instead (medium 36 → 32, large 52 → 40 chunks) — density is the knob that
+  does not hurt the look.
+
+### Technical
+- The gateway has **no collision**, like a nether portal. Minecraft has no block that is solid
+  for one player and not another, and faking one with per-player block packets produces ghost
+  blocks and suffocation. So passage is decided in `MazeBarrier`, in three layers: the block is
+  the visible signal, `onEntityCollision` shoves back a player who may not pass (naming the step
+  they owe, since a bare "access denied" leaves no way to work the rule out in game), and a
+  periodic sweep teleports out anyone who got in anyway. The sweep is the real guarantee — a
+  one-block-thick plane without collision can be crossed in a single tick at elytra speed.
+- Players in a boat or on a horse are handled: the vehicle collides, not the rider.
+- Mobs, items and projectiles pass freely; only players are gated.
+- The anti-climb teleport already dropped players 2 blocks *outside* the entrance, so it lands
+  them on the correct side of the gateway with no change needed.
+- `MazeLayout.entranceGap()` / `entranceAlongX()` expose the carved doorway. Verified over
+  2400 generated mazes (4 sizes × 4 sides × 150 seeds): all 7200 doorway cells sit on the outer
+  wall line, are carved open, are contiguous, and have the approach path directly outside.
+
+## [0.8.0-alpha.1] — 2026-10-01
 
 Per-player progression: small → medium → large, one branch per style.
 

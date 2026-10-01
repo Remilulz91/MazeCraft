@@ -1,7 +1,6 @@
 {
   "replace": false,
   "values": [
-    "mazecraft:maze_swamp",
     "mazecraft:maze_swamp_small",
     "mazecraft:maze_swamp_medium",
     "mazecraft:maze_swamp_large"
