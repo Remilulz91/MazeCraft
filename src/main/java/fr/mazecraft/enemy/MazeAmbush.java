@@ -70,7 +70,9 @@ public final class MazeAmbush {
                     : MazeEnemies.spawn(world, MazeEnemies.championType(maze.getStyle()), pos, 0, true, SpawnReason.EVENT);
             if (boss != null) {
                 if (boss instanceof MinotaurEntity m) {
-                    m.setupForMaze(maze.getSize());
+                    // Kronos gets the Minotaur the whole progression leads to, not the colossal
+                    // one with a bigger health bar.
+                    if (maze.getStyle().isKronos()) m.setupForKronos(maze.chestPos()); else m.setupForMaze(maze.getSize());
                     boss.addCommandTag(MazeEnemies.CHAMPION_TAG);
                 } else {
                     MazeEnemies.makeChampion(world, boss, maze.getSize());
@@ -83,7 +85,9 @@ public final class MazeAmbush {
                 if (!exempt) boss.setTarget(player);
                 poof(world, pos);
                 spawned++;
-                player.sendMessage(Text.translatable(minotaur ? "mazecraft.minotaur.appears" : "mazecraft.champion.appears")
+                String appears = maze.getStyle().isKronos() ? "mazecraft.kronos.appears"
+                        : minotaur ? "mazecraft.minotaur.appears" : "mazecraft.champion.appears";
+                player.sendMessage(Text.translatable(appears)
                         .formatted(Formatting.DARK_RED, Formatting.BOLD), false);
                 if (minotaur) {
                     world.playSound(null, pos, fr.mazecraft.entity.ModSounds.MINOTAUR_ROAR, SoundCategory.HOSTILE, 3.0f, 0.5f);

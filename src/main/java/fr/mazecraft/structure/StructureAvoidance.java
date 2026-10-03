@@ -72,6 +72,23 @@ public final class StructureAvoidance {
             Identifier.ofVanilla("ocean_ruins")
     );
 
+    /** Sets a DEEP structure may ignore: they only ever appear at or near the surface. */
+    private static final Set<Identifier> SURFACE_ONLY = Set.of(
+            Identifier.ofVanilla("villages"),
+            Identifier.ofVanilla("pillager_outposts"),
+            Identifier.ofVanilla("desert_pyramids"),
+            Identifier.ofVanilla("jungle_temples"),
+            Identifier.ofVanilla("swamp_huts"),
+            Identifier.ofVanilla("igloos"),
+            Identifier.ofVanilla("woodland_mansions"),
+            Identifier.ofVanilla("ocean_monuments"),
+            Identifier.ofVanilla("ocean_ruins"),
+            Identifier.ofVanilla("shipwrecks"),
+            Identifier.ofVanilla("buried_treasures"),
+            Identifier.ofVanilla("trail_ruins"),
+            Identifier.ofVanilla("ruined_portals")
+    );
+
     private StructureAvoidance() { }
 
     /** True if another structure could start close enough to overlap a maze of this size here. */
@@ -81,11 +98,15 @@ public final class StructureAvoidance {
         long seed = context.seed();
 
         int ownRank = rank(style, size);
+        // Kronos is the one maze that lives underground, so the structures a surface maze can
+        // safely ignore are exactly the ones it must not: ancient cities sit at its depth.
+        boolean underground = style.isKronos();
 
         Registry<StructureSet> sets = context.dynamicRegistryManager().get(RegistryKeys.STRUCTURE_SET);
         for (Map.Entry<RegistryKey<StructureSet>, StructureSet> entry : sets.getEntrySet()) {
             Identifier id = entry.getKey().getValue();
-            if (IGNORED.contains(id)) continue;
+            if (!underground && IGNORED.contains(id)) continue;
+            if (underground && SURFACE_ONLY.contains(id)) continue;
             StructureSet set = entry.getValue();
             if (!(set.placement() instanceof RandomSpreadStructurePlacement placement)) continue;
 

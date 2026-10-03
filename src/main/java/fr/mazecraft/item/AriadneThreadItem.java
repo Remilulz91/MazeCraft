@@ -77,7 +77,26 @@ public class AriadneThreadItem extends Item {
 
         MazeState state = MazeState.get(world);
         long key = hit.key();
-        List<BlockPos> path = maze.threadPath(pos, gate -> state.isSolved(key) || state.isGateOpen(key, gate));
+
+        // A conquered maze has nothing left to lead anyone towards, and walking eight hundred
+        // blocks back out through corridors you have already solved is not gameplay, it is a
+        // chore. So the thread does what it does in the myth and takes you out. Only once the
+        // maze is beaten — before that, finding the way is the whole point.
+        if (state.isSolved(key)) {
+            BlockPos out = maze.entranceOutsidePos();
+            world.spawnParticles(net.minecraft.particle.ParticleTypes.PORTAL,
+                    player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.4, 0.8, 0.4, 0.1);
+            player.requestTeleport(out.getX() + 0.5, out.getY(), out.getZ() + 0.5);
+            player.fallDistance = 0.0f;
+            world.spawnParticles(net.minecraft.particle.ParticleTypes.PORTAL,
+                    player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.4, 0.8, 0.4, 0.1);
+            world.playSound(null, out, SoundEvents.BLOCK_BEACON_DEACTIVATE,
+                    SoundCategory.PLAYERS, 0.8f, 1.6f);
+            player.sendMessage(Text.translatable("mazecraft.thread.way_out").formatted(Formatting.GOLD), true);
+            return true;
+        }
+
+        List<BlockPos> path = maze.threadPath(pos, gate -> state.isSolved(key) || state.isGateOpen(key, gate), world);
         if (path.size() <= 1) {
             player.sendMessage(Text.translatable("mazecraft.thread.here").formatted(Formatting.GOLD), true);
             return true;

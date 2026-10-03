@@ -2,6 +2,7 @@ package fr.mazecraft.block;
 
 import fr.mazecraft.progression.MazeBarrier;
 import fr.mazecraft.structure.MazeSize;
+import fr.mazecraft.structure.MazeStyle;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
@@ -48,7 +49,9 @@ public class SealedGatewayBlock extends Block {
 
     public enum Tier implements StringIdentifiable {
         MEDIUM("medium"),
-        LARGE("large");
+        LARGE("large"),
+        /** The door of Kronos: opens only once every maze of every style has been conquered. */
+        KRONOS("kronos");
 
         private final String name;
 
@@ -61,8 +64,9 @@ public class SealedGatewayBlock extends Block {
             return name;
         }
 
-        /** The gateway tier guarding a maze of this size, or null when the step is always open. */
-        public static Tier of(MazeSize size) {
+        /** The gateway tier guarding this maze, or null when it is never sealed. */
+        public static Tier of(MazeStyle style, MazeSize size) {
+            if (style.isKronos()) return KRONOS;
             return switch (size.step()) {
                 case MEDIUM -> MEDIUM;
                 case LARGE -> LARGE;

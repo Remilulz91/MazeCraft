@@ -4,6 +4,7 @@ import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.MazeAmbush;
 import fr.mazecraft.item.KeyFragmentItem;
+import fr.mazecraft.item.KronosKeyItem;
 import fr.mazecraft.item.ModItems;
 import fr.mazecraft.progression.MazeProgress;
 import fr.mazecraft.structure.MazeFinder;
@@ -63,6 +64,17 @@ public final class MazeProtection {
     public static void register() {
         // --- Block breaking
         PlayerBlockBreakEvents.BEFORE.register((world, player, pos, state, blockEntity) -> {
+            // The central chest first, before any exemption: breaking it is opening it by other
+            // means. It used to fall through to the generic protection, which lets a creative
+            // player — or anyone at all with protection turned off — smash it, take the loot and
+            // never conquer the maze. Same rule either way, same reward either way.
+            if (state.isOf(Blocks.CHEST) && world instanceof ServerWorld breakWorld
+                    && player instanceof ServerPlayerEntity breaker) {
+                MazeFinder.MazeHit hit = MazeFinder.find(breakWorld, pos, 0);
+                if (hit != null && hit.piece().chestPos().equals(pos)) {
+                    return claimChest(breakWorld, breaker, hit);
+                }
+            }
             if (!(world instanceof ServerWorld serverWorld) || isExempt(player)) return true;
             if (!MazeCraftConfig.get().protectUntilSolved) return true;
             if (lockedMazeAt(serverWorld, pos, 0) == null) return true;
@@ -101,27 +113,7 @@ public final class MazeProtection {
             MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, pos, 0);
             if (hit == null || !hit.piece().chestPos().equals(pos)) return ActionResult.PASS;
 
-            MazeState state = MazeState.get(serverWorld);
-            if (!state.isSolved(hit.key())) {
-                // Every lever must have been pulled. Until 0.9.1 the only lock was "a champion
-                // is alive", and the champion only appears on the LAST lever — so anyone who
-                // reached the plaza without pulling levers (flying over in creative, or any
-                // future hole in the walls) opened the chest for free. The rule is now the one
-                // the maze is actually built around: open every gate, then face what guards it.
-                int closed = firstClosedGate(state, hit.key(), hit.piece().gateCount());
-                if (closed >= 0) {
-                    deny(serverPlayer, "mazecraft.chest.gates_closed");
-                    return ActionResult.FAIL;
-                }
-                if (state.hasChampion(hit.key())) {
-                    deny(serverPlayer, "mazecraft.champion.guarding");
-                    return ActionResult.FAIL;
-                }
-            }
-
-            if (state.markSolved(hit.key())) {
-                onConquered(serverWorld, serverPlayer, hit.piece());
-            }
+            if (!claimChest(serverWorld, serverPlayer, hit)) return ActionResult.FAIL;
             return ActionResult.PASS; // let the chest open normally
         });
 
@@ -244,7 +236,45 @@ public final class MazeProtection {
         return player.isCreative() || player.isSpectator();
     }
 
+    /**
+     * The single rule of the central chest, applied whether it is opened or broken.
+     *
+     * @return true if this player may have it — and, if so, they have just conquered the maze
+     */
+    private static boolean claimChest(ServerWorld world, ServerPlayerEntity player,
+                                      MazeFinder.MazeHit hit) {
+        MazeState state = MazeState.get(world);
+        if (!state.isSolved(hit.key())) {
+            // Every lever must have been pulled. Until 0.9.1 the only lock was "a champion is
+            // alive", and the champion only appears on the LAST lever — so anyone who reached
+            // the plaza without pulling levers opened the chest for free. The rule is now the
+            // one the maze is actually built around: open every gate, then face what guards it.
+            int closed = firstClosedGate(state, hit.key(), hit.piece().gateCount());
+            if (closed >= 0) {
+                deny(player, "mazecraft.chest.gates_closed");
+                return false;
+            }
+            if (state.hasChampion(hit.key())) {
+                deny(player, "mazecraft.champion.guarding");
+                return false;
+            }
+        }
+
+        // markSolved is the MAZE's state and is true only the first time anybody opens it.
+        // Conquering is the PLAYER's, so it must not hang off that: a second player opening the
+        // same chest used to get nothing at all — no step, no fragment — which quietly broke
+        // co-op, since progression is per player by design.
+        state.markSolved(hit.key());
+        onConquered(world, player, hit.piece());
+        return true;
+    }
+
     private static void onConquered(ServerWorld world, ServerPlayerEntity player, MazePiece maze) {
+        // Idempotent per player: whoever has already had this step gets nothing a second time,
+        // and everybody else gets the whole thing however late they open the chest.
+        String owed = MazeProgress.advancementId(maze.getStyle(), maze.getSize());
+        if (MazeProgress.hasAdvancement(player, owed)) return;
+
         player.sendMessage(Text.translatable("mazecraft.maze.conquered").formatted(Formatting.GOLD), false);
         world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 1.0f, 1.0f);
 
@@ -295,7 +325,18 @@ public final class MazeProtection {
                 SoundCategory.PLAYERS, 1.0f, 1.2f);
         int owned = MazeProgress.completedStyles(player);
         player.sendMessage(Text.translatable("mazecraft.fragment.obtained",
-                owned, MazeStyle.values().length).formatted(Formatting.LIGHT_PURPLE), false);
+                owned, MazeStyle.PROGRESSION.length).formatted(Formatting.LIGHT_PURPLE), false);
+
+        // The sixteenth fragment is the key. It is granted rather than crafted: a recipe cannot
+        // tell one fragment from another, so a grid would accept sixteen copies of the same one.
+        if (owned >= MazeStyle.PROGRESSION.length) {
+            ItemStack key = KronosKeyItem.forPlayer(ModItems.KRONOS_KEY, player);
+            if (!player.getInventory().insertStack(key)) player.dropItem(key, false);
+            player.sendMessage(Text.translatable("mazecraft.kronos.key_granted")
+                    .formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
+            world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_END_PORTAL_SPAWN,
+                    SoundCategory.PLAYERS, 0.6f, 1.4f);
+        }
     }
 
     private static MazeSize nextOf(MazeSize size) {

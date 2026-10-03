@@ -1,0 +1,26 @@
+{
+  "display": {
+    "icon": {
+      "id": "mazecraft:kronos_key"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.unseal_kronos.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.unseal_kronos.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false,
+    "background": "minecraft:textures/gui/advancements/backgrounds/stone.png"
+  },
+  "criteria": {
+    "turned": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 500
+  }
+}

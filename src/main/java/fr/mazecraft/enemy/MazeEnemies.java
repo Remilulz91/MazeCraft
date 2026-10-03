@@ -54,6 +54,9 @@ public final class MazeEnemies {
             case SOUL -> List.of(EntityType.WITHER_SKELETON, EntityType.SKELETON);
             case BASALT -> List.of(EntityType.MAGMA_CUBE, EntityType.BLAZE);
             case END -> List.of(EntityType.ENDERMITE, EntityType.SHULKER, EntityType.ENDERMAN);
+            // Kronos: the Underworld's own, drawn from every dimension at once.
+            case KRONOS -> List.of(EntityType.WITHER_SKELETON, EntityType.VINDICATOR,
+                    EntityType.CAVE_SPIDER, EntityType.BOGGED);
         };
     }
 
@@ -68,6 +71,7 @@ public final class MazeEnemies {
             case CRIMSON -> EntityType.PIGLIN_BRUTE;
             case FORTRESS, WARPED, SOUL, BASALT -> EntityType.WITHER_SKELETON;
             case END -> EntityType.ENDERMAN;
+            case KRONOS -> EntityType.WITHER_SKELETON;
         };
     }
 

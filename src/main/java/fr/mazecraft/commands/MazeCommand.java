@@ -58,7 +58,7 @@ public class MazeCommand {
                 done, MazeProgress.TOTAL_STEPS).formatted(Formatting.GOLD), false);
 
         List<MazeStyle> here = MazeProgress.stylesOf(player.getWorld());
-        for (MazeStyle style : MazeStyle.values()) {
+        for (MazeStyle style : MazeStyle.PROGRESSION) {
             MutableText steps = Text.empty();
             for (MazeSize step : MazeSize.STEPS) {
                 boolean cleared = MazeProgress.hasCleared(player, style, step);

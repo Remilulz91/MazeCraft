@@ -10,6 +10,7 @@ import fr.mazecraft.entity.ModSounds;
 import fr.mazecraft.item.ModItems;
 import fr.mazecraft.item.ThreadTrails;
 import fr.mazecraft.item.ThreadLoot;
+import fr.mazecraft.progression.KronosWalls;
 import fr.mazecraft.progression.MazeBarrier;
 import fr.mazecraft.protection.MazeProtection;
 import fr.mazecraft.protection.MazeRepair;
@@ -101,6 +102,10 @@ public class MazeCraft implements ModInitializer {
 
         // 8. Sealed gateways: per-player progression enforced at the maze entrances
         MazeBarrier.register();
+
+        // 9. The shifting walls of the Labyrinth of Kronos
+        KronosWalls.register();
+        fr.mazecraft.progression.KronosArena.register();
 
         LOGGER.info("[MazeCraft] Mod loaded successfully!");
     }

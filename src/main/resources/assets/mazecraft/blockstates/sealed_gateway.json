@@ -11,6 +11,12 @@
     },
     "axis=z,tier=large": {
       "model": "mazecraft:block/sealed_gateway_large_z"
+    },
+    "axis=x,tier=kronos": {
+      "model": "mazecraft:block/sealed_gateway_kronos_x"
+    },
+    "axis=z,tier=kronos": {
+      "model": "mazecraft:block/sealed_gateway_kronos_z"
     }
   }
 }

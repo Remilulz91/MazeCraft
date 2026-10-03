@@ -49,6 +49,9 @@ public class MazeCraftConfig {
     /** The last lever also spawns a champion (named, 4x health, enchanted gear, boss bar). */
     public boolean enableChampion = true;
 
+    /** The Labyrinth of Kronos rearranges itself while it is being walked. */
+    public boolean enableMovingWalls = true;
+
     /** Patrols: while a player explores an unconquered maze, mobs keep appearing out of sight (day and night). */
     public boolean enablePatrols = true;
 

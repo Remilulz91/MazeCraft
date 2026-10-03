@@ -10,6 +10,9 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
+import fr.mazecraft.item.KronosKeyItem;
+import fr.mazecraft.item.ModItems;
+import net.minecraft.item.ItemStack;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -88,7 +91,7 @@ public final class MazeBarrier {
         MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, pos, 0);
         if (hit == null) return;
         MazePiece maze = hit.piece();
-        if (MazeProgress.canEnter(player, maze.getStyle(), maze.getSize())) return;
+        if (mayEnter(player, maze)) return;
 
         // Shove the player back out along the line from the maze centre.
         Vec3d centre = Vec3d.ofCenter(maze.chestPos());
@@ -101,11 +104,55 @@ public final class MazeBarrier {
         warn(serverWorld, player, maze);
     }
 
+    /**
+     * May this player walk into this maze? An ordinary maze asks for the previous step of its own
+     * style; the Labyrinth of Kronos asks for all of them.
+     */
+    private static boolean mayEnter(ServerPlayerEntity player, MazePiece maze) {
+        // Kronos asks for the door to have been opened with the key, not merely for the 48
+        // steps. The steps are what earns the key; turning it is what opens the door.
+        if (maze.getStyle().isKronos()) {
+            return MazeProgress.hasAdvancement(player, KronosKeyItem.UNSEALED);
+        }
+        return MazeProgress.canEnter(player, maze.getStyle(), maze.getSize());
+    }
+
+    /** Hands back a Key of Kronos to a player who has earned one and no longer has it. */
+    private static void giveKeyIfMissing(ServerWorld world, ServerPlayerEntity player) {
+        for (int slot = 0; slot < player.getInventory().size(); slot++) {
+            if (player.getInventory().getStack(slot).isOf(ModItems.KRONOS_KEY)) return;
+        }
+        ItemStack key = KronosKeyItem.forPlayer(ModItems.KRONOS_KEY, player);
+        if (!player.getInventory().insertStack(key)) player.dropItem(key, false);
+        player.sendMessage(Text.translatable("mazecraft.kronos.key_returned")
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
+                SoundCategory.PLAYERS, 1.0f, 1.0f);
+    }
+
     private static void warn(ServerWorld world, ServerPlayerEntity player, MazePiece maze) {
         long now = world.getTime();
         Long last = lastMessage.get(player.getUuid());
         if (last != null && now - last < MESSAGE_COOLDOWN) return;
         lastMessage.put(player.getUuid(), now);
+
+        if (maze.getStyle().isKronos()) {
+            if (MazeProgress.isEverythingComplete(player)) {
+                // Earned it, but has not turned the key. If the key itself is gone — lost in
+                // lava, left in a chest a world away — the lock gives them another rather than
+                // shutting them out of the whole endgame over a dropped item.
+                player.sendMessage(Text.translatable("mazecraft.kronos.use_key")
+                        .formatted(Formatting.LIGHT_PURPLE), true);
+                giveKeyIfMissing(world, player);
+            } else {
+                player.sendMessage(Text.translatable("mazecraft.barrier.kronos",
+                        MazeProgress.completedSteps(player), MazeProgress.TOTAL_STEPS)
+                        .formatted(Formatting.RED), true);
+            }
+            world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_BEACON_DEACTIVATE,
+                    SoundCategory.BLOCKS, 0.5f, 0.6f);
+            return;
+        }
 
         MazeSize required = maze.getSize().previousStep();
         if (required != null) {
@@ -129,7 +176,7 @@ public final class MazeBarrier {
         if (hit == null) return;
         MazePiece maze = hit.piece();
         if (!maze.isInsideMaze(pos.getX(), pos.getZ())) return;
-        if (MazeProgress.canEnter(player, maze.getStyle(), maze.getSize())) return;
+        if (mayEnter(player, maze)) return;
 
         BlockPos out = maze.entranceOutsidePos();
         player.teleport(world, out.getX() + 0.5, out.getY(), out.getZ() + 0.5,
@@ -156,7 +203,7 @@ public final class MazeBarrier {
      * can break bedrock, and it closes again on the next sweep.</p>
      */
     public static void ensureGateway(ServerWorld world, MazePiece maze) {
-        SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(maze.getSize());
+        SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(maze.getStyle(), maze.getSize());
         if (tier == null) return; // small mazes are never sealed
 
         BlockState gateway = ModBlocks.SEALED_GATEWAY.getDefaultState()

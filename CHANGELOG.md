@@ -2,7 +2,323 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
-## [0.9.0-alpha.1] — Unreleased
+## [1.0.0-alpha.3] — 2026-10-03
+
+Kronos, part three: the arena.
+
+### Added
+- **The arena of Kronos.** The vault's central room grows from 3 × 3 cells to 5 × 5 — 19 × 19
+  blocks — and is dug out of the floor: a 13 × 13 fighting floor two blocks down, reached by a
+  ring of two steps, with the plaza door opening onto the rim rather than into the pit. The
+  11 × 11 chest room of an ordinary maze leaves a boss that charges in a straight line no run-up
+  at all; the extra headroom is for a boss taller than a corridor.
+- **Ariadne's thread is the way out.** Used inside a maze that has been conquered, it does what
+  it does in the myth and pulls you back to the entrance. Walking eight hundred blocks back
+  through corridors you have already solved is not gameplay, it is a chore. Only once the maze
+  is beaten — before that, finding the way is the whole point.
+- **The hoard of Asterion.** Minecraft hands out treasure in chests: you walk to a box, open
+  it, and the reward is a list. This one is meant to be *looked at*. Under the arena floor,
+  sealed from the day the vault generates, a 13 × 13 chamber: a floor of gold, heaps of bronze
+  and raw gold and emerald standing on it, bronze pilasters, four soul lanterns, and a double
+  chest on a pedestal against the far wall.
+  - When Asterion falls the arena floor gives way, twelve fireworks go up in gold and verdigris,
+    and a spiral stair drops eight blocks into the chamber. Only the way down is cut at that
+    moment — a room raised block by block from a tick would be watched appearing through the
+    hole, so the room itself is built with the vault.
+  - About 49 gold blocks in the floor and 570 ingots' worth all told, which is roughly a bastion
+    treasure room. Diamond blocks were in the first draft at one in a hundred; doubled where
+    heaps stack, the worst room came out at **ninety diamonds**, so they are gone — diamonds
+    stay in the chest, where their count is bounded.
+  - What is where is a pure function of the block's coordinates. Drawn from the `Random` handed
+    to a build pass it would have rearranged itself the first time a chunk was repaired, because
+    generation and repair are seeded differently.
+- **The Horn of Asterion**, one guaranteed in the chest. Strength II, Speed II and Resistance
+  for two minutes to every player within 40 blocks. The Bronze Horn of a large maze is a good
+  item; this is the same gesture at the far end of 48 mazes and a 400 HP boss, so it is plainly
+  better rather than ten per cent better.
+- **No chest at the centre of Kronos.** What is at the centre is the Minotaur, and the hoard is
+  only opened once it is down.
+- **The Minotaur of Kronos.** Not the colossal Minotaur with a longer health bar: 400 HP, 14
+  damage, 12 armour, immovable, 600 XP, and **three phases** instead of its lesser kin's single
+  rage.
+  - **Phase 1**, above two thirds — the fight as it has always been, charging a little oftener.
+  - **Phase 2**, at two thirds — it calls the labyrinth. The shifting walls of the whole vault
+    drop from 45 seconds to 10, and two guards of the tomb come up out of the floor beside it.
+  - **Phase 3**, at one third — it puts the lights out in pulses and gains another third of
+    speed. The darkness is a status effect on the player, not lanterns taken out of the arena:
+    removing blocks from a protected structure means putting them back on every path the fight
+    can end by, and one missed path leaves the arena dark for good.
+  - Phases are derived from health and only ever go forwards, so healing it cannot walk them
+    back, and nothing is saved — a reload recomputes the phase on the first tick and can never
+    disagree with the boss's own health.
+- **A hide of its own.** Same model, same bones, same animations, a different skin: the brown
+  of a beast replaced by the slate of the tomb, horns and hooves gone to verdigris like
+  everything else down there, eyes left burning — on a slate-coloured animal a brown eye
+  disappears. It also stands a head taller (rendering only; its hitbox is the Minotaur's).
+- **The door of the arena shuts behind you.** Step in with the Minotaur alive and the plaza door
+  closes; it opens when the Minotaur is dead, or when you are.
+
+### Changed
+- **The Key of Kronos now opens the door, and is spent doing it.** The door used to read the
+  player's advancements directly and the key only pointed at the vault — so everything the key
+  was for had already happened by the time you held it, and it was a souvenir. Turning it in
+  the lock is now the act itself: the key dissolves, and that door is open to that player for
+  good. Entry is gated on having turned it, not on the 48 steps; the steps are what earn the
+  key.
+  - Spending it is only safe **because finding Kronos moved to the compass** in the same
+    change. A key that both opened the door and was the only way to find the place again would
+    have become a trap the moment it was consumed — this is the one thing that made the idea
+    workable rather than dangerous.
+  - And a key lost before it is turned cannot lock anyone out of the endgame: a player who has
+    all 48 steps and no key is handed another at the door.
+  - New advancement **The Key Turns**, now the root of the Kronos tab, with **Theseus** hanging
+    off it — the tab reads door, then Asterion.
+- **The compass does not die at the endgame.** Once every step is cleared its list of owed
+  mazes is empty and it had nothing left to say. Kronos becomes its last target.
+- **There is one Minotaur, and he has a name.** The beast guarding a large or colossal maze was
+  called a Minotaur too, which the myth does not allow and which left two different creatures
+  sharing a name. It is now a **Bronze Guardian** — one of the bull-wardens Daedalus forged for
+  his lesser labyrinths — and the one at the bottom of Kronos is **Asterion, the Minotaur**.
+  - The Bronze Guardian keeps everything it had, renamed in place: its drop is the **Bronze
+    Horn** (same item, same recipe, same effect) and its advancement is **Daedalus' Herd**.
+    Nothing moves to the endgame: Kronos needs all 48 mazes, so putting the horn there would
+    have emptied the middle of the game to fill an ending that is already full.
+  - **Theseus** moves up one rung, onto the only fight that earns it: slaying Asterion. It is
+    the final challenge, in a tab of its own, 2000 XP.
+  - Asterion gets a purple boss bar; the Bronze Guardian's turns bronze. Two identical purple
+    bars would have said they were the same thing.
+  - All of this is text. The identifiers do not move — `mazecraft:minotaur_horn`,
+    `mazecraft:defeat_minotaur`, the entity `mazecraft:minotaur` — so there is no migration and
+    horns already sitting in chests keep working.
+  - Theseus is granted from code to everyone still standing in the arena, not only to whoever
+    landed the last blow: the Guardian and Asterion are the same entity type, told apart by a
+    tracked field no advancement predicate can read — and a fight that long should not hand its
+    only reward to the last hit.
+
+### Fixed
+- **Phases could be skipped.** They were entered by jumping straight to whichever one the
+  Minotaur's health fell into, so a blow that crossed both thresholds at once skipped phase two
+  entirely — no guards of the tomb, no frenzy in the walls — and anything that killed Asterion
+  outright skipped the lot. Phases now step one at a time, so each one is certain to have
+  happened. (It is also why a test kill shows nothing: phase three's darkness is a status
+  effect, and a creative player is rightly immune to it.)
+- **Phase three is now visible to everyone**, not only to whoever it blinds: each pulse throws
+  a cloud of smoke and soul particles across the arena with a low sound under it. Without that,
+  the whole phase was invisible to anyone testing in creative.
+- **The hoard's chest was destroyed on every chunk load, before anyone ever reached it.** The
+  repair pass rebuilds the chamber with `placeChest` false — so it filled the chest's own
+  position with air, which scatters a chest's contents across the floor and leaves no chest,
+  and then never put one back. Teleporting to a fresh vault already showed a smashed chest and
+  items lying on the ground. The two blocks the chest stands on are now never written by a
+  repair at all, and the room's air is cleared with `SKIP_DROPS` so emptying it can never spill
+  anything whatever ends up standing there later.
+- **The double chest was not double.** Its halves were placed one on each side of the
+  pedestal's middle block, a block apart — which is two single chests that cannot see each
+  other, not a double chest. They are adjacent now (LEFT at the pedestal, RIGHT to its east,
+  which is the partner side for a chest facing north).
+- Both are caught by a test that walks the chamber through a generation and three repairs and
+  fails if anything is ever written over the chest. Run against the old code it reports the
+  overwrite twice and ends with air where the chest was.
+- **Co-op progression was quietly broken.** Conquering hung off `markSolved`, which is the
+  *maze's* state and is true only the first time anybody opens the chest. So the second player
+  to open the same chest got nothing at all — no step, no key fragment — even though
+  progression is per player by design. The two are now separate: the maze is marked solved
+  once, and every player who opens the chest is credited, however late. Opening it twice still
+  gives one player nothing twice.
+- **Breaking the central chest skipped the maze entirely.** It fell through to the generic
+  protection, which exempts creative players and can be turned off in the config — so the chest
+  could be smashed, the loot taken, and the maze never conquered. Breaking it is now opening it
+  by other means: same rule (every lever pulled, no champion alive), same reward, and the same
+  refusal if they are not met.
+- **Champions wander off, and the chest will not open while one is alive** — which left the
+  player hunting a 101 × 101 maze for a stray zombie before they could finish. Every champion is
+  now leashed to the plaza it guards, the way Asterion is to its arena: alone within 14 blocks,
+  walked back past that, put back past 28. Nothing is stored for it — the plaza is found from
+  where the champion is standing, so one that is genuinely outside its maze is left alone rather
+  than dragged somewhere wrong.
+- **Ariadne's thread now takes the shortcuts.** It was tracing the path over the layout, which
+  says every movable segment is a wall, so it walked the player the long way round past a
+  shortcut standing wide open in front of them. It reads the world now. The path is worked out
+  afresh on every use, so a shortcut that shuts again is not a trap — the next use routes round
+  it — and it cannot strand anyone, because these segments only ever add loops to a tree.
+- **The Minotaur of Kronos stays in its arena.** It has a wander goal like any mob, and with no
+  target it walked out of the open door and went for a stroll in the labyrinth, leaving the
+  arena door with no boss behind it and a fight that never starts. Visible in creative, where
+  vanilla rightly refuses to let it target the player, but not a creative-mode quirk: in
+  survival the same thing happens whenever it loses its target for long enough. It is now
+  leashed to the centre of its arena — left completely alone within 11 blocks so the fight is
+  never nudged, walked back past that, and simply put back past 20, because a boss that spends
+  five minutes pathing home through a maze is worse than one that reappears. The centre is
+  saved with the entity, so a reload does not set it loose.
+
+### Technical
+- **The vault sits higher: floor range -50…-36 becomes -44…-36.** The hoard is dug ten blocks
+  under the arena, and at -50 its own floor landed at **-60 — inside the bedrock**, which runs
+  to -59. Worlds already holding a Kronos vault will place new ones at the new depth.
+- The hoard stair is checked the way the surface shaft is, and for the same reason: both of its
+  ends are where the two earlier mistakes were made. 135 step-to-step transitions over all nine
+  possible vault depths — first step reachable from the chamber floor, last step flush with the
+  arena, never more than half a block of rise, and the chamber clear of bedrock every time.
+- **The arena door is computed, never stored.** Every pass works out what the door should be
+  from two live facts — is a Minotaur of Kronos standing in the arena, and is a player in there
+  with it — and makes the blocks match. A seal that is written down has to be cleared on every
+  path the fight can end by, and one missed path walls a player in for good; this way a crash or
+  a logout mid-swing can at worst leave the door briefly wrong.
+  - The boss must be **in the room**, not merely alive. The saved "this vault has a champion"
+    flag would have been enough to shut the door, and that is exactly the trap: the Minotaur
+    wanders, so it can leave the arena through the open door before the player walks in, and the
+    flag would then have sealed them into an empty room with the boss outside.
+  - The pass refuses to touch a door whose lever has not been pulled. Without that it would have
+    cheerfully *opened* the arena for any player merely standing in the vault.
+  - The whole truth table of (boss in the arena × player inside × lever pulled) is enumerated in
+    a test: there is no state in which the door is shut without the boss in there.
+- `MazeLayout` takes a plaza radius. At radius 1 every expression is what it was, draw for draw:
+  verified by hashing the block grid, the gates and the levers of **640 mazes** (4 sizes × 4
+  entrance sides × 40 seeds) before and after — the two digests are identical, so the sixteen
+  ordinary styles generate exactly as before.
+- The plaza door was cut at a fixed offset of one cell. At radius 2 that is a wall line which no
+  longer exists, so the room stayed sealed and the progression could not be computed at all
+  (0 gates, 0 zones). It scales with the radius now.
+- Verified over 200 colossal vaults at radius 2: floor fully connected with nothing walled off,
+  5 gates and 5 levers, all 5 zones populated, the full 160 shifting walls still drawn. And over
+  100 more: the dug-out area never reaches outside the plaza, and no doorway opens into the pit.
+
+## [1.0.0-alpha.2] — 2026-10-03
+
+Kronos, part two: the labyrinth moves.
+
+### Added
+- **The shifting walls.** Every 45 seconds the Labyrinth of Kronos rearranges: a third of its
+  160 movable segments stand open, the rest are shut, and which third it is rotates. Shortcuts
+  appear and are taken away while you are still inside. Two seconds of particles and a rising
+  chime warn of each shift, and a segment is never closed on top of anyone — it simply waits for
+  the next pass.
+- **The shifting walls are chiselled deepslate.** They were built from the pillar block, which
+  was wrong twice over: that block *is* what the structural pillars are made of, so a shifting
+  wall could not be told from a corner, and a hundred and sixty bronze segments turned a
+  deepslate tomb into a copper mine. A bronze rail let into the floor was tried next and hid the
+  mechanism well, but drew a cross on the ground at every segment. The tell is now the wall
+  itself, in a stone of the same family: at a glance down a corridor it is one more dark wall,
+  looked at, the chiselled face is not the polished one.
+- Config: **Shifting walls (Kronos)**, on by default.
+
+### Changed
+- **A wall only moves where it is worth moving.** The segments used to be drawn at random among
+  every valid wall, which meant most of them opened onto a corridor three steps away — the wall
+  ground open, and nothing happened. Each candidate is now scored by how far apart its two sides
+  are along the maze, and only those past a bar that scales with the maze (18 cells for Kronos,
+  one cell being four blocks) are eligible. Measured over 960 mazes: the old draw put a quarter
+  of the segments between corridors three cells apart and over half under twelve; the new one
+  gives Kronos forty segments that save **19 cells at the very least and 41 at the median** —
+  over 150 blocks of walking, removed by one step through a wall.
+
+- **Four times as many shifting walls: 40 → 160.** A colossal maze is 3025 cells and the walk
+  from the entrance to the plaza crosses about 200 of them. At forty segments only **2.9** of
+  them touched that walk, so a player could cross the whole of Kronos without ever watching a
+  wall move — which is exactly what happened in testing. At 160 it is **11.3**, roughly one
+  every seventy blocks of corridor, drawn from the ~880 walls that clear the detour bar, so the
+  selection stays varied and the median detour is unchanged at 41 cells.
+- The tick now tests distance against a single block before building a segment's full block
+  list. With 160 segments, nearly all of them far from everyone, the far ones cost one
+  allocation instead of fifteen.
+
+### Fixed
+- **The bottom step of the shaft is now on the doorway's side.** The spiral always began on the
+  shaft's east face, whichever way the vault's doorway faced, so for three orientations out of
+  four a player walking back out of the vault met a full block with nothing to step on and had
+  to place one. The spiral now starts in the cell immediately inside the doorway. Checked over
+  the four orientations and every shaft depth: 12 900 step-to-step transitions, none rising more
+  than half a block or dropping more than one, and the old code fails that same check 45 times.
+
+### Technical
+- **The shifting walls give nothing away about the route.** 6.6 % of a colossal maze's cells lie
+  on the direct walk to the plaza, and 7.1 % of the chosen segments border it — the selection is
+  indistinguishable from uniform, so a copper wall is never a hint that you are going the right
+  way. (The detour filter actually nudges them slightly *away*: 8.9 % of all eligible walls touch
+  the route.)
+- **Nothing can be sealed off, by construction.** The maze is a tree — exactly one path between
+  any two cells — so opening a wall only adds a loop and closing it restores the tree. No
+  connectivity check is performed anywhere, because none is needed.
+- **No shortcut past a gate.** A loop crossing a zone boundary would hand the player the next
+  zone without its lever, so a segment only qualifies when the cells on both sides sit in the
+  same zone. Plaza cells, gates and the walls carrying levers are excluded outright.
+- Both properties are **verified, not argued**: over 960 generated mazes (4 sizes × 4 entrance
+  sides × 60 seeds) and 145 745 movable segments, opening every one of them never removed a
+  reachable cell and never let a flood from the entrance zone reach a deeper zone or the plaza.
+  Every colossal maze still yields the full 160 segments after the detour filter — it has
+  around 880 eligible walls to draw them from, 720 in the worst case seen.
+- Detours are measured on the cell tree by walking both sides up to their common ancestor, and
+  checked by a second harness that rebuilds the cell graph from the block grid and runs its own
+  breadth-first search — so an error in the scoring cannot vouch for itself.
+- Which segments are open is a **pure function of the world time**, so nothing is saved and a
+  reload cannot disagree with what the blocks say. The tick makes the world match the schedule
+  rather than replaying events, which is also why a blocked closure simply happens later.
+
+## [1.0.0-alpha.1] — 2026-10-02
+
+Kronos, part one: the vault exists, and it can be found and opened.
+
+### Added
+- **The Labyrinth of Kronos** (`mazecraft:maze_kronos`): one of a kind, colossal (221 × 221,
+  5 gates), buried between Y -50 and -36 under the Overworld, in a style of its own — polished
+  deepslate and blackstone for the tomb, oxidised copper for the bronze, soul lanterns under a
+  deepslate-tile roof, oxidised copper grates for the gates. Roughly one every 3200 blocks.
+- **The way down**: a weathered ruin on the surface — a cracked slab, four bronze-capped columns,
+  a lantern over the mouth — and a brick-lined shaft with a ladder, dropping straight onto the
+  vault's doorway. The ruin is there from the first day of a world: finding the door long before
+  being able to open it is the point.
+- **The door of Kronos**: a third tier of the sealed gateway, verdigris bronze, which opens only
+  for a player who has conquered all 48 mazes. It reports progress when it refuses.
+- **Key of Kronos** (`mazecraft:kronos_key`): granted the moment the sixteenth fragment is earned,
+  bound to the player who earned it, and useless in anyone else's hands. Right-click points the
+  way to the vault — buried that deep, it would otherwise never be found.
+- `/maze debug kronos` (debug builds): locates the vault and teleports to its ruin, so none of
+  this has to wait on 48 cleared mazes to be testable.
+
+### Fixed
+- **The shaft no longer drops its ladders on the floor.** A ladder needs the wall behind it to
+  exist already, and a structure is built one chunk at a time — wherever a chunk boundary ran
+  between a ladder and its wall, the ladder was placed against nothing and popped off as an item.
+  The climb is now a spiral stair of slabs, which stand on their own; verified that consecutive
+  steps stay adjacent and inside the shaft, so it is walkable all the way up.
+- **The shaft no longer gets plugged by its own vault.** Its foot sat inside the maze's
+  bounding box, and both generation and the repair pass rewrite every column in that box, roof
+  included — so a ceiling slab was dropped straight across the shaft, every time. The shaft now
+  starts two blocks clear of the box and lands on the doorway the maze already leaves in its
+  outer wall, which until now opened onto bare rock.
+- **The climb needs no jumping.** The spiral was one full block per step, which is a jump each
+  time — forty of them to get out. Two half-steps per block now (a bottom slab, then a top one),
+  and the first starts on the shaft floor rather than a block above it, where it sat a block and
+  a half out of reach. Checked end to end over a 117-block climb — getting onto the first step
+  and off the last one included, which is where both mistakes were: 236 steps, half a block
+  each, every pair adjacent and inside the shaft.
+- **The lantern hangs from something.** The ruin is now a proper well-head — four bronze-capped
+  posts around the mouth carrying a roof, with the lantern hanging under it.
+- **The foot of the shaft opens onto the door.** The brick lining went all the way round at the
+  bottom too, so the climb down ended in a sealed box with the vault's doorway walled off behind
+  it. The face looking at the vault is now left open, three wide and three high — and only that
+  face, not the corners beside it.
+
+### Changed
+- `MazeStyle.PROGRESSION` now backs everything that counts steps, lists branches or builds the 48
+  structures, instead of `values()`. Kronos is a style but not a step: without this the target
+  would have quietly slid from 48 to 51 and the door could never have opened.
+- Structure avoidance knows the difference between a surface maze and a buried one. Kronos avoids
+  ancient cities and mineshafts, which share its depth and which a surface maze rightly ignores,
+  and skips the surface-only sets that can never reach it.
+- Colossal is accepted as a declared size for Kronos alone; for every other style it stays what
+  it was, a rare upgrade of a large maze.
+
+### Notes
+- The second level and the moving walls come in the next step, and the arena, the Minotaur of
+  Kronos and the real hoard in the one after. The chest at the centre is a placeholder so the
+  vault is solvable and testable now.
+- Stacking two levels was planned for this step and deferred on purpose: it needs flags threaded
+  through `MazePiece` for the chest, the support pillars and the lower level's doorway-to-nowhere,
+  and that is shared code the sixteen ordinary styles depend on. Kronos as it stands required no
+  change to `MazePiece` at all.
+
+## [0.9.0-alpha.1] — 2026-10-01
 
 Sealed gateways: the progression is now enforced, not just tracked.
 

@@ -58,6 +58,7 @@ public final class ChampionTracker {
                     continue;
                 }
                 t.bar().setPercent(living.getHealth() / living.getMaxHealth());
+                keepToThePlaza(t.world(), living);
                 for (ServerPlayerEntity player : new ArrayList<>(t.bar().getPlayers())) {
                     if (player.isRemoved() || player.getWorld() != t.world() || player.squaredDistanceTo(living) > BAR_RANGE_SQ) {
                         t.bar().removePlayer(player);
@@ -106,13 +107,49 @@ public final class ChampionTracker {
         });
     }
 
+    /** How far a champion may stray from the plaza it guards. */
+    private static final double LEASH = 14.0, LEASH_HARD = 28.0;
+
+    /**
+     * Keeps a champion in the room it is supposed to be guarding.
+     *
+     * <p>Champions wander like any mob, and the central chest refuses to open while one is
+     * alive — so a zombie that strolls off leaves the player hunting a 101 × 101 maze for it
+     * before they can finish. Not fatal, but a miserable twenty minutes. Asterion has its own
+     * leash; this is the same idea for every other champion.</p>
+     *
+     * <p>Nothing is stored for it: the plaza is found from where the champion is standing, so a
+     * champion that is already outside its maze is simply left alone rather than being dragged
+     * somewhere wrong.</p>
+     */
+    private static void keepToThePlaza(ServerWorld world, LivingEntity champion) {
+        if (champion instanceof fr.mazecraft.entity.MinotaurEntity m && m.isKronos()) return;
+        if (!(champion instanceof net.minecraft.entity.mob.MobEntity mob)) return;
+        var hit = fr.mazecraft.structure.MazeFinder.find(world, champion.getBlockPos(), 0);
+        if (hit == null) return;
+        net.minecraft.util.math.BlockPos home = hit.piece().chestPos();
+        double dx = champion.getX() - (home.getX() + 0.5), dz = champion.getZ() - (home.getZ() + 0.5);
+        double distance = Math.sqrt(dx * dx + dz * dz);
+        if (distance <= LEASH) return;
+        if (distance > LEASH_HARD) {
+            champion.requestTeleport(home.getX() + 0.5, home.getY(), home.getZ() + 0.5);
+            mob.getNavigation().stop();
+            return;
+        }
+        mob.getNavigation().startMovingTo(home.getX() + 0.5, home.getY(), home.getZ() + 0.5, 1.0);
+    }
+
     public static void track(ServerWorld world, LivingEntity champion) {
         if (CHAMPIONS.containsKey(champion.getUuid())) return;
         boolean minotaur = champion instanceof fr.mazecraft.entity.MinotaurEntity;
+        // Asterion gets a bar of its own. The Bronze Guardian of a large maze is a serious
+        // fight, but it is not the one the whole mod leads to, and two identical purple bars
+        // would say they were the same thing.
+        boolean asterion = champion instanceof fr.mazecraft.entity.MinotaurEntity m && m.isKronos();
         ServerBossBar bar = new ServerBossBar(
-                minotaur ? champion.getName().copy().formatted(Formatting.DARK_PURPLE)
+                minotaur ? champion.getName().copy().formatted(asterion ? Formatting.DARK_PURPLE : Formatting.GOLD)
                         : Text.translatable("mazecraft.champion.name").formatted(Formatting.GOLD),
-                minotaur ? BossBar.Color.PURPLE : BossBar.Color.RED,
+                asterion ? BossBar.Color.PURPLE : minotaur ? BossBar.Color.YELLOW : BossBar.Color.RED,
                 minotaur ? BossBar.Style.NOTCHED_20 : BossBar.Style.NOTCHED_10);
         CHAMPIONS.put(champion.getUuid(), new Tracked(world, bar, minotaur));
     }

@@ -38,6 +38,11 @@ public final class MazeCraftConfigScreen {
                 .setTooltip(Text.translatable("config.mazecraft.preventWallWalking.tooltip"))
                 .setSaveConsumer(v -> cfg.preventWallWalking = v).build());
 
+        gen.addEntry(entry.startBooleanToggle(Text.translatable("config.mazecraft.enableMovingWalls"), cfg.enableMovingWalls)
+                .setDefaultValue(true)
+                .setTooltip(Text.translatable("config.mazecraft.enableMovingWalls.tooltip"))
+                .setSaveConsumer(v -> cfg.enableMovingWalls = v).build());
+
         // === Enemies category ===
         ConfigCategory enemies = builder.getOrCreateCategory(Text.translatable("config.mazecraft.category.enemies"));
         enemies.addEntry(entry.startBooleanToggle(Text.translatable("config.mazecraft.enableGuardians"), cfg.enableGuardians)

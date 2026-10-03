@@ -12,6 +12,10 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ChestBlock;
+import net.minecraft.block.LanternBlock;
+import net.minecraft.block.SlabBlock;
+import net.minecraft.block.enums.SlabType;
+import net.minecraft.block.enums.ChestType;
 import net.minecraft.block.HorizontalConnectingBlock;
 import net.minecraft.block.LeverBlock;
 import net.minecraft.block.enums.BlockFace;
@@ -123,9 +127,59 @@ public class MazePiece extends StructurePiece {
         nbt.putInt("Entrance", entranceSide);
     }
 
+    /**
+     * Half-width of the central room, in cells. Kronos gets 2 — a 19 × 19 arena instead of the
+     * ordinary 11 × 11 chest room — because its Minotaur charges in a straight line and is
+     * stunned when it hits a wall: in an 11-block room there is no run-up and the fight is a
+     * scrum in a corner.
+     */
+    public int plazaRadius() {
+        return style.isKronos() ? 2 : 1;
+    }
+
+    /** Radius, in blocks, of the sunken fighting floor of the arena of Kronos. */
+    private static final int ARENA_FLOOR = 6;
+    /** How far the fighting floor sits below the rest of the maze. */
+    private static final int ARENA_DEPTH = 2;
+
+    /**
+     * How far below the maze floor this column sits: the arena of Kronos is dug out of the
+     * plaza, a 13 × 13 fighting floor two blocks down, reached by a ring of two steps.
+     *
+     * <p>Sunken rather than flat so the fight can be watched from the rim, and so the plaza
+     * door opens onto a view of the arena instead of into it. The two extra blocks of headroom
+     * are for a boss that is taller than a corridor.</p>
+     *
+     * @return 0 outside the arena, 1 on the upper step, {@link #ARENA_DEPTH} on the floor
+     */
+    private int arenaSink(int lx, int lz) {
+        if (!style.isKronos() || !layout().isPlaza(lx, lz)) return 0;
+        int centre = size.span() / 2;
+        int d = Math.max(Math.abs(lx - centre), Math.abs(lz - centre));
+        if (d <= ARENA_FLOOR) return ARENA_DEPTH;
+        return d == ARENA_FLOOR + 1 ? 1 : 0;
+    }
+
+    /** Half-width of the hoard chamber: 15 × 15 outside, 13 × 13 of room. */
+    private static final int HOARD_RADIUS = 7;
+    /** Depth of the chamber floor below the maze floor, and of its ceiling. */
+    private static final int HOARD_FLOOR = 10, HOARD_CEIL = 5;
+
+    /** Centre of the maze in local coordinates. */
+    private int localCentre() {
+        return size.span() / 2;
+    }
+
+    /** The double chest of the hoard: against the far wall, on its pedestal. */
+    public BlockPos hoardChestPos() {
+        int c = localCentre();
+        return new BlockPos(originX() + c, floorY - HOARD_FLOOR + 2, originZ() + c + HOARD_RADIUS - 2);
+    }
+
     public MazeLayout layout() {
         if (layout == null) {
-            layout = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates());
+            layout = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates(),
+                    plazaRadius());
         }
         return layout;
     }
@@ -147,8 +201,23 @@ public class MazePiece extends StructurePiece {
 
     /** World position (feet) just outside the entrance, on the approach path. */
     public BlockPos entranceOutsidePos() {
-        int[] l = layout().entranceOutside(2);
+        return entranceOutsidePos(2);
+    }
+
+    /**
+     * World position (feet) on the approach line, {@code distance} blocks out from the maze.
+     * Past {@code style.margin} this leaves the bounding box altogether — which is what anything
+     * built out there has to do, because generation and the repair pass both rewrite every
+     * column inside the box, roof included, and would bury it.
+     */
+    public BlockPos entranceOutsidePos(int distance) {
+        int[] l = layout().entranceOutside(distance);
         return new BlockPos(originX() + l[0], floorY + 1, originZ() + l[1]);
+    }
+
+    /** Flattened ring around the maze, in blocks; part of the bounding box. */
+    public int getMargin() {
+        return style.margin;
     }
 
     /**
@@ -189,6 +258,74 @@ public class MazePiece extends StructurePiece {
         return list;
     }
 
+    /**
+     * How many wall segments of a Kronos vault shift.
+     *
+     * <p>Measured rather than guessed. A colossal maze is 3025 cells and the walk from the
+     * entrance to the plaza is about 200 of them: at forty segments only 2.9 of them touched
+     * that walk, so most players would cross the whole vault without watching a single wall
+     * move. At 160 it is 11.3 — one roughly every seventy blocks of corridor — while still
+     * leaving around 880 eligible walls to draw from, so the choice stays varied and every
+     * segment still clears the detour bar.</p>
+     */
+    public static final int MOVABLE_WALLS = 160;
+
+    private List<MazeLayout.Gate> movable;
+
+    /** The wall segments that open and close while the maze is walked (Kronos only). */
+    public List<MazeLayout.Gate> movableWalls() {
+        if (movable == null) {
+            movable = style.isKronos()
+                    ? layout().movableWalls(seed ^ 0x51F7L, MOVABLE_WALLS)
+                    : List.of();
+        }
+        return movable;
+    }
+
+    /**
+     * One block of movable wall {@code index}, to test distance against without building the
+     * whole segment. The tick looks at every segment of the vault several times a second and
+     * all but a handful are too far away to matter — those must cost one allocation, not
+     * fifteen.
+     */
+    public BlockPos movableWallAnchor(int index) {
+        MazeLayout.Gate seg = movableWalls().get(index);
+        return new BlockPos(originX() + seg.x0(), floorY + 1, originZ() + seg.z0());
+    }
+
+    /** World positions of movable wall {@code index} (3 wide × WALL_HEIGHT high). */
+    public List<BlockPos> movableWallBlocks(int index) {
+        List<BlockPos> list = new ArrayList<>();
+        MazeLayout.Gate seg = movableWalls().get(index);
+        for (int x = seg.x0(); x <= seg.x1(); x++) {
+            for (int z = seg.z0(); z <= seg.z1(); z++) {
+                for (int dy = 1; dy <= WALL_HEIGHT; dy++) {
+                    list.add(new BlockPos(originX() + x, floorY + dy, originZ() + z));
+                }
+            }
+        }
+        return list;
+    }
+
+    /**
+     * The block a shifting wall is made of: chiselled deepslate.
+     *
+     * <p>Three answers were tried here. The pillar block was wrong twice over — it <em>is</em>
+     * what the structural pillars are made of, so a shifting wall could not be told from a
+     * corner, and a hundred and sixty bronze segments turned a deepslate tomb into a copper
+     * mine. The ordinary wall block, with a bronze rail let into the floor, hid the mechanism
+     * well but drew a cross on the ground at every one of them.</p>
+     *
+     * <p>So: the tell is the wall itself, in a stone of the same family. At a glance down a
+     * corridor it is one more dark wall; looked at, the chiselled face is not the polished one.
+     * That is the line between a mechanism a player can learn and one that is merely random —
+     * without any tell, a corridor that was shut and is now open reads as a faulty memory, and
+     * a wall closed behind you cannot be told from a dead end.</p>
+     */
+    public BlockState movableWallState() {
+        return Blocks.CHISELED_DEEPSLATE.getDefaultState();
+    }
+
     public int gateCount() {
         return layout().gates().size();
     }
@@ -207,6 +344,11 @@ public class MazePiece extends StructurePiece {
         return -1;
     }
 
+    /** Is this world position inside the central room (the arena, for Kronos)? */
+    public boolean isInPlaza(BlockPos pos) {
+        return layout().isPlaza(pos.getX() - originX(), pos.getZ() - originZ());
+    }
+
     /** Blocks protected by this maze: its box, plus the floor and foundation below it. */
     public boolean isProtected(BlockPos pos) {
         return pos.getX() >= boundingBox.getMinX() && pos.getX() <= boundingBox.getMaxX()
@@ -221,10 +363,41 @@ public class MazePiece extends StructurePiece {
      * {@code from} is not inside the maze proper.
      */
     public List<BlockPos> threadPath(BlockPos from, IntPredicate gateOpen) {
+        return threadPath(from, gateOpen, null);
+    }
+
+    /**
+     * The same, reading the world so that the shifting walls of Kronos count.
+     *
+     * <p>Without the world the thread only knows the layout, which says every movable segment is
+     * a wall — so it routed the player the long way round past a shortcut that was standing wide
+     * open in front of them. With it, a segment that is open right now is just a passage.</p>
+     *
+     * <p>The path is worked out afresh on every use, so a shortcut that shuts again is not a
+     * trap: the next use simply routes around it. It cannot strand anyone either — the maze is
+     * a tree and these segments only ever add loops, so the long way round never stops
+     * existing.</p>
+     */
+    public List<BlockPos> threadPath(BlockPos from, IntPredicate gateOpen,
+                                     net.minecraft.world.BlockView world) {
         MazeLayout layout = layout();
         int span = layout.span();
         int sx = from.getX() - originX(), sz = from.getZ() - originZ();
         if (!layout.isInside(sx, sz)) return List.of();
+
+        // Segments of shifting wall that are standing open right now: passable, whatever the
+        // layout says.
+        boolean[] opened = new boolean[span * span];
+        if (world != null && style.isKronos()) {
+            for (int i = 0; i < movableWalls().size(); i++) {
+                List<BlockPos> blocks = movableWallBlocks(i);
+                if (blocks.isEmpty() || !world.getBlockState(blocks.get(0)).isAir()) continue;
+                MazeLayout.Gate seg = movableWalls().get(i);
+                for (int x = seg.x0(); x <= seg.x1(); x++) {
+                    for (int z = seg.z0(); z <= seg.z1(); z++) opened[x * span + z] = true;
+                }
+            }
+        }
 
         boolean[] blocked = new boolean[span * span];
         int target = -1;
@@ -254,8 +427,9 @@ public class MazePiece extends StructurePiece {
             int cx = cur / span, cz = cur % span;
             for (int[] d : dirs) {
                 int nx = cx + d[0], nz = cz + d[1];
-                if (!layout.isInside(nx, nz) || layout.isWall(nx, nz)) continue;
+                if (!layout.isInside(nx, nz)) continue;
                 int ni = nx * span + nz;
+                if (layout.isWall(nx, nz) && !opened[ni]) continue;
                 if (blocked[ni] || prev[ni] != -2) continue;
                 prev[ni] = cur;
                 queue.add(ni);
@@ -370,6 +544,26 @@ public class MazePiece extends StructurePiece {
                 }
                 world.setBlockState(pos.set(x, floorY, z), floor, Block.NOTIFY_LISTENERS);
 
+                // 2b. The arena of Kronos is dug down out of the plaza: the floor just written
+                //     becomes air and is laid again lower. Written this way round so the
+                //     ordinary path is untouched and only Kronos pays for it.
+                int sink = arenaSink(lx, lz);
+                if (sink > 0) {
+                    for (int d = 0; d < sink; d++) {
+                        world.setBlockState(pos.set(x, floorY - d, z), air, Block.NOTIFY_LISTENERS);
+                    }
+                    world.setBlockState(pos.set(x, floorY - sink, z), style.plaza, Block.NOTIFY_LISTENERS);
+                    // Nothing must be left hanging under the dug-out floor.
+                    world.setBlockState(pos.set(x, floorY - sink - 1, z), style.foundation,
+                            Block.NOTIFY_LISTENERS);
+                }
+
+                // 2c. The hoard of Asterion, sealed under the arena. Built with the vault, not
+                //     when he dies: a room this size cannot be raised block by block from a
+                //     tick without the player watching it appear. What his death does is open
+                //     the way down to it.
+                if (style.isKronos()) buildHoard(world, pos, x, z, lx, lz, placeChest);
+
                 // 3. Walls, pillars, and clearing above
                 if (style.enclosed) {
                     buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
@@ -423,7 +617,7 @@ public class MazePiece extends StructurePiece {
 
         // 4b. Sealed gateway across the entrance (medium and large mazes only). It is only the
         // visible signal — who may walk through is decided per player in MazeBarrier.
-        SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(size);
+        SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(style, size);
         if (tier != null) {
             BlockState gateway = ModBlocks.SEALED_GATEWAY.getDefaultState()
                     .with(SealedGatewayBlock.AXIS, entranceAlongX() ? Direction.Axis.X : Direction.Axis.Z)
@@ -454,14 +648,210 @@ public class MazePiece extends StructurePiece {
             spawnGuardians(world, chunkBox);
         }
 
+        // The arena of Kronos has no chest at its centre: what is at the centre is the
+        // Minotaur, and the hoard is only opened once it is down.
         BlockPos chest = chestPos();
-        if (placeChest && chunkBox.contains(chest)) {
+        if (placeChest && !style.isKronos() && chunkBox.contains(chest)) {
             world.setBlockState(chest,
                     Blocks.CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
             BlockEntity be = world.getBlockEntity(chest);
             if (be instanceof ChestBlockEntity chestEntity) {
                 chestEntity.setLootTable(lootTableFor(style, size), random.nextLong());
             }
+        }
+    }
+
+    /**
+     * One column of the hoard chamber of Asterion.
+     *
+     * <p>Minecraft hands out treasure in chests: you walk to a box, open it, and the reward is
+     * a list. The point of this room is to be <em>looked at</em> — gold under your feet, bronze
+     * on the walls, soul-light on all of it — so that the last thing the labyrinth gives you is
+     * a sight and not an inventory screen.</p>
+     *
+     * <p>What is where is a pure function of the block's coordinates, never of the {@code
+     * Random} passed in: generation and the repair pass are seeded differently, so anything
+     * drawn from that random would have rearranged itself the first time a chunk was repaired.</p>
+     */
+    private void buildHoard(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                            int lx, int lz, boolean placeChest) {
+        int c = localCentre();
+        int dx = lx - c, dz = lz - c;
+        int d = Math.max(Math.abs(dx), Math.abs(dz));
+        if (d > HOARD_RADIUS) return;
+
+        int floor = floorY - HOARD_FLOOR;
+        int ceiling = floorY - HOARD_CEIL;
+        BlockState brick = Blocks.DEEPSLATE_BRICKS.getDefaultState();
+        BlockState cracked = Blocks.CRACKED_DEEPSLATE_BRICKS.getDefaultState();
+        BlockState bronze = Blocks.OXIDIZED_COPPER.getDefaultState();
+        BlockState air = Blocks.AIR.getDefaultState();
+        boolean wall = d == HOARD_RADIUS;
+
+        // The two blocks the double chest stands on. A repair pass must not write to them at
+        // all: it rebuilds the room with placeChest false, so it used to fill the chest's own
+        // position with air — which scatters the chest's contents on the floor and leaves no
+        // chest — and then never put one back. Every chunk load did it again.
+        BlockPos chest = hoardChestPos();
+        boolean onChest = z == chest.getZ() && (x == chest.getX() || x == chest.getX() + 1);
+        int chestY = floor + 2;
+
+        // Floor, then the room, then the lid.
+        pos.set(x, floor, z);
+        world.setBlockState(pos, wall ? brick : hoardFloor(dx, dz), Block.NOTIFY_LISTENERS);
+
+        for (int y = floor + 1; y < ceiling; y++) {
+            if (onChest && y == chestY && !placeChest) continue;
+            pos.set(x, y, z);
+            if (wall) {
+                // Bronze pilasters every four blocks, brick between, a little of it cracked.
+                boolean pilaster = (Math.abs(dx) == HOARD_RADIUS && Math.abs(dz) % 4 == 0)
+                        || (Math.abs(dz) == HOARD_RADIUS && Math.abs(dx) % 4 == 0);
+                world.setBlockState(pos, pilaster ? bronze
+                        : (hash(dx, dz, y) % 5 == 0 ? cracked : brick), Block.NOTIFY_LISTENERS);
+            } else {
+                // SKIP_DROPS as well as a plain air write: emptying a room should never be able
+                // to spill anything on its floor, whatever ends up standing in it one day.
+                world.setBlockState(pos, air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            }
+        }
+        pos.set(x, ceiling, z);
+        world.setBlockState(pos, hash(dx, dz, 0) % 6 == 0 ? cracked : brick, Block.NOTIFY_LISTENERS);
+
+        if (wall) return;
+
+        // Four hanging lights, off the diagonals so they light the chest and the stair.
+        if (Math.abs(dx) == 4 && Math.abs(dz) == 4) {
+            pos.set(x, ceiling - 1, z);
+            world.setBlockState(pos, Blocks.SOUL_LANTERN.getDefaultState()
+                    .with(LanternBlock.HANGING, true), Block.NOTIFY_LISTENERS);
+            return;
+        }
+
+        // The pedestal, four blocks of it, and the double chest standing on the middle two.
+        if (z == chest.getZ() && x >= chest.getX() - 1 && x <= chest.getX() + 2) {
+            pos.set(x, floor + 1, z);
+            world.setBlockState(pos, Blocks.CHISELED_POLISHED_BLACKSTONE.getDefaultState(),
+                    Block.NOTIFY_LISTENERS);
+            if (onChest && placeChest) {
+                // Two ADJACENT blocks. They used to be put one on each side of the pedestal's
+                // middle, a block apart — which is not a double chest at all, just two single
+                // ones that cannot see each other.
+                placeHoardChest(world, new BlockPos(x, chestY, z),
+                        x == chest.getX() ? ChestType.LEFT : ChestType.RIGHT);
+            }
+            return;
+        }
+
+        // Heaped treasure, standing on the floor: the part you see before you see the chest.
+        BlockState heap = hoardHeap(dx, dz);
+        if (heap != null) {
+            pos.set(x, floor + 1, z);
+            world.setBlockState(pos, heap, Block.NOTIFY_LISTENERS);
+            if (hash(dx, dz, 7) % 4 == 0) {
+                pos.set(x, floor + 2, z);
+                world.setBlockState(pos, heap, Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /** The eight cells round a 3 × 3 shaft: one step per half block makes a walkable spiral. */
+    private static final int[][] HOARD_SPIRAL = {
+            {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
+    };
+
+    /**
+     * Asterion is down: the floor of the arena gives way onto the hoard.
+     *
+     * <p>Only the way down is cut here — eight blocks of shaft and its stair. The room itself
+     * was built with the vault, because a chamber raised block by block from a tick would be
+     * watched appearing through the hole.</p>
+     *
+     * <p>The stair is slabs, half a block to a step, and it starts on the chamber floor and
+     * ends flush with the arena: the same two mistakes were made on the shaft of the surface
+     * ruin — a first step a block and a half up, and a last step that needed a block placed to
+     * finish the climb — and this one is laid out so that neither is possible.</p>
+     */
+    public void openHoard(net.minecraft.server.world.ServerWorld world) {
+        int c = localCentre();
+        int cx = originX() + c, cz = originZ() + c;
+        int bottom = floorY - HOARD_FLOOR + 1;   // the chamber's walking level
+        int top = floorY - 2;                    // the arena's floor block
+        BlockState air = Blocks.AIR.getDefaultState();
+        BlockState brick = Blocks.DEEPSLATE_BRICKS.getDefaultState();
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+
+        for (int y = bottom; y <= top; y++) {
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    boolean lining = Math.abs(dx) == 2 || Math.abs(dz) == 2;
+                    pos.set(cx + dx, y, cz + dz);
+                    // Line only the rock the shaft is cut through; inside the chamber and the
+                    // arena the surrounding blocks are already what they should be.
+                    if (lining) {
+                        if (y > floorY - HOARD_CEIL && y < top) {
+                            world.setBlockState(pos, brick, Block.NOTIFY_LISTENERS);
+                        }
+                    } else {
+                        world.setBlockState(pos, air, Block.NOTIFY_LISTENERS);
+                    }
+                }
+            }
+            for (int half = 0; half < 2; half++) {
+                int[] step = HOARD_SPIRAL[Math.floorMod((y - bottom) * 2 + half, HOARD_SPIRAL.length)];
+                pos.set(cx + step[0], y, cz + step[1]);
+                world.setBlockState(pos, Blocks.DEEPSLATE_BRICK_SLAB.getDefaultState()
+                        .with(SlabBlock.TYPE, half == 0 ? SlabType.BOTTOM : SlabType.TOP),
+                        Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /**
+     * Gold under the middle of the room, blackstone at its edges: a 7 × 7 floor of gold, 49
+     * blocks, which is about what a bastion treasure room holds. Enough to read as a hoard the
+     * moment the hole opens, and not so much that the rest of the game stops mattering.
+     */
+    private BlockState hoardFloor(int dx, int dz) {
+        return Math.max(Math.abs(dx), Math.abs(dz)) <= 3
+                ? Blocks.GOLD_BLOCK.getDefaultState()
+                : Blocks.POLISHED_BLACKSTONE.getDefaultState();
+    }
+
+    /** What is heaped on this floor block, or null for bare floor. */
+    private BlockState hoardHeap(int dx, int dz) {
+        if (Math.max(Math.abs(dx), Math.abs(dz)) <= 1) return null; // the foot of the stair
+        // Mostly bronze, which is the vault's own metal and costs nothing; gold and emerald
+        // sparingly. No diamond blocks: at one in a hundred, doubled when they stack, the worst
+        // room came out at ninety diamonds, which is not a reward, it is a cheat code.
+        int roll = hash(dx, dz, 3) % 100;
+        if (roll < 11) return Blocks.OXIDIZED_COPPER.getDefaultState();
+        if (roll < 18) return Blocks.RAW_GOLD_BLOCK.getDefaultState();
+        if (roll < 21) return Blocks.EMERALD_BLOCK.getDefaultState();
+        return null;
+    }
+
+    /** Stable pseudo-random from coordinates — never from the Random handed to a build pass. */
+    private int hash(int a, int b, int c) {
+        int h = (int) (seed ^ 0x9E3779B9L);
+        h = h * 31 + a;
+        h = h * 31 + b;
+        h = h * 31 + c;
+        h ^= h >>> 15;
+        return Math.abs(h);
+    }
+
+    /**
+     * One half of the double chest. Facing north, the LEFT half's partner is the block to its
+     * east, so the two halves are at {@code chestX} and {@code chestX + 1}.
+     */
+    private void placeHoardChest(StructureWorldAccess world, BlockPos at, ChestType half) {
+        world.setBlockState(at, Blocks.CHEST.getDefaultState()
+                .with(ChestBlock.FACING, Direction.NORTH)
+                .with(ChestBlock.CHEST_TYPE, half),
+                Block.NOTIFY_LISTENERS);
+        if (world.getBlockEntity(at) instanceof ChestBlockEntity chest) {
+            chest.setLootTable(lootTableFor(MazeStyle.KRONOS, MazeSize.COLOSSAL), seed ^ at.asLong());
         }
     }
 

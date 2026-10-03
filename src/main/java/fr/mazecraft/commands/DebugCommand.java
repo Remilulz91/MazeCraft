@@ -11,7 +11,12 @@ import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazeStyle;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.tag.TagKey;
+import net.minecraft.world.Heightmap;
+import net.minecraft.world.gen.structure.Structure;
 import net.minecraft.server.command.CommandManager;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
@@ -47,6 +52,8 @@ public class DebugCommand {
     public static LiteralArgumentBuilder<ServerCommandSource> build() {
         return CommandManager.literal("debug")
                 .requires(src -> MazeCraft.isDebugBuild() && src.hasPermissionLevel(2))
+                .then(CommandManager.literal("kronos")
+                        .executes(DebugCommand::onKronos))
                 .then(CommandManager.literal("info")
                         .executes(DebugCommand::onInfo))
                 .then(CommandManager.literal("where")
@@ -74,6 +81,33 @@ public class DebugCommand {
         src.sendFeedback(() -> Text.literal("Build type: DEBUG").formatted(Formatting.GRAY), false);
         src.sendFeedback(() -> Text.literal("protectUntilSolved: " + cfg.protectUntilSolved
                 + ", preventWallWalking: " + cfg.preventWallWalking).formatted(Formatting.GRAY), false);
+        return 1;
+    }
+
+    /**
+     * DEBUG: finds the Labyrinth of Kronos and teleports to the foot of its shaft.
+     * Without this the whole vault is untestable until all 48 mazes have been cleared.
+     */
+    private static int onKronos(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id("kronos"));
+        BlockPos found = world.locateStructure(tag, player.getBlockPos(), 200, false);
+        if (found == null) {
+            src.sendFeedback(() -> Text.translatable("mazecraft.command.kronos_not_found")
+                    .formatted(Formatting.RED), false);
+            return 0;
+        }
+        int surface = world.getTopY(Heightmap.Type.WORLD_SURFACE, found.getX(), found.getZ());
+        player.teleport(world, found.getX() + 0.5, surface + 1, found.getZ() + 0.5,
+                player.getYaw(), player.getPitch());
+        src.sendFeedback(() -> Text.translatable("mazecraft.command.kronos_found",
+                found.getX(), surface, found.getZ()).formatted(Formatting.LIGHT_PURPLE), false);
         return 1;
     }
 

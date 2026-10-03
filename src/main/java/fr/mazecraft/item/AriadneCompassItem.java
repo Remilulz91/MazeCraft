@@ -67,9 +67,19 @@ public class AriadneCompassItem extends Item {
         }
 
         public Text label() {
+            if (style.isKronos()) return Text.translatable("mazecraft.kronos.target");
             return Text.translatable("mazecraft.maze.name",
                     Text.translatable("mazecraft.style." + style.id()),
                     Text.translatable("mazecraft.size." + size.step().id()));
+        }
+
+        /**
+         * The structure tag to search. Every ordinary step has a tag of its own holding one
+         * structure, which is what lets a tag lookup target one precise step; Kronos is one of
+         * a kind and has its own.
+         */
+        public String tag() {
+            return style.isKronos() ? "kronos" : "step/" + style.id() + "_" + size.step().id();
         }
     }
 
@@ -79,6 +89,13 @@ public class AriadneCompassItem extends Item {
         for (MazeStyle style : MazeProgress.stylesOf(world)) {
             MazeSize next = MazeProgress.nextStep(player, style);
             if (next != null) targets.add(new Target(style, next));
+        }
+        // Once every step is cleared the list would be empty and the compass a dead item for
+        // the whole endgame. What is left owed at that point is Kronos, so it becomes the last
+        // target — in the Overworld, where it is buried.
+        if (targets.isEmpty() && world.getRegistryKey().equals(World.OVERWORLD)
+                && MazeProgress.isEverythingComplete(player)) {
+            targets.add(new Target(MazeStyle.KRONOS, MazeSize.COLOSSAL));
         }
         return targets;
     }
@@ -168,8 +185,7 @@ public class AriadneCompassItem extends Item {
      * tag-based lookup target one precise step.
      */
     private static BlockPos locate(ServerWorld world, Target target, BlockPos from) {
-        TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE,
-                MazeCraft.id("step/" + target.style().id() + "_" + target.size().step().id()));
+        TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id(target.tag()));
         return world.locateStructure(tag, from, SEARCH_RADIUS, false);
     }
 

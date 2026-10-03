@@ -33,7 +33,7 @@ import java.util.List;
 public final class MazeProgress {
 
     /** Number of steps to clear before the Labyrinth of Kronos opens (16 styles × 3 steps). */
-    public static final int TOTAL_STEPS = MazeStyle.values().length * MazeSize.STEPS.length;
+    public static final int TOTAL_STEPS = MazeStyle.PROGRESSION.length * MazeSize.STEPS.length;
 
     private MazeProgress() { }
 
@@ -89,7 +89,7 @@ public final class MazeProgress {
     /** How many of the {@link #TOTAL_STEPS} steps this player has cleared. */
     public static int completedSteps(ServerPlayerEntity player) {
         int done = 0;
-        for (MazeStyle style : MazeStyle.values()) {
+        for (MazeStyle style : MazeStyle.PROGRESSION) {
             for (MazeSize step : MazeSize.STEPS) {
                 if (hasCleared(player, style, step)) done++;
             }
@@ -100,7 +100,7 @@ public final class MazeProgress {
     /** How many of the 16 styles this player has fully cleared (one key fragment each). */
     public static int completedStyles(ServerPlayerEntity player) {
         int done = 0;
-        for (MazeStyle style : MazeStyle.values()) {
+        for (MazeStyle style : MazeStyle.PROGRESSION) {
             if (isStyleComplete(player, style)) done++;
         }
         return done;
@@ -117,7 +117,7 @@ public final class MazeProgress {
     public static List<MazeStyle> stylesOf(World world) {
         var key = world.getRegistryKey();
         List<MazeStyle> list = new ArrayList<>();
-        for (MazeStyle style : MazeStyle.values()) {
+        for (MazeStyle style : MazeStyle.PROGRESSION) {
             boolean match;
             if (key.equals(World.NETHER)) match = style.enclosed;
             else if (key.equals(World.END)) match = style.isEnd();

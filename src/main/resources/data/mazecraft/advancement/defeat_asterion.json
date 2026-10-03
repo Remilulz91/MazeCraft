@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:unseal_kronos",
+  "display": {
+    "icon": {
+      "id": "mazecraft:kronos_key"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.defeat_asterion.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.defeat_asterion.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "slain": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 2000
+  }
+}

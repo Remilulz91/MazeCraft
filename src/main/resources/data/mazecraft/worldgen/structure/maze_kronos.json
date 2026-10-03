@@ -1,0 +1,9 @@
+{
+  "type": "mazecraft:maze",
+  "style": "kronos",
+  "size": "colossal",
+  "biomes": "#minecraft:is_overworld",
+  "step": "underground_structures",
+  "spawn_overrides": {},
+  "terrain_adaptation": "none"
+}

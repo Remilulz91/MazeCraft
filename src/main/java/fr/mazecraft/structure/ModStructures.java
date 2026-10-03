@@ -20,6 +20,11 @@ public final class ModStructures {
             Registries.STRUCTURE_PIECE, MazeCraft.id("maze_piece"),
             (StructurePieceType) MazePiece::new);
 
+    /** The way down to Kronos: surface ruin plus the shaft under it. */
+    public static final StructurePieceType KRONOS_GATE_PIECE = Registry.register(
+            Registries.STRUCTURE_PIECE, MazeCraft.id("kronos_gate_piece"),
+            (StructurePieceType) KronosGatePiece::new);
+
     private ModStructures() { }
 
     /** Forces class loading (and therefore registration). */

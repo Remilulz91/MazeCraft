@@ -317,6 +317,30 @@ public enum MazeStyle {
             Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
             Blocks.GLOWSTONE.getDefaultState(),
             null
+    ),
+
+    // =====================================================================
+    // KRONOS — the Labyrinth of Kronos: one of a kind, buried deep under the
+    // Overworld. Not a biome style and NOT part of the 16-style progression
+    // (see PROGRESSION below): it is the thing the progression leads to.
+    // Deepslate and blackstone for the tomb, oxidised copper for the bronze.
+    // =====================================================================
+
+    KRONOS(
+            Blocks.POLISHED_DEEPSLATE.getDefaultState(),
+            Blocks.OXIDIZED_COPPER.getDefaultState(),
+            Blocks.DEEPSLATE_BRICKS.getDefaultState(),
+            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
+            Blocks.CHISELED_POLISHED_BLACKSTONE.getDefaultState(),
+            Blocks.DEEPSLATE.getDefaultState(),
+            Blocks.OXIDIZED_COPPER_GRATE.getDefaultState(),
+            Mix.of(Blocks.POLISHED_DEEPSLATE.getDefaultState(), 40,
+                    Blocks.DEEPSLATE_BRICKS.getDefaultState(), 30,
+                    Blocks.CRACKED_DEEPSLATE_BRICKS.getDefaultState(), 20,
+                    Blocks.POLISHED_BLACKSTONE.getDefaultState(), 10),
+            Blocks.DEEPSLATE_TILES.getDefaultState(),
+            Blocks.SHROOMLIGHT.getDefaultState(),
+            Blocks.SOUL_LANTERN.getDefaultState()
     );
 
     public final BlockState wall;
@@ -339,6 +363,7 @@ public enum MazeStyle {
     public final BlockState hangingLight;
     /** Loot table prefix: chests/<prefix>_<size>. */
     public String lootPrefix() {
+        if (this == KRONOS) return "kronos";
         if (enclosed) return "nether_maze";
         return this == END ? "end_maze" : "maze";
     }
@@ -347,6 +372,21 @@ public enum MazeStyle {
     public boolean isEnd() {
         return this == END;
     }
+
+    /** True for the Labyrinth of Kronos, which is its own thing entirely. */
+    public boolean isKronos() {
+        return this == KRONOS;
+    }
+
+    /**
+     * The sixteen styles that make up the per-player progression — every style except
+     * {@link #KRONOS}, which is the reward at the end of it rather than a step in it.
+     * Anything counting steps, listing branches or building the 48 structures uses this,
+     * never {@code values()}.
+     */
+    public static final MazeStyle[] PROGRESSION = java.util.Arrays.stream(values())
+            .filter(style -> style != KRONOS)
+            .toArray(MazeStyle[]::new);
 
     /** Optional horizontal bands: wall block per height above the floor (1 = lowest). Null = plain {@link #wall}. */
     private final BlockState[] wallBands;

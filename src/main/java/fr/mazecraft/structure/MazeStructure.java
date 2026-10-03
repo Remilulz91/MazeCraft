@@ -6,6 +6,7 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.mazecraft.MazeCraft;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
+import net.minecraft.util.math.Direction;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.structure.Structure;
@@ -50,6 +51,16 @@ public class MazeStructure extends Structure {
     private static final int NETHER_MIN_FLOOR = 40;
     private static final int NETHER_MAX_FLOOR = 80;
 
+    /**
+     * Floor height range of the Labyrinth of Kronos: deep under the Overworld, clear of the
+     * bedrock floor (Y -64..-59) and below where players dig by habit.
+     */
+    // Raised from -50 in 1.0.0-alpha.3: the hoard of Asterion is dug ten blocks under the
+    // arena floor, and at -50 its own floor landed at -60 — inside the bedrock layer, which
+    // runs to -59. The vault is still deep in the deepslate.
+    private static final int KRONOS_MIN_FLOOR = -44;
+    private static final int KRONOS_MAX_FLOOR = -36;
+
     public MazeStructure(Structure.Config config, String styleId, String sizeId) {
         super(config);
         MazeStyle parsedStyle = MazeStyle.fromId(styleId);
@@ -60,7 +71,9 @@ public class MazeStructure extends Structure {
         this.style = parsedStyle;
 
         MazeSize parsedSize = MazeSize.fromId(sizeId);
-        if (parsedSize == null || parsedSize == MazeSize.COLOSSAL) {
+        // Colossal is normally a rare upgrade of a large maze rather than a size a structure may
+        // ask for — except for Kronos, which is colossal by definition.
+        if (parsedSize == null || (parsedSize == MazeSize.COLOSSAL && !this.style.isKronos())) {
             MazeCraft.LOGGER.warn("[MazeCraft] Invalid maze size '{}' in worldgen JSON, using medium", sizeId);
             parsedSize = MazeSize.MEDIUM;
         }
@@ -86,11 +99,37 @@ public class MazeStructure extends Structure {
         // The size is fixed by the structure. It is never downgraded when the terrain is poor:
         // a "medium" structure that quietly generated a small maze would hand the player the
         // wrong progression step. A spot that doesn't fit simply gets no maze.
+        if (style.isKronos()) {
+            // One of a kind, and buried: the whole point is that it is not stumbled upon. It
+            // must also keep well clear of ancient cities, which share its depth — the usual
+            // avoidance ignores them because a surface maze never meets one.
+            if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
+            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size,
+                    KRONOS_MIN_FLOOR, KRONOS_MAX_FLOOR);
+            if (floorY.isEmpty()) return Optional.empty();
+            int y = floorY.getAsInt();
+            int entrance = context.random().nextInt(4);
+            MazePiece vault = new MazePiece(style, size, mazeSeed, centerX, y, centerZ, entrance);
+            // Clear of the bounding box: inside it, the repair pass rebuilds the roof over the
+            // margin ring and plugs the shaft. Two blocks past the box puts the foot of the
+            // shaft right against the doorway the maze already leaves in its outer wall.
+            BlockPos shaftFoot = vault.entranceOutsidePos(vault.getMargin() + 2);
+            Direction toVault = Direction.getFacing(
+                    centerX - shaftFoot.getX(), 0, centerZ - shaftFoot.getZ());
+            int surface = context.chunkGenerator().getHeight(shaftFoot.getX(), shaftFoot.getZ(),
+                    Heightmap.Type.WORLD_SURFACE_WG, context.world(), context.noiseConfig());
+            return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector -> {
+                collector.addPiece(vault);
+                collector.addPiece(new KronosGatePiece(shaftFoot, surface, toVault));
+            }));
+        }
+
         if (style.enclosed) {
             // Nether: buried in the rock like a fortress, at the height where the rock is the
             // most solid (never hanging over the lava sea). No colossal mazes down here.
             if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
-            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size);
+            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size,
+                    NETHER_MIN_FLOOR, NETHER_MAX_FLOOR);
             if (floorY.isEmpty()) return Optional.empty();
             int y = floorY.getAsInt();
             int entrance = mostOpenSide(context, centerX, centerZ, size, y);
@@ -191,7 +230,8 @@ public class MazeStructure extends Structure {
      * buried in solid rock. Rejects heights with lava around the maze, and returns empty if even
      * the best height is not solid enough (the maze would float in a cavern).
      */
-    private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ, MazeSize size) {
+    private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ, MazeSize size,
+                                                int minFloor, int maxFloor) {
         ChunkGenerator gen = context.chunkGenerator();
         int half = size.span() / 2 + 4;
         var columns = new java.util.ArrayList<net.minecraft.world.gen.chunk.VerticalBlockSample>();
@@ -206,7 +246,7 @@ public class MazeStructure extends Structure {
         int bestY = -1;
         float bestRatio = -1f;
         int offset = context.random().nextInt(2); // vary the parity between mazes
-        for (int y = NETHER_MIN_FLOOR + offset; y <= NETHER_MAX_FLOOR; y += 2) {
+        for (int y = minFloor + offset; y <= maxFloor; y += 2) {
             int solid = 0, total = 0;
             boolean lava = false;
             for (var column : columns) {
