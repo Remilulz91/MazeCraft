@@ -98,6 +98,23 @@
       }
     ]
   },
+  "item.asterion_horn.use": {
+    "subtitle": "subtitles.mazecraft.asterion_horn",
+    "sounds": [
+      {
+        "name": "minecraft:item.goat_horn.sound.6",
+        "type": "event",
+        "pitch": 0.55,
+        "volume": 1.0
+      },
+      {
+        "name": "minecraft:entity.ravager.roar",
+        "type": "event",
+        "pitch": 0.45,
+        "volume": 0.55
+      }
+    ]
+  },
   "music.minotaur": {
     "sounds": [
       {

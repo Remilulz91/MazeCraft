@@ -22,6 +22,8 @@ public final class ModSounds {
     public static final SoundEvent MINOTAUR_CHARGE_HIT = register("entity.minotaur.charge_hit");
     public static final SoundEvent MINOTAUR_STUNNED = register("entity.minotaur.stunned");
     public static final SoundEvent MINOTAUR_HORN = register("item.minotaur_horn.use");
+    /** Asterion's horn has a voice of its own: a deeper call with the beast's own breath under it. */
+    public static final SoundEvent ASTERION_HORN = register("item.asterion_horn.use");
 
     public static final Identifier MUSIC_MINOTAUR_ID = MazeCraft.id("music.minotaur");
     public static final RegistryEntry.Reference<SoundEvent> MUSIC_MINOTAUR =

@@ -2,6 +2,13 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.4] — 2026-10-03
+
+### Changed
+- **The Horn of Asterion has a voice of its own.** Both horns played the same sound event,
+  so Asterion's announced itself with the subtitle "a bronze horn sounds". It now has its
+  own event: a deeper call, with the beast's own breath layered under it.
+
 ## [1.0.0-alpha.3] — 2026-10-03
 
 Kronos, part three: the arena.

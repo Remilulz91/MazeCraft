@@ -277,5 +277,6 @@
   "mazecraft.kronos.key_returned": "La serrure te reconnaît. Une nouvelle Clé de Kronos t'est rendue.",
   "item.mazecraft.asterion_horn": "Corne d'Astérion",
   "item.mazecraft.asterion_horn.tooltip": "Souffler : Force II, Vitesse II et Résistance aux joueurs dans 40 blocs (2 min)",
-  "mazecraft.kronos.hoard": "Le sol de l'arène s'effondre. Le trésor d'Astérion s'ouvre sous tes pieds."
+  "mazecraft.kronos.hoard": "Le sol de l'arène s'effondre. Le trésor d'Astérion s'ouvre sous tes pieds.",
+  "subtitles.mazecraft.asterion_horn": "Le cor d'Astérion retentit"
 }

@@ -277,5 +277,6 @@
   "mazecraft.kronos.key_returned": "The lock knows you. A new Key of Kronos is returned to you.",
   "item.mazecraft.asterion_horn": "Horn of Asterion",
   "item.mazecraft.asterion_horn.tooltip": "Blow it: Strength II, Speed II and Resistance to players within 40 blocks (2 min)",
-  "mazecraft.kronos.hoard": "The floor of the arena gives way. The hoard of Asterion opens beneath you."
+  "mazecraft.kronos.hoard": "The floor of the arena gives way. The hoard of Asterion opens beneath you.",
+  "subtitles.mazecraft.asterion_horn": "The Horn of Asterion sounds"
 }

@@ -41,7 +41,7 @@ public class AsterionHornItem extends Item {
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack stack = user.getStackInHand(hand);
         if (world instanceof ServerWorld server) {
-            server.playSound(null, user.getBlockPos(), ModSounds.MINOTAUR_HORN, SoundCategory.PLAYERS, 4.0f, 0.55f);
+            server.playSound(null, user.getBlockPos(), ModSounds.ASTERION_HORN, SoundCategory.PLAYERS, 4.0f, 1.0f);
             for (PlayerEntity player : server.getPlayers(p -> p.squaredDistanceTo(user) <= RANGE * RANGE)) {
                 player.addStatusEffect(new StatusEffectInstance(StatusEffects.STRENGTH, DURATION, 1));
                 player.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED, DURATION, 1));
