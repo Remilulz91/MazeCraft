@@ -89,12 +89,35 @@ public class MazeStructure extends Structure {
         return size;
     }
 
+    /**
+     * How far a maze must keep from the origin.
+     *
+     * <p>Honest about what this is: Minecraft does not hand worldgen the spawn point — it is
+     * chosen afterwards, on suitable ground near the origin — so this cannot be exact. It
+     * clears a square around (0, 0) wide enough to cover where the spawn is normally picked.
+     * It makes landing in a maze at world spawn very unlikely, not impossible.</p>
+     */
+    private static final int SPAWN_CLEARANCE = 160;
+
+    /** Would a maze placed here reach into the cleared square around the origin? */
+    private boolean coversWorldSpawn(int centerX, int centerZ) {
+        int reach = size.span() / 2 + MazeStyle.MAX_MARGIN + SPAWN_CLEARANCE;
+        return Math.abs(centerX) < reach && Math.abs(centerZ) < reach;
+    }
+
     @Override
     protected Optional<StructurePosition> getStructurePosition(Context context) {
         ChunkPos chunkPos = context.chunkPos();
         long mazeSeed = context.random().nextLong();
         int centerX = chunkPos.getCenterX();
         int centerZ = chunkPos.getCenterZ();
+
+        // Nothing on top of the world's spawn. A maze that covers it drops a new player inside
+        // a structure they may not even be allowed to enter — the barrier shoves them straight
+        // back out, and again on every death. Kronos is exempt: it is forty blocks underground,
+        // nobody spawns inside it, and it is rare enough that losing a site would cost more
+        // than it saves.
+        if (!style.isKronos() && coversWorldSpawn(centerX, centerZ)) return Optional.empty();
 
         // The size is fixed by the structure. It is never downgraded when the terrain is poor:
         // a "medium" structure that quietly generated a small maze would hand the player the

@@ -25,6 +25,11 @@ public final class ModSounds {
     /** Asterion's horn has a voice of its own: a deeper call with the beast's own breath under it. */
     public static final SoundEvent ASTERION_HORN = register("item.asterion_horn.use");
 
+    /** The three music discs. Registered events, so the jukebox songs can name them directly. */
+    public static final SoundEvent DISC_FIL = register("music_disc.fil");
+    public static final SoundEvent DISC_AIRAIN = register("music_disc.airain");
+    public static final SoundEvent DISC_ASTERION = register("music_disc.asterion");
+
     public static final Identifier MUSIC_MINOTAUR_ID = MazeCraft.id("music.minotaur");
     public static final RegistryEntry.Reference<SoundEvent> MUSIC_MINOTAUR =
             Registry.registerReference(Registries.SOUND_EVENT, MUSIC_MINOTAUR_ID, SoundEvent.of(MUSIC_MINOTAUR_ID));

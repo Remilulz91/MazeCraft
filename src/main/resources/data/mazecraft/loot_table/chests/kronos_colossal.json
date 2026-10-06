@@ -179,6 +179,15 @@
           ]
         }
       ]
+    },
+    {
+      "rolls": 1,
+      "entries": [
+        {
+          "type": "minecraft:item",
+          "name": "mazecraft:music_disc_asterion"
+        }
+      ]
     }
   ]
 }

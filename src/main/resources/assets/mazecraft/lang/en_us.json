@@ -278,5 +278,11 @@
   "item.mazecraft.asterion_horn": "Horn of Asterion",
   "item.mazecraft.asterion_horn.tooltip": "Blow it: Strength II, Speed II and Resistance to players within 40 blocks (2 min)",
   "mazecraft.kronos.hoard": "The floor of the arena gives way. The hoard of Asterion opens beneath you.",
-  "subtitles.mazecraft.asterion_horn": "The Horn of Asterion sounds"
+  "subtitles.mazecraft.asterion_horn": "The Horn of Asterion sounds",
+  "item.mazecraft.music_disc_fil": "Music Disc",
+  "jukebox_song.mazecraft.fil": "Kevin MacLeod - Dark Walk",
+  "item.mazecraft.music_disc_airain": "Music Disc",
+  "jukebox_song.mazecraft.airain": "Kevin MacLeod - Ancient Rite",
+  "item.mazecraft.music_disc_asterion": "Music Disc",
+  "jukebox_song.mazecraft.asterion": "Kevin MacLeod - Final Battle of the Dark Wizards"
 }

@@ -1,0 +1,8 @@
+{
+  "comparator_output": 13,
+  "description": {
+    "translate": "jukebox_song.mazecraft.airain"
+  },
+  "length_in_seconds": 114,
+  "sound_event": "mazecraft:music_disc.airain"
+}

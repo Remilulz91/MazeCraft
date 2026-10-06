@@ -122,5 +122,29 @@
         "type": "event"
       }
     ]
+  },
+  "music_disc.fil": {
+    "sounds": [
+      {
+        "name": "mazecraft:music/fil",
+        "stream": true
+      }
+    ]
+  },
+  "music_disc.airain": {
+    "sounds": [
+      {
+        "name": "mazecraft:music/airain",
+        "stream": true
+      }
+    ]
+  },
+  "music_disc.asterion": {
+    "sounds": [
+      {
+        "name": "mazecraft:music/asterion",
+        "stream": true
+      }
+    ]
   }
 }

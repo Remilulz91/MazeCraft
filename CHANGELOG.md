@@ -2,6 +2,39 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.5] — 2026-10-06
+
+### Added
+- **Three music discs**, with their own items, their own songs and their own textures —
+  nothing vanilla is overwritten. *Fil* turns up in any maze chest (10 %), *Airain* in the
+  large and colossal ones (25 %), and *Astérion* waits in the hoard, guaranteed. The artist
+  and title are shown in game when a disc plays, which is also where the CC-BY attribution
+  lives.
+
+### Fixed
+- **Two of the three discs were silent.** Their OGG files carried a **Theora video stream**
+  beside the audio: the source MP3s had cover art, the OGG container accepts video, and
+  ffmpeg duly re-encoded the artwork into the file. Minecraft's loader expects a bare Vorbis
+  stream and played nothing. The third track had no cover art, which is exactly why it was
+  the only one that worked. Repaired by copying the Vorbis stream into a clean container —
+  no re-encode, so no second generation of loss.
+- **Disc textures now follow the vanilla silhouette.** They were drawn as full circles with a
+  large coloured centre; a vanilla disc is an *ellipse* — a record seen in perspective — with
+  a dark body and a small coloured label.
+- **No maze over the world's spawn.** A maze covering it drops a new player inside a structure
+  they may not be allowed to enter, and the barrier shoves them back out again on every death.
+  Mazes now keep a cleared square around the origin, 198 blocks for a small one and 278 for a
+  colossal. Kronos is exempt: it is forty blocks down, nobody spawns inside it. Honest limit:
+  Minecraft chooses the spawn after worldgen, so this makes the case very unlikely, not
+  impossible.
+
+### Technical
+- Levers were measured rather than assumed. One can sit two blocks from the gate it opens *as
+  the crow flies* and look like a key taped to its own door — but the walk from that gate to
+  that lever is **118 to 352 blocks at the median, and never under 6** across 6720 levers. A
+  change to push levers further from gates was written, measured, found to move nothing, and
+  reverted: it would have altered generation in every maze for no gain.
+
 ## [1.0.0-alpha.4] — 2026-10-03
 
 ### Changed

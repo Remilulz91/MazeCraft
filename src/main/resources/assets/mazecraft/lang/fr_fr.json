@@ -278,5 +278,11 @@
   "item.mazecraft.asterion_horn": "Corne d'Astérion",
   "item.mazecraft.asterion_horn.tooltip": "Souffler : Force II, Vitesse II et Résistance aux joueurs dans 40 blocs (2 min)",
   "mazecraft.kronos.hoard": "Le sol de l'arène s'effondre. Le trésor d'Astérion s'ouvre sous tes pieds.",
-  "subtitles.mazecraft.asterion_horn": "Le cor d'Astérion retentit"
+  "subtitles.mazecraft.asterion_horn": "Le cor d'Astérion retentit",
+  "item.mazecraft.music_disc_fil": "Disque de musique",
+  "jukebox_song.mazecraft.fil": "Kevin MacLeod - Dark Walk",
+  "item.mazecraft.music_disc_airain": "Disque de musique",
+  "jukebox_song.mazecraft.airain": "Kevin MacLeod - Ancient Rite",
+  "item.mazecraft.music_disc_asterion": "Disque de musique",
+  "jukebox_song.mazecraft.asterion": "Kevin MacLeod - Final Battle of the Dark Wizards"
 }
