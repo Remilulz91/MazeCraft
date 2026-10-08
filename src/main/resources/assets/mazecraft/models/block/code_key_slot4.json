@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "front": "mazecraft:block/code_key_slot4",
+    "side": "mazecraft:block/code_key_side",
+    "top": "mazecraft:block/code_key_side"
+  }
+}

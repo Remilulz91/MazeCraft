@@ -88,6 +88,15 @@ public class MazeCraft implements ModInitializer {
         CommandRegistrationCallback.EVENT.register(MazeCommand::register);
         LOGGER.info("[MazeCraft] Commands registered");
 
+        // 3b. The keypad, BEFORE the protection. Listeners are called in registration order
+        //     and the first one that does not pass ends the chain — so a handler registered
+        //     after the anti-cheat depends on the anti-cheat passing every keypad click along,
+        //     which is a thing to verify rather than a thing to rely on.
+        fr.mazecraft.progression.VaultKeypad.register();
+        net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents.DISCONNECT.register(
+                (handler, server) ->
+                        fr.mazecraft.progression.VaultKeypad.forget(handler.player.getUuid()));
+
         // 4. Anti-cheat protection + "maze conquered" detection (central chest)
         MazeProtection.register();
 

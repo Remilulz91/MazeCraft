@@ -1,5 +1,6 @@
 package fr.mazecraft.structure;
 
+import fr.mazecraft.block.CodeKeyBlock;
 import fr.mazecraft.block.ModBlocks;
 import fr.mazecraft.block.SealedGatewayBlock;
 import fr.mazecraft.MazeCraft;
@@ -168,6 +169,297 @@ public class MazePiece extends StructurePiece {
     /** Centre of the maze in local coordinates. */
     private int localCentre() {
         return size.span() / 2;
+    }
+
+    // =====================================================================
+    // The vault of a colossal maze — the keypad room
+    // =====================================================================
+
+    /**
+     * Cells the vault's dead end keeps from the maze's outer wall.
+     *
+     * <p>Three cells is twelve blocks, and the room reaches ten blocks from the middle of its
+     * cell at the furthest — so the whole of it, walls included, stays inside the footprint the
+     * maze protects and the repair pass rebuilds.</p>
+     */
+    private static final int VAULT_CLEARANCE = 3;
+
+    /** Depth of the vault's floor and of its ceiling below the maze floor. */
+    private static final int VAULT_FLOOR = 10, VAULT_CEIL = 5;
+
+    /**
+     * The room, as block offsets from the middle of its dead-end cell. Two chambers end to end:
+     * the antechamber you come down into, with the twelve keys on its far wall, and the treasure
+     * room behind the sealed door.
+     *
+     * <pre>
+     *   dz = -5   keypad wall — twelve keys at dx -6..+5
+     *   dz -4..3  antechamber (8 deep), the stair shaft at its middle
+     *   dz =  4   the sealed door, three wide at dx -1..+1
+     *   dz  5..9  treasure room (5 deep), the chest against its far wall
+     *   dz = 10   back wall
+     *   dx = -8 and +7 side walls; dx -7..+6 interior (14 wide)
+     * </pre>
+     *
+     * <p>Fixed in world space rather than turned to face the corridor: the stair comes down the
+     * middle of the antechamber whichever way the dead end runs, so the room reads the same from
+     * the bottom step either way, and a room that never rotates is a room whose every block is a
+     * pure function of its coordinates — which is what lets generation and the repair pass agree
+     * on it without storing anything.</p>
+     */
+    private static final int VAULT_X0 = -8, VAULT_X1 = 7;
+    private static final int VAULT_Z0 = -5, VAULT_Z1 = 10;
+    /** The wall the sealed door stands in, and the half-width of the doorway. */
+    private static final int VAULT_DOOR_Z = 4, VAULT_DOOR_HALF = 1;
+    /** The leftmost of the twelve keys. */
+    private static final int VAULT_KEY_X0 = -6;
+    /** Height of the keys above the vault floor — eye level for somebody standing on it. */
+    private static final int VAULT_KEY_DY = 2;
+
+    /** Stands in the cache for "asked, and this maze has no vault" — see {@link #vaultCell()}. */
+    private static final int[] NO_VAULT = new int[0];
+
+    /** Cached: {cx, cz} of the vault's dead end, {@link #NO_VAULT}, or null if not asked yet. */
+    private int[] vaultCell;
+
+    /** True for a maze that has a vault at all: the colossal ones, Kronos excepted. */
+    public boolean hasVault() {
+        return size == MazeSize.COLOSSAL && !style.isKronos();
+    }
+
+    /**
+     * The dead end the vault hangs under, or null.
+     *
+     * <p>Cached, and that is not an optimisation: choosing the cell walks the whole maze, and
+     * {@link #build} asks for it once per column — fifty thousand times for a colossal maze.</p>
+     *
+     * <p>One field and one write, with {@link #NO_VAULT} standing in for "there is none", rather
+     * than a value and a {@code known} flag. Chunks of the same maze generate on several threads
+     * at once: with two fields, a thread can see the flag already set and the value not yet
+     * written, and build a chunk of maze with the room missing out of it.</p>
+     */
+    private int[] vaultCell() {
+        int[] cached = vaultCell;
+        if (cached == null) {
+            int[] found = hasVault() ? layout().vaultDeadEnd(VAULT_CLEARANCE) : null;
+            cached = found == null ? NO_VAULT : found;
+            vaultCell = cached;
+        }
+        return cached == NO_VAULT ? null : cached;
+    }
+
+    /** Local X/Z of the middle of the vault's dead-end cell, or null. */
+    private int[] vaultOrigin() {
+        int[] cell = vaultCell();
+        return cell == null ? null
+                : new int[]{MazeLayout.CELL * cell[0] + 2, MazeLayout.CELL * cell[1] + 2};
+    }
+
+    /** World position of the top of the vault's stair — the dead end, at feet height. */
+    public BlockPos vaultEntrance() {
+        int[] o = vaultOrigin();
+        return o == null ? null : new BlockPos(originX() + o[0], floorY + 1, originZ() + o[1]);
+    }
+
+    /** Somewhere to stand in the antechamber, in front of the keys (debug teleport). */
+    public BlockPos vaultFloorPos() {
+        int[] o = vaultOrigin();
+        return o == null ? null
+                : new BlockPos(originX() + o[0], floorY - VAULT_FLOOR + 1, originZ() + o[1] - 3);
+    }
+
+    /**
+     * The four digits that open this vault.
+     *
+     * <p>Derived from the maze's seed and nothing else, so the code is the same every time the
+     * piece is rebuilt, the same for every player, the same after a restart, and the same for
+     * the plaques as for the door — without a byte of it being saved anywhere. It cannot be
+     * read off the world either: a player holding the seed could compute it, which is the same
+     * bargain every seeded secret in Minecraft makes.</p>
+     *
+     * <p>A splitmix64 finalizer rather than {@link #hash}, which is good enough for scattering
+     * gold over a floor and not for this. Measured over 200 000 seeds: the position-hash gave
+     * only <b>1 765 of the 10 000 possible codes</b>, its commonest code came up 28 times more
+     * often than it should, and 1234-style runs appeared 24 times more often than chance —
+     * because consecutive digits differed by one multiply in the mix and stayed correlated.
+     * With a real mixer all 10 000 codes occur, and every pattern lands where chance puts
+     * it.</p>
+     */
+    public int[] vaultCode() {
+        int[] code = new int[CodeKeyBlock.SLOTS];
+        for (int i = 0; i < code.length; i++) {
+            long h = seed * 0x9E3779B97F4A7C15L + (i + 1) * 0xBF58476D1CE4E5B9L;
+            h ^= h >>> 30;
+            h *= 0xBF58476D1CE4E5B9L;
+            h ^= h >>> 27;
+            h *= 0x94D049BB133111EBL;
+            h ^= h >>> 31;
+            code[i] = (int) Math.floorMod(h, 10L);
+        }
+        return code;
+    }
+
+    /** Cached dead ends carrying the plaques, one per zone; see {@link #codePlaqueCells()}. */
+    private int[][] plaqueCells;
+
+    /**
+     * The dead ends carrying the code's four digits, indexed by slot. An entry may be null
+     * when a zone had no dead end to spare.
+     */
+    private int[][] codePlaqueCells() {
+        int[][] cached = plaqueCells;
+        if (cached == null) {
+            cached = hasVault()
+                    ? layout().codePlaqueCells(1, CodeKeyBlock.SLOTS, vaultCell())
+                    : new int[CodeKeyBlock.SLOTS][];
+            if (cached == null) cached = new int[CodeKeyBlock.SLOTS][];
+            plaqueCells = cached;
+        }
+        return cached;
+    }
+
+    /** World position of the digit plaque for {@code slot} (0-based), or null. */
+    public BlockPos codePlaquePos(int slot) {
+        int[][] cells = codePlaqueCells();
+        if (slot < 0 || slot >= cells.length || cells[slot] == null) return null;
+        int[] wall = plaqueWall(cells[slot]);
+        return wall == null ? null
+                : new BlockPos(originX() + wall[0], floorY + PLAQUE_DY, originZ() + wall[1]);
+    }
+
+    /** Height of the digit plaque above the corridor floor — eye level for a standing player. */
+    private static final int PLAQUE_DY = 2;
+
+    /**
+     * The wall block a plaque hangs on: the middle of the wall <b>facing the way in</b>, so it
+     * is the first thing seen on entering the dead end and cannot be missed by walking in and
+     * straight back out.
+     *
+     * @return {@code {localX, localZ, facing}} of the wall block, or null
+     */
+    private int[] plaqueWall(int[] cell) {
+        int exit = layout().onlyExit(cell[0], cell[1]);
+        if (exit < 0) return null;
+        // The wall opposite the doorway, and the direction its face looks (back at the player).
+        int opposite = switch (exit) {
+            case MazeLayout.NORTH -> MazeLayout.SOUTH;
+            case MazeLayout.SOUTH -> MazeLayout.NORTH;
+            case MazeLayout.WEST -> MazeLayout.EAST;
+            default -> MazeLayout.WEST;
+        };
+        int[] mid = layout().wallMiddleOf(cell[0], cell[1], opposite);
+        return new int[]{mid[0], mid[1], exit};
+    }
+
+    /** Which way a plaque's face looks: back down the corridor the player came from. */
+    private Direction plaqueFacing(int[] cell) {
+        int[] wall = plaqueWall(cell);
+        if (wall == null) return Direction.NORTH;
+        return switch (wall[2]) {
+            case MazeLayout.NORTH -> Direction.NORTH;
+            case MazeLayout.SOUTH -> Direction.SOUTH;
+            case MazeLayout.WEST -> Direction.WEST;
+            default -> Direction.EAST;
+        };
+    }
+
+    /**
+     * Writes the four plaques. Called after the walls are raised, like the levers, because the
+     * wall loop would otherwise write straight over them.
+     */
+    private void buildPlaques(StructureWorldAccess world, BlockBox chunkBox) {
+        if (!hasVault()) return;
+        int[] code = vaultCode();
+        int[][] cells = codePlaqueCells();
+        for (int slot = 0; slot < cells.length; slot++) {
+            int[] cell = cells[slot];
+            if (cell == null) continue;
+            int[] wall = plaqueWall(cell);
+            if (wall == null) continue;
+            Direction facing = plaqueFacing(cell);
+            int wx = originX() + wall[0], wz = originZ() + wall[1];
+
+            BlockPos digit = new BlockPos(wx, floorY + PLAQUE_DY, wz);
+            if (chunkBox.contains(digit)) {
+                world.setBlockState(digit, ModBlocks.CODE_KEY.getDefaultState()
+                        .with(CodeKeyBlock.KEY, code[slot])
+                        .with(CodeKeyBlock.FACING, facing), Block.NOTIFY_LISTENERS);
+            }
+            BlockPos tally = digit.up();
+            if (chunkBox.contains(tally)) {
+                world.setBlockState(tally, ModBlocks.CODE_KEY.getDefaultState()
+                        .with(CodeKeyBlock.KEY, CodeKeyBlock.SLOT + slot)
+                        .with(CodeKeyBlock.FACING, facing), Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /** World position of key {@code key} (0–9, {@link CodeKeyBlock#RESET}, {@link CodeKeyBlock#ENTER}). */
+    public BlockPos codeKeyPos(int key) {
+        int[] o = vaultOrigin();
+        return o == null ? null : new BlockPos(originX() + o[0] + VAULT_KEY_X0 + key,
+                floorY - VAULT_FLOOR + VAULT_KEY_DY, originZ() + o[1] + VAULT_Z0);
+    }
+
+    /** The nine blocks of the sealed door, or an empty list. */
+    public List<BlockPos> vaultDoorBlocks() {
+        List<BlockPos> list = new ArrayList<>();
+        int[] o = vaultOrigin();
+        if (o == null) return list;
+        for (int dx = -VAULT_DOOR_HALF; dx <= VAULT_DOOR_HALF; dx++) {
+            for (int dy = 1; dy <= 3; dy++) {
+                list.add(new BlockPos(originX() + o[0] + dx, floorY - VAULT_FLOOR + dy,
+                        originZ() + o[1] + VAULT_DOOR_Z));
+            }
+        }
+        return list;
+    }
+
+    /**
+     * Is the vault's door already down?
+     *
+     * <p>Asks the door rather than a record of the door. {@link fr.mazecraft.protection.MazeState}
+     * remembers which vaults have been opened, and for a naturally generated maze that is the
+     * same answer — but it is keyed on the structure, so a maze from {@code /maze debug place}
+     * has no entry at all and the keypad happily reopened an open vault, replaying the message
+     * and the sound every time the code was typed again. It would also disagree with the world
+     * if the blocks were ever taken out by hand.</p>
+     *
+     * <p>The same "compute, don't store" rule the shifting walls, the arena door and the hoard
+     * all follow: the blocks are the truth, and one of them is enough to read it.</p>
+     */
+    public boolean isVaultDoorOpen(net.minecraft.world.BlockView world) {
+        List<BlockPos> door = vaultDoorBlocks();
+        return !door.isEmpty() && !world.getBlockState(door.get(0)).isOf(ModBlocks.VAULT_DOOR);
+    }
+
+    /** The chest of the treasure room, or null. */
+    public BlockPos vaultChestPos() {
+        int[] o = vaultOrigin();
+        return o == null ? null : new BlockPos(originX() + o[0],
+                floorY - VAULT_FLOOR + 2, originZ() + o[1] + VAULT_Z1 - 2);
+    }
+
+    /**
+     * Is this block part of the vault — its rooms, its walls, its shaft?
+     *
+     * <p>What this guards is the one way the puzzle could be walked around. Everything else in a
+     * maze stops being protected the moment the maze is conquered, and that is deliberate: it is
+     * yours afterwards. But the vault outlives the conquest, so without this the answer to a
+     * four-digit code would be a pickaxe and nine blocks of wall.</p>
+     */
+    public boolean isInVault(BlockPos pos) {
+        int[] o = vaultOrigin();
+        if (o == null) return false;
+        int dx = pos.getX() - (originX() + o[0]);
+        int dz = pos.getZ() - (originZ() + o[1]);
+        int y = pos.getY();
+        // The shaft, from the dead-end floor down to the ceiling.
+        if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2 && y <= floorY && y >= floorY - VAULT_CEIL) {
+            return true;
+        }
+        return dx >= VAULT_X0 && dx <= VAULT_X1 && dz >= VAULT_Z0 && dz <= VAULT_Z1
+                && y >= floorY - VAULT_FLOOR && y <= floorY - VAULT_CEIL;
     }
 
     /** The double chest of the hoard: against the far wall, on its pedestal. */
@@ -564,6 +856,11 @@ public class MazePiece extends StructurePiece {
                 //     the way down to it.
                 if (style.isKronos()) buildHoard(world, pos, x, z, lx, lz, placeChest);
 
+                // 2d. The vault of a colossal maze: the keypad room, under the deepest dead end.
+                //     Built with the maze and left open — finding the stair is what tells you
+                //     there is a code to look for. Only the door behind the keys is sealed.
+                if (hasVault()) buildVault(world, pos, x, z, lx, lz, placeChest, repairing);
+
                 // 3. Walls, pillars, and clearing above
                 if (style.enclosed) {
                     buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
@@ -592,6 +889,9 @@ public class MazePiece extends StructurePiece {
                         world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
                     }
                 }
+
+                // 3b. Everything still standing above the cleared height, up to the build limit.
+                clearAbove(world, pos, x, z, inside);
             }
         }
 
@@ -642,6 +942,10 @@ public class MazePiece extends StructurePiece {
             }
         }
 
+        // 5b. The four plaques carrying the vault's code, one per zone. After the walls, like
+        //     the levers: the wall loop writes every block of its own column and would bury them.
+        buildPlaques(world, chunkBox);
+
         // 6. Central chest
         // 6b. Guardians (generation only, never on repair)
         if (!repairing && MazeCraftConfig.get().enableGuardians) {
@@ -658,6 +962,49 @@ public class MazePiece extends StructurePiece {
             if (be instanceof ChestBlockEntity chestEntity) {
                 chestEntity.setLootTable(lootTableFor(style, size), random.nextLong());
             }
+        }
+    }
+
+    /**
+     * Clears what is left hanging over the maze, from {@link #CLEAR_HEIGHT} to the build limit.
+     *
+     * <p>The maze clears ten blocks of headroom and stops. That is fine on flat ground and
+     * wrong everywhere else: a hillside, an overhang or a cliff that reaches higher than ten
+     * blocks keeps its top while the ground beneath it is cut away, and what is left hangs in
+     * the air over the corridors. The ten blocks were never a design decision about how much
+     * sky a maze gets — they are just how far the old loop ran.</p>
+     *
+     * <p>So the column is taken all the way up. The cut is square-edged where a mountain meets
+     * the maze's boundary, which is the honest trade: a vertical face reads as something that
+     * was carved, floating ground reads as a broken mod.</p>
+     *
+     * <p>Over the margin ring, a tree is left alone <b>until the column has had ground taken
+     * out from under it</b>. That one condition settles both ways of getting it wrong: a canopy
+     * overhanging the ring from a trunk rooted outside the maze is still spared, as it is below
+     * the clearing height, but a tree standing on a shelf this pass is about to remove comes
+     * down with it instead of being left hanging in the air. Sparing trees unconditionally
+     * would trade floating ground for floating trees, which is not a trade.</p>
+     *
+     * <p>Cost is a read per block of sky and a write only where something is actually in the
+     * way — roughly sixty thousand reads per chunk, a few milliseconds, and nothing at all to
+     * write over the flat ground a maze normally lands on.</p>
+     */
+    private void clearAbove(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                            boolean inside) {
+        // Enclosed mazes are buried in rock under a roof of their own: there is no sky over
+        // them to clear, and taking the column up would bore a shaft to the Nether ceiling.
+        if (style.enclosed) return;
+
+        BlockState air = Blocks.AIR.getDefaultState();
+        boolean groundCut = false;
+        for (int y = floorY + CLEAR_HEIGHT + 1; y < world.getTopY(); y++) {
+            pos.set(x, y, z);
+            BlockState current = world.getBlockState(pos);
+            if (current.isAir()) continue;
+            boolean tree = isTreeMatter(current);
+            if (!inside && tree && !groundCut) continue;
+            if (!tree) groundCut = true;
+            world.setBlockState(pos, air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
         }
     }
 
@@ -756,9 +1103,251 @@ public class MazePiece extends StructurePiece {
     }
 
     /** The eight cells round a 3 × 3 shaft: one step per half block makes a walkable spiral. */
-    private static final int[][] HOARD_SPIRAL = {
+    private static final int[][] SHAFT_SPIRAL = {
             {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
     };
+
+    /**
+     * One column of the vault of a colossal maze.
+     *
+     * <p>Written exactly like the hoard of Asterion, and for the same reason: a room this size
+     * cannot be raised from a tick, and nothing about it may depend on the {@code Random} handed
+     * to a build pass, because generation and the repair pass are seeded differently and the room
+     * would rearrange itself the first time a chunk was repaired.</p>
+     *
+     * <p>Two things here are <em>not</em> rebuilt on a repair: the sealed door and the chest. Both
+     * are state — a door that has been opened, a chest that has been looted — and a pass that
+     * knows nothing about either must leave them exactly as it found them. Putting the door back
+     * would re-seal a vault somebody had already solved; writing the chest's own block would
+     * scatter its contents on the floor, which is precisely the bug the hoard shipped with.</p>
+     */
+    private void buildVault(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                            int lx, int lz, boolean placeChest, boolean repairing) {
+        int[] o = vaultOrigin();
+        if (o == null) return;
+        int dx = lx - o[0], dz = lz - o[1];
+        if (dx < VAULT_X0 || dx > VAULT_X1 || dz < VAULT_Z0 || dz > VAULT_Z1) return;
+
+        int floor = floorY - VAULT_FLOOR;
+        int ceiling = floorY - VAULT_CEIL;
+        BlockState shell = style.wallBase;
+        BlockState air = Blocks.AIR.getDefaultState();
+
+        boolean wall = dx == VAULT_X0 || dx == VAULT_X1
+                || dz == VAULT_Z0 || dz == VAULT_Z1 || dz == VAULT_DOOR_Z;
+
+        // The chest's own block, which a repair pass must not write to AT ALL.
+        //
+        // Emptying the room writes air over every block of it, the chest included, and the chest
+        // is only put back when placeChest is true — which it never is on a repair. So the first
+        // time the chunk was repaired the chest was deleted and its contents spilled on the
+        // floor. This is the exact bug the hoard of Asterion shipped with; the hoard was guarded
+        // and this room, written afterwards from the same pattern, was not.
+        BlockPos chest = vaultChestPos();
+        boolean onChest = !wall && chest != null && x == chest.getX() && z == chest.getZ();
+        int chestDy = 2;
+
+        // 1. Floor, the room, the ceiling.
+        world.setBlockState(pos.set(x, floor, z), wall ? shell : vaultFloor(dx, dz),
+                Block.NOTIFY_LISTENERS);
+        for (int dy = 1; dy < VAULT_FLOOR - VAULT_CEIL; dy++) {
+            if (onChest && dy == chestDy && !placeChest) continue;
+            pos.set(x, floor + dy, z);
+            if (wall) {
+                BlockState state = vaultWall(dx, dz, dy);
+                // The door and the chest are the two blocks a repair pass must not touch.
+                if (state == null) {
+                    if (!repairing) {
+                        world.setBlockState(pos, ModBlocks.VAULT_DOOR.getDefaultState(),
+                                Block.NOTIFY_LISTENERS);
+                    }
+                    continue;
+                }
+                world.setBlockState(pos, state, Block.NOTIFY_LISTENERS);
+            } else {
+                world.setBlockState(pos, air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            }
+        }
+        // Ceiling: beams every four blocks, and an accent ring round the mouth of the stairwell.
+        // Without the ring the opening, its lining and the stair are all the same masonry, and
+        // the whole thing reads from the floor as a lump of rock hanging off the ceiling rather
+        // than as a way up.
+        boolean mouth = Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
+        world.setBlockState(pos.set(x, ceiling, z),
+                mouth || Math.floorMod(dx, 4) == 0 ? style.pillar : shell, Block.NOTIFY_LISTENERS);
+
+        // 2. What stands on the floor of the two rooms.
+        if (!wall) vaultFurniture(world, pos, x, z, dx, dz, floor, placeChest);
+
+        // 3. The shaft and its stair, cut up through the ceiling to the dead end above.
+        if (Math.abs(dx) > 2 || Math.abs(dz) > 2) return;
+        if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+            // Line the rock the shaft is cut through. Below the ceiling it is already the room.
+            for (int y = ceiling + 1; y < floorY; y++) {
+                world.setBlockState(pos.set(x, y, z), shell, Block.NOTIFY_LISTENERS);
+            }
+            return;
+        }
+        int bottom = floor + 1;
+        int rot = vaultSpiralRotation(bottom);
+        for (int y = bottom; y <= floorY; y++) {
+            world.setBlockState(pos.set(x, y, z), air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+        }
+        for (int y = bottom; y <= floorY; y++) {
+            for (int half = 0; half < 2; half++) {
+                int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
+                        SHAFT_SPIRAL.length)];
+                if (step[0] != dx || step[1] != dz) continue;
+                world.setBlockState(pos.set(x, y, z), vaultSlab()
+                                .with(SlabBlock.TYPE, half == 0 ? SlabType.BOTTOM : SlabType.TOP),
+                        Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /**
+     * How far the stair's spiral is turned, so that its <b>top</b> step is the one under the
+     * doorway of the dead end.
+     *
+     * <p>Without this the last step lands wherever the arithmetic puts it, which for three
+     * orientations out of four is on the far side of the hole: you walk into the dead end and the
+     * first thing you meet is the drop. The same mistake was made on the shaft of the surface
+     * ruin and fixed there the same way.</p>
+     */
+    private int vaultSpiralRotation(int bottom) {
+        int[] cell = vaultCell();
+        int exit = cell == null ? -1 : layout().onlyExit(cell[0], cell[1]);
+        int[] towards = switch (exit) {
+            case MazeLayout.NORTH -> new int[]{0, -1};
+            case MazeLayout.SOUTH -> new int[]{0, 1};
+            case MazeLayout.WEST -> new int[]{-1, 0};
+            case MazeLayout.EAST -> new int[]{1, 0};
+            default -> null;
+        };
+        if (towards == null) return 0;
+        int target = 0;
+        for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
+            if (SHAFT_SPIRAL[i][0] == towards[0] && SHAFT_SPIRAL[i][1] == towards[1]) target = i;
+        }
+        // The last step is (floorY - bottom) * 2 + 1 half-steps along the spiral.
+        return target - ((floorY - bottom) * 2 + 1);
+    }
+
+    /** Floor of the vault's rooms: the style's finer block, bordered by its masonry. */
+    private BlockState vaultFloor(int dx, int dz) {
+        boolean border = dx == VAULT_X0 + 1 || dx == VAULT_X1 - 1
+                || dz == VAULT_Z0 + 1 || dz == VAULT_Z1 - 1
+                || dz == VAULT_DOOR_Z - 1 || dz == VAULT_DOOR_Z + 1;
+        return border ? style.wallBase : style.plaza;
+    }
+
+    /**
+     * One block of one of the vault's walls, {@code dy} blocks above its floor.
+     *
+     * @return the block, or null for a block of the sealed door (handled by the caller, because a
+     *         repair pass must leave the door exactly as it found it)
+     */
+    private BlockState vaultWall(int dx, int dz, int dy) {
+        BlockState shell = style.wallBase;
+        BlockState accent = style.pillar;
+        boolean onKeys = dx >= VAULT_KEY_X0 && dx < VAULT_KEY_X0 + 12;
+
+        if (dz == VAULT_Z0) {
+            // The keypad wall: twelve keys in a row, framed above and below. No pilasters —
+            // they would fall exactly where the keys go.
+            if (onKeys && dy == VAULT_KEY_DY) {
+                return ModBlocks.CODE_KEY.getDefaultState()
+                        .with(CodeKeyBlock.KEY, dx - VAULT_KEY_X0)
+                        .with(CodeKeyBlock.FACING, Direction.SOUTH);
+            }
+            if (onKeys && (dy == VAULT_KEY_DY - 1 || dy == VAULT_KEY_DY + 1)) return accent;
+            // A light at each end of the row, on the only two columns the keys leave free.
+            // Without them the nearest lantern is on a side wall ten blocks away and the middle
+            // of the keypad sits at light 5, which is not enough to read a digit off a wall.
+            if (dy == VAULT_KEY_DY && (dx == VAULT_KEY_X0 - 1 || dx == VAULT_KEY_X0 + 12)) {
+                return style.light;
+            }
+            return shell;
+        }
+        if (dz == VAULT_DOOR_Z) {
+            // The sealed door, three wide and three high, in an accent frame.
+            if (Math.abs(dx) <= VAULT_DOOR_HALF && dy <= 3) return null;
+            if (Math.abs(dx) <= VAULT_DOOR_HALF + 1 && dy == 4) return accent;
+            if (Math.abs(dx) == VAULT_DOOR_HALF + 1 && dy <= 3) return accent;
+            return shell;
+        }
+        if (dz == VAULT_Z1) {
+            return Math.floorMod(dx, 4) == 0 ? accent : shell;
+        }
+        // The two side walls: pilasters every four blocks, a light between them.
+        if (dy == 3 && (dz == -3 || dz == 1 || dz == VAULT_Z1 - 3)) return style.light;
+        return Math.floorMod(dz, 4) == 0 ? accent : shell;
+    }
+
+    /**
+     * What stands on the floor of the vault: the chest on its pedestal, and the two posts that
+     * light it.
+     */
+    private void vaultFurniture(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                                int dx, int dz, int floor, boolean placeChest) {
+        if (dz != VAULT_Z1 - 2) return;
+        if (Math.abs(dx) <= 1) {
+            world.setBlockState(pos.set(x, floor + 1, z), style.pillar, Block.NOTIFY_LISTENERS);
+            if (dx == 0 && placeChest) {
+                BlockPos at = new BlockPos(x, floor + 2, z);
+                world.setBlockState(at, Blocks.CHEST.getDefaultState()
+                        .with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
+                if (world.getBlockEntity(at) instanceof ChestBlockEntity chest) {
+                    chest.setLootTable(vaultLootTable(), seed ^ at.asLong());
+                }
+            }
+            return;
+        }
+        if (Math.abs(dx) == 3) {
+            world.setBlockState(pos.set(x, floor + 1, z), style.pillar, Block.NOTIFY_LISTENERS);
+            world.setBlockState(pos.set(x, floor + 2, z), style.light, Block.NOTIFY_LISTENERS);
+        }
+    }
+
+    /** Loot of the vault's chest: better than the maze's own, because it is harder to reach. */
+    public static RegistryKey<LootTable> vaultLootTable() {
+        return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/vault"));
+    }
+
+    /**
+     * The slab the vault's stair is built from. Taken from the style's own masonry wherever it
+     * has a slab, and from its finer block where it has not — packed ice and basalt have none.
+     */
+    private BlockState vaultSlab() {
+        return switch (style) {
+            case HEDGE, JUNGLE, DARK_FOREST -> Blocks.MOSSY_STONE_BRICK_SLAB.getDefaultState();
+            case DESERT -> Blocks.SANDSTONE_SLAB.getDefaultState();
+            case SNOW -> Blocks.SPRUCE_SLAB.getDefaultState();
+            case BADLANDS -> Blocks.RED_SANDSTONE_SLAB.getDefaultState();
+            case CHERRY, SAVANNA -> Blocks.STONE_BRICK_SLAB.getDefaultState();
+            case SWAMP -> Blocks.MUD_BRICK_SLAB.getDefaultState();
+            case TAIGA -> Blocks.MOSSY_COBBLESTONE_SLAB.getDefaultState();
+            case END -> Blocks.END_STONE_BRICK_SLAB.getDefaultState();
+            case FORTRESS -> Blocks.NETHER_BRICK_SLAB.getDefaultState();
+            case CRIMSON -> Blocks.CRIMSON_SLAB.getDefaultState();
+            case WARPED -> Blocks.WARPED_SLAB.getDefaultState();
+            case SOUL, BASALT -> Blocks.POLISHED_BLACKSTONE_SLAB.getDefaultState();
+            case KRONOS -> Blocks.DEEPSLATE_BRICK_SLAB.getDefaultState();
+        };
+    }
+
+    /**
+     * Opens the vault: the nine blocks of the sealed door come down.
+     *
+     * <p>Nothing else changes. The room behind it was built with the maze, like the hoard, so
+     * what the right code buys is a door and not a chamber appearing out of nothing.</p>
+     */
+    public void openVault(net.minecraft.server.world.ServerWorld world) {
+        for (BlockPos door : vaultDoorBlocks()) {
+            world.setBlockState(door, Blocks.AIR.getDefaultState(),
+                    Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+        }
+    }
 
     /**
      * Asterion is down: the floor of the arena gives way onto the hoard.
@@ -798,7 +1387,7 @@ public class MazePiece extends StructurePiece {
                 }
             }
             for (int half = 0; half < 2; half++) {
-                int[] step = HOARD_SPIRAL[Math.floorMod((y - bottom) * 2 + half, HOARD_SPIRAL.length)];
+                int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half, SHAFT_SPIRAL.length)];
                 pos.set(cx + step[0], y, cz + step[1]);
                 world.setBlockState(pos, Blocks.DEEPSLATE_BRICK_SLAB.getDefaultState()
                         .with(SlabBlock.TYPE, half == 0 ? SlabType.BOTTOM : SlabType.TOP),

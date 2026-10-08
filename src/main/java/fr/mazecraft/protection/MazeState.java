@@ -33,6 +33,33 @@ public class MazeState extends PersistentState {
         if (alive ? championAlive.add(mazeKey) : championAlive.remove(mazeKey)) markDirty();
     }
 
+    /**
+     * Mazes whose vault door has been opened with the right code.
+     *
+     * <p>Per maze and not per player, like a gate and unlike a step of the ladder: the door is a
+     * block, and a block cannot be open for one person and shut for another. Whoever types the
+     * code opens it for everybody on the server, which is the same bargain the levers make.</p>
+     */
+    private final LongSet vaultsOpen = new LongOpenHashSet();
+
+    public boolean isVaultOpen(long mazeKey) {
+        return vaultsOpen.contains(mazeKey);
+    }
+
+    /** @return true if the vault was still sealed */
+    public boolean openVault(long mazeKey) {
+        boolean added = vaultsOpen.add(mazeKey);
+        if (added) markDirty();
+        return added;
+    }
+
+    /** DEBUG: seal a vault again (the door itself is not rebuilt). */
+    public boolean resealVault(long mazeKey) {
+        boolean removed = vaultsOpen.remove(mazeKey);
+        if (removed) markDirty();
+        return removed;
+    }
+
     /** Chunks already repaired once after full generation (see MazeRepair). */
     private final LongSet repairedChunks = new LongOpenHashSet();
 
@@ -101,6 +128,7 @@ public class MazeState extends PersistentState {
         nbt.put("Gates", gates);
         nbt.putLongArray("Repaired", repairedChunks.toLongArray());
         nbt.putLongArray("Champions", championAlive.toLongArray());
+        nbt.putLongArray("VaultsOpen", vaultsOpen.toLongArray());
         return nbt;
     }
 
@@ -111,6 +139,9 @@ public class MazeState extends PersistentState {
         }
         for (long key : nbt.getLongArray("Champions")) {
             state.championAlive.add(key);
+        }
+        for (long key : nbt.getLongArray("VaultsOpen")) {
+            state.vaultsOpen.add(key);
         }
         for (long chunk : nbt.getLongArray("Repaired")) {
             state.repairedChunks.add(chunk);

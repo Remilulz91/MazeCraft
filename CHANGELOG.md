@@ -2,6 +2,50 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.6] — 2026-10-08
+
+### Added
+- **A vault under every colossal maze, opened by a four-digit code.** Under the deepest dead
+  end, a spiral stair drops ten blocks into a decorated antechamber: twelve keys set into the
+  wall — the ten digits, a reset and a validate — a sealed bronze door, and a treasure room
+  behind it. The room is built in the maze's own style, so it is mossy stone brick under the
+  hedges, sandstone in the desert and end stone brick beyond.
+- **The code is written on four plaques, one per zone.** A colossal maze has several hundred
+  dead ends, and four plaques hidden anywhere among them would be a search nobody finishes.
+  But the maze is already cut into zones by its gates, and a player sweeps each zone looking
+  for its lever — so each of the first four zones holds one digit, in the deepest dead end it
+  has to offer. Above each digit, a row of tally bars says which position of the code it is.
+  The plaques are the same block as the keys on purpose: whoever has seen the wall of twelve
+  knows what to do with one.
+- **The vault's chest, richer than the chest at the centre of the same maze on every count.**
+  A netherite ingot and one to two diamond blocks guaranteed, as the centre gives, and then a
+  third again as many diamonds, half again as many diamond blocks, emeralds and echo shards
+  the centre has none of, and a three-in-five chance of a music disc. Measured over 20 000
+  rolls of each table rather than judged by eye: the first version of it quietly gave *less*
+  netherite than the chest you simply walk to.
+- The advancement **Four Digits**, and `/maze debug colossal` and `/maze debug vault` to reach
+  a colossal maze and its vault without walking a 221-block maze first.
+
+### Fixed
+- **Floating terrain over a maze.** The build cleared ten blocks of headroom and stopped — fine
+  on flat ground, wrong on a hillside: anything reaching higher kept its top while the ground
+  under it was cut away. The column is now taken up to the build limit in the Overworld and the
+  End. A tree over the margin ring is still spared, but only until the column has had ground
+  taken out from under it; sparing them unconditionally trades floating ground for floating
+  trees, which is not a trade.
+- **The keypad, the vault door and the sealed gateways cannot be broken in creative.** Hardness
+  -1 stops a pickaxe in survival but not a creative player, who skips the hardness check
+  altogether — which is why bedrock comes up in creative. A four-digit code whose other answer
+  is a pickaxe is not a code.
+- **The vault's chest did not survive a repair pass.** Emptying the room wrote air over every
+  block of it, the chest included, and the chest was only put back on generation — so the first
+  chunk reload deleted it and spilled its contents on the floor. The same bug the hoard of
+  Asterion shipped with, and the same fix: a repair pass must not write to that block at all.
+- **A lever could sit right beside the vault's stair.** Only the lever's own cell was excluded,
+  which left one in the next cell 1.5 % of the time and within two cells 11 % — close enough to
+  hand the vault to anybody who was only there to pull it. The stair now keeps four cells from
+  every lever, which costs two cells of walking distance out of 350.
+
 ## [1.0.0-alpha.5] — 2026-10-06
 
 ### Added

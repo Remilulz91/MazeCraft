@@ -1,0 +1,244 @@
+{
+  "variants": {
+    "key=0,facing=north": {
+      "model": "mazecraft:block/code_key_0"
+    },
+    "key=0,facing=east": {
+      "model": "mazecraft:block/code_key_0",
+      "y": 90
+    },
+    "key=0,facing=south": {
+      "model": "mazecraft:block/code_key_0",
+      "y": 180
+    },
+    "key=0,facing=west": {
+      "model": "mazecraft:block/code_key_0",
+      "y": 270
+    },
+    "key=1,facing=north": {
+      "model": "mazecraft:block/code_key_1"
+    },
+    "key=1,facing=east": {
+      "model": "mazecraft:block/code_key_1",
+      "y": 90
+    },
+    "key=1,facing=south": {
+      "model": "mazecraft:block/code_key_1",
+      "y": 180
+    },
+    "key=1,facing=west": {
+      "model": "mazecraft:block/code_key_1",
+      "y": 270
+    },
+    "key=2,facing=north": {
+      "model": "mazecraft:block/code_key_2"
+    },
+    "key=2,facing=east": {
+      "model": "mazecraft:block/code_key_2",
+      "y": 90
+    },
+    "key=2,facing=south": {
+      "model": "mazecraft:block/code_key_2",
+      "y": 180
+    },
+    "key=2,facing=west": {
+      "model": "mazecraft:block/code_key_2",
+      "y": 270
+    },
+    "key=3,facing=north": {
+      "model": "mazecraft:block/code_key_3"
+    },
+    "key=3,facing=east": {
+      "model": "mazecraft:block/code_key_3",
+      "y": 90
+    },
+    "key=3,facing=south": {
+      "model": "mazecraft:block/code_key_3",
+      "y": 180
+    },
+    "key=3,facing=west": {
+      "model": "mazecraft:block/code_key_3",
+      "y": 270
+    },
+    "key=4,facing=north": {
+      "model": "mazecraft:block/code_key_4"
+    },
+    "key=4,facing=east": {
+      "model": "mazecraft:block/code_key_4",
+      "y": 90
+    },
+    "key=4,facing=south": {
+      "model": "mazecraft:block/code_key_4",
+      "y": 180
+    },
+    "key=4,facing=west": {
+      "model": "mazecraft:block/code_key_4",
+      "y": 270
+    },
+    "key=5,facing=north": {
+      "model": "mazecraft:block/code_key_5"
+    },
+    "key=5,facing=east": {
+      "model": "mazecraft:block/code_key_5",
+      "y": 90
+    },
+    "key=5,facing=south": {
+      "model": "mazecraft:block/code_key_5",
+      "y": 180
+    },
+    "key=5,facing=west": {
+      "model": "mazecraft:block/code_key_5",
+      "y": 270
+    },
+    "key=6,facing=north": {
+      "model": "mazecraft:block/code_key_6"
+    },
+    "key=6,facing=east": {
+      "model": "mazecraft:block/code_key_6",
+      "y": 90
+    },
+    "key=6,facing=south": {
+      "model": "mazecraft:block/code_key_6",
+      "y": 180
+    },
+    "key=6,facing=west": {
+      "model": "mazecraft:block/code_key_6",
+      "y": 270
+    },
+    "key=7,facing=north": {
+      "model": "mazecraft:block/code_key_7"
+    },
+    "key=7,facing=east": {
+      "model": "mazecraft:block/code_key_7",
+      "y": 90
+    },
+    "key=7,facing=south": {
+      "model": "mazecraft:block/code_key_7",
+      "y": 180
+    },
+    "key=7,facing=west": {
+      "model": "mazecraft:block/code_key_7",
+      "y": 270
+    },
+    "key=8,facing=north": {
+      "model": "mazecraft:block/code_key_8"
+    },
+    "key=8,facing=east": {
+      "model": "mazecraft:block/code_key_8",
+      "y": 90
+    },
+    "key=8,facing=south": {
+      "model": "mazecraft:block/code_key_8",
+      "y": 180
+    },
+    "key=8,facing=west": {
+      "model": "mazecraft:block/code_key_8",
+      "y": 270
+    },
+    "key=9,facing=north": {
+      "model": "mazecraft:block/code_key_9"
+    },
+    "key=9,facing=east": {
+      "model": "mazecraft:block/code_key_9",
+      "y": 90
+    },
+    "key=9,facing=south": {
+      "model": "mazecraft:block/code_key_9",
+      "y": 180
+    },
+    "key=9,facing=west": {
+      "model": "mazecraft:block/code_key_9",
+      "y": 270
+    },
+    "key=10,facing=north": {
+      "model": "mazecraft:block/code_key_reset"
+    },
+    "key=10,facing=east": {
+      "model": "mazecraft:block/code_key_reset",
+      "y": 90
+    },
+    "key=10,facing=south": {
+      "model": "mazecraft:block/code_key_reset",
+      "y": 180
+    },
+    "key=10,facing=west": {
+      "model": "mazecraft:block/code_key_reset",
+      "y": 270
+    },
+    "key=11,facing=north": {
+      "model": "mazecraft:block/code_key_enter"
+    },
+    "key=11,facing=east": {
+      "model": "mazecraft:block/code_key_enter",
+      "y": 90
+    },
+    "key=11,facing=south": {
+      "model": "mazecraft:block/code_key_enter",
+      "y": 180
+    },
+    "key=11,facing=west": {
+      "model": "mazecraft:block/code_key_enter",
+      "y": 270
+    },
+    "key=12,facing=north": {
+      "model": "mazecraft:block/code_key_slot1"
+    },
+    "key=12,facing=east": {
+      "model": "mazecraft:block/code_key_slot1",
+      "y": 90
+    },
+    "key=12,facing=south": {
+      "model": "mazecraft:block/code_key_slot1",
+      "y": 180
+    },
+    "key=12,facing=west": {
+      "model": "mazecraft:block/code_key_slot1",
+      "y": 270
+    },
+    "key=13,facing=north": {
+      "model": "mazecraft:block/code_key_slot2"
+    },
+    "key=13,facing=east": {
+      "model": "mazecraft:block/code_key_slot2",
+      "y": 90
+    },
+    "key=13,facing=south": {
+      "model": "mazecraft:block/code_key_slot2",
+      "y": 180
+    },
+    "key=13,facing=west": {
+      "model": "mazecraft:block/code_key_slot2",
+      "y": 270
+    },
+    "key=14,facing=north": {
+      "model": "mazecraft:block/code_key_slot3"
+    },
+    "key=14,facing=east": {
+      "model": "mazecraft:block/code_key_slot3",
+      "y": 90
+    },
+    "key=14,facing=south": {
+      "model": "mazecraft:block/code_key_slot3",
+      "y": 180
+    },
+    "key=14,facing=west": {
+      "model": "mazecraft:block/code_key_slot3",
+      "y": 270
+    },
+    "key=15,facing=north": {
+      "model": "mazecraft:block/code_key_slot4"
+    },
+    "key=15,facing=east": {
+      "model": "mazecraft:block/code_key_slot4",
+      "y": 90
+    },
+    "key=15,facing=south": {
+      "model": "mazecraft:block/code_key_slot4",
+      "y": 180
+    },
+    "key=15,facing=west": {
+      "model": "mazecraft:block/code_key_slot4",
+      "y": 270
+    }
+  }
+}

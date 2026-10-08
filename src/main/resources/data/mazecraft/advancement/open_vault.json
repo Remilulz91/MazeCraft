@@ -1,0 +1,26 @@
+{
+  "parent": "mazecraft:conquer_colossal",
+  "display": {
+    "icon": {
+      "id": "minecraft:tripwire_hook"
+    },
+    "title": {
+      "translate": "advancements.mazecraft.open_vault.title"
+    },
+    "description": {
+      "translate": "advancements.mazecraft.open_vault.description"
+    },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "opened": {
+      "trigger": "minecraft:impossible"
+    }
+  },
+  "rewards": {
+    "experience": 300
+  }
+}

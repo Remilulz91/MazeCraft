@@ -1,6 +1,7 @@
 package fr.mazecraft.protection;
 
 import fr.mazecraft.MazeCraft;
+import fr.mazecraft.block.ModBlocks;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.enemy.MazeAmbush;
 import fr.mazecraft.item.KeyFragmentItem;
@@ -75,7 +76,27 @@ public final class MazeProtection {
                     return claimChest(breakWorld, breaker, hit);
                 }
             }
+            // The locks of the mod, before any exemption: a keypad key, a vault door, a sealed
+            // gateway. Hardness -1 stops a pickaxe in survival but NOT a creative player —
+            // creative mining skips the hardness check altogether, which is why bedrock comes
+            // up in creative. A four-digit code whose other answer is "switch to creative and
+            // punch the wall" is not a code, and a key knocked out of the row cannot be put
+            // back. An operator who really means it still has /setblock.
+            if (state.isOf(ModBlocks.CODE_KEY) || state.isOf(ModBlocks.VAULT_DOOR)
+                    || state.isOf(ModBlocks.SEALED_GATEWAY)) {
+                if (player instanceof ServerPlayerEntity locked) {
+                    deny(locked, "mazecraft.protection.cant_break");
+                }
+                return false;
+            }
             if (!(world instanceof ServerWorld serverWorld) || isExempt(player)) return true;
+            // A sealed vault outlives the conquest. Everything else in a maze stops being
+            // protected the moment the central chest is opened — that is the point of opening it
+            // — but a four-digit code whose other solution is a pickaxe is not a code.
+            if (isSealedVault(serverWorld, pos)) {
+                player.sendMessage(Text.translatable("mazecraft.vault.sealed").formatted(Formatting.RED), true);
+                return false;
+            }
             if (!MazeCraftConfig.get().protectUntilSolved) return true;
             if (lockedMazeAt(serverWorld, pos, 0) == null) return true;
             player.sendMessage(Text.translatable("mazecraft.protection.cant_break").formatted(Formatting.RED), true);
@@ -121,13 +142,22 @@ public final class MazeProtection {
         UseItemCallback.EVENT.register((player, world, hand) -> {
             ItemStack stack = player.getStackInHand(hand);
             if (!(world instanceof ServerWorld serverWorld) || !(player instanceof ServerPlayerEntity serverPlayer)
-                    || isExempt(player) || !MazeCraftConfig.get().protectUntilSolved) {
+                    || isExempt(player)) {
                 return TypedActionResult.pass(stack);
             }
             Item item = stack.getItem();
             if (!(item instanceof BucketItem) && !(item instanceof ChorusFruitItem)) {
                 return TypedActionResult.pass(stack);
             }
+            // Chorus fruit inside a sealed vault, whatever the maze's state and whatever the
+            // config says. It lands you anywhere within eight blocks that you fit in, and the
+            // treasure room is seven blocks from where you stand to type the code — so without
+            // this the answer to the keypad is an apple.
+            if (item instanceof ChorusFruitItem && isSealedVault(serverWorld, player.getBlockPos())) {
+                deny(serverPlayer, "mazecraft.vault.sealed");
+                return TypedActionResult.fail(stack);
+            }
+            if (!MazeCraftConfig.get().protectUntilSolved) return TypedActionResult.pass(stack);
             if (!isNearLockedMaze(serverWorld, player.getBlockPos())) return TypedActionResult.pass(stack);
             deny(serverPlayer, "mazecraft.protection.forbidden_item");
             return TypedActionResult.fail(stack);
@@ -170,18 +200,28 @@ public final class MazeProtection {
      * Maze lookups are cached per X/Z column.
      */
     public static void filterExplosion(ServerWorld world, List<BlockPos> affected) {
-        if (!MazeCraftConfig.get().protectUntilSolved || affected.isEmpty()) return;
+        if (affected.isEmpty()) return;
+        boolean guardMazes = MazeCraftConfig.get().protectUntilSolved;
+        MazeState state = MazeState.get(world);
         Map<Long, Optional<MazeFinder.MazeHit>> cache = new HashMap<>();
         affected.removeIf(pos -> {
             Long chunkKey = BlockPos.asLong(pos.getX(), 0, pos.getZ()); // cache per column
             Optional<MazeFinder.MazeHit> hit = cache.get(chunkKey);
             if (hit == null) {
-                MazeFinder.MazeHit found = MazeFinder.findInColumn(world, pos);
-                boolean locked = found != null && !MazeState.get(world).isSolved(found.key());
-                hit = locked ? Optional.of(found) : Optional.empty();
+                hit = Optional.ofNullable(MazeFinder.findInColumn(world, pos));
                 cache.put(chunkKey, hit);
             }
-            return hit.isPresent() && hit.get().piece().isProtected(pos);
+            // The locks again: an explosion must not do what a pickaxe cannot.
+            if (world.getBlockState(pos).isOf(ModBlocks.CODE_KEY)
+                    || world.getBlockState(pos).isOf(ModBlocks.VAULT_DOOR)
+                    || world.getBlockState(pos).isOf(ModBlocks.SEALED_GATEWAY)) return true;
+            if (hit.isEmpty()) return false;
+            MazePiece maze = hit.get().piece();
+            long key = hit.get().key();
+            // A sealed vault is protected whatever the maze's state and whatever the config
+            // says, for the same reason a pickaxe cannot open it.
+            if (maze.hasVault() && !state.isVaultOpen(key) && maze.isInVault(pos)) return true;
+            return guardMazes && !state.isSolved(key) && maze.isProtected(pos);
         });
     }
 
@@ -223,6 +263,20 @@ public final class MazeProtection {
         player.teleport(world, back.getX() + 0.5, back.getY(), back.getZ() + 0.5, player.getYaw(), player.getPitch());
         player.fallDistance = 0;
         player.sendMessage(Text.translatable("mazecraft.protection.no_climbing").formatted(Formatting.RED), true);
+    }
+
+    /**
+     * Is this block part of a vault that has not been opened yet?
+     *
+     * <p>Not covered by {@code protectUntilSolved}: that switch is there so a player can turn the
+     * anti-cheat off and treat a maze as scenery, and it is answered by the maze no longer being
+     * locked. This one is the lock itself.</p>
+     */
+    public static boolean isSealedVault(ServerWorld world, BlockPos pos) {
+        MazeFinder.MazeHit hit = MazeFinder.find(world, pos, 0);
+        if (hit == null || !hit.piece().hasVault()) return false;
+        if (MazeState.get(world).isVaultOpen(hit.key())) return false;
+        return hit.piece().isInVault(pos);
     }
 
     /** The maze at pos if it exists and is not conquered yet, else null. */
