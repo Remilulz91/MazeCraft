@@ -2,6 +2,55 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.10] — 2026-10-20
+
+### Fixed
+- **A maze on sloping ground could end in a shelf of flat ground hanging in the air.** The
+  foundation fills downward from the floor until it meets solid rock, and it gave up after
+  twelve blocks; past that, the platform simply stopped and left a gap. Measured over 37 sites
+  that the placement rules accept as they stand: two of them, one in eighteen, drop further
+  below their floor than the fill could reach, and the worst drops 24 blocks — twelve blocks
+  of daylight under the edge. The fill now goes to 32.
+  The alternative was to make the rule stricter, by surveying the flattened ring the build
+  lays down and refusing sites whose ring is too steep. That was measured too: it costs three
+  points of acceptance for hedge mazes and five for badlands and cherry grove, to avoid a
+  defect in one site out of eighteen. Deepening the fill costs nothing — it does not change
+  which sites are chosen, it does not touch the bounding box, and on ground that needs no
+  filling it writes no extra blocks. The depth is a point at which the fill gives up, not a
+  wall height: the ground decides how tall the plinth is, so raising it cannot make any maze
+  look heavier than it already did.
+- **`/maze debug place` now says whether generation would accept the site**, in green or in
+  red, and sits the maze on the floor generation would have chosen. It still runs no placement
+  test of its own, because forcing a maze anywhere is the whole point of it — but a maze
+  forced onto ground with a relief of 49, five times the tolerance, came out as a slab in the
+  air and was read as evidence against a relief setting it had never exercised. A debug tool
+  that can be mistaken for the real thing has to say so itself.
+
+### Added
+- `/maze debug placement <style> <size> hunt [relief] [mindrop]` — walks outward from the
+  player and stops at the first site the placement rules actually accept, then teleports
+  there. With a relief figure larger than the one in force it looks instead for a site that
+  the looser value would admit and the current rule would not, so that what you go and look at
+  is what the change would buy and not a site that already passes. With a minimum drop it
+  looks for ground steep enough to test the foundation.
+
+### Changed
+- **The debug scan is paced against the clock.** Third attempt, and the first two are worth
+  recording. A per-tick budget bounds nothing: when the server falls behind it runs catch-up
+  ticks back to back and the budget fires on every one. A fixed 50 ms gap between slices bounds
+  nothing either — a slice can only stop between sites, and one site in the right biome costs
+  about 330 ms, so a 10 ms budget produced 330 ms slices every 380. The rest is now
+  proportional to what the slice cost: a fifth of the thread, whatever the granularity.
+  Measured at 20 % on two runs, with no "Can't keep up".
+- Every line `/maze debug` prints is ASCII. These lines get pasted out of a Windows client log,
+  where an em dash arrives as mojibake in the middle of the sentence meant to be read.
+
+### Notes
+- **No placement rule changed in this release.** Three candidates were measured and all three
+  were left alone: the water tolerance (a swamp site is already as likely to carry a maze as a
+  desert one), the relief tolerance, and the survey's coverage. The one real defect turned out
+  to be downstream of all of them, in how deep the ground gets filled.
+
 ## [1.0.0-alpha.9] — 2026-10-20
 
 ### Changed

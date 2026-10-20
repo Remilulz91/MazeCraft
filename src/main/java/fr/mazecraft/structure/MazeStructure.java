@@ -237,8 +237,15 @@ public class MazeStructure extends Structure {
 
     /** The worldgen view of {@link #surveyFloor}: the floor Y, or empty when the site is refused. */
     private static OptionalInt findFloorY(Context context, int centerX, int centerZ, MazeSize size) {
+        // ringMargin 0: the survey still stops at the maze's own half-span, which is what
+        // every world generated so far was built on. The flattened ring reaches `margin`
+        // blocks further out and is NOT surveyed, which is how a maze ends up with a shelf of
+        // ground hanging in the air on steep terrain. Widening this is 1.0.0-alpha.10's
+        // subject; it makes the test stricter for every style at once, so the figure comes
+        // from `/maze debug placement ... scan`, which reports both spans side by side,
+        // before it is changed here and not after.
         Site site = surveyFloor(context.chunkGenerator(), context.world(), context.noiseConfig(),
-                centerX, centerZ, size, reliefAllowance(size), MAX_WATER_DEPTH);
+                centerX, centerZ, size, 0, reliefAllowance(size), MAX_WATER_DEPTH);
         return site.ok() ? OptionalInt.of(site.floorY()) : OptionalInt.empty();
     }
 
@@ -299,7 +306,7 @@ public class MazeStructure extends Structure {
      * @param wet      how many of the samples stood in any water at all
      * @param rejected the test that refused, or null when the site is good
      */
-    public record Site(int relief, int water, int wet, int floorY, String rejected, int x, int z) {
+    public record Site(int relief, int water, int wet, int drop, int floorY, String rejected, int x, int z) {
         public boolean ok() {
             return rejected == null;
         }
@@ -319,7 +326,7 @@ public class MazeStructure extends Structure {
      */
     public static Site surveyFloor(ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
                                    net.minecraft.world.gen.noise.NoiseConfig noise,
-                                   int centerX, int centerZ, MazeSize size,
+                                   int centerX, int centerZ, MazeSize size, int ringMargin,
                                    int maxRelief, int maxWater) {
         int half = size.span() / 2;
         int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE, sum = 0, n = 0, deepest = 0, wet = 0;
@@ -336,7 +343,7 @@ public class MazeStructure extends Structure {
                 // are rejected, and a rejected site now costs a handful of them instead of
                 // fifty, which is what makes a compass search survivable on a server.
                 if (max - min > maxRelief) {
-                    return new Site(max - min, deepest, wet, 0, "relief", x, z);
+                    return new Site(max - min, deepest, wet, 0, 0, "relief", x, z);
                 }
                 // The water test needs a second NoiseChunk, so it waits until the relief test
                 // has had its say: a site rejected for relief — which is most of them — now
@@ -350,14 +357,72 @@ public class MazeStructure extends Structure {
                 deepest = Math.max(deepest, surface - ground);
                 if (surface > ground) wet++;
                 if (surface - ground > maxWater) {
-                    return new Site(max - min, deepest, wet, 0, "water", x, z);
+                    return new Site(max - min, deepest, wet, 0, 0, "water", x, z);
                 }
                 sum += surface;
                 n++;
             }
         }
         // getHeight returns the first air block → the floor replaces the surface block below it
-        return new Site(max - min, deepest, wet, Math.round((float) sum / n) - 1, null, 0, 0);
+        int floorY = Math.round((float) sum / n) - 1;
+
+        // The ring the build actually flattens, which the 5×5 above never looks at.
+        //
+        // This is NOT the same thing as stretching the 5×5 further out. The first attempt did
+        // that, and it was not a stricter rule but a coarser one: the same twenty-five points
+        // spread wider thin out the middle, so they can miss a bump the narrow survey caught.
+        // The measurement said so out loud — desert accepted MORE sites at tolerance 18 under
+        // the "wider" rule than under the narrow one, which is impossible for a rule that only
+        // adds ground to look at. Sixteen points on the perimeter, on top of the twenty-five,
+        // can only ever refuse more.
+        //
+        // The ring feeds the relief and water tests only, never the floor height, which stays
+        // the average of the same twenty-five samples it has always been.
+        //
+        // It also measures `drop`: how far the solid ground falls below that floor out at the
+        // ring. That, not the relief spread, is the number the overhang question turns on — a
+        // maze hangs in the air exactly when the drop exceeds MazePiece.FOUNDATION_DEPTH,
+        // because the foundation fills that far down and then stops.
+        int drop = 0;
+        if (ringMargin > 0) {
+            int edge = half + ringMargin;
+            for (int k = 0; k < 16; k++) {
+                int[] p = ringPoint(k, edge);
+                int x = centerX + p[0];
+                int z = centerZ + p[1];
+                int surface = gen.getHeight(x, z, Heightmap.Type.WORLD_SURFACE_WG, world, noise);
+                min = Math.min(min, surface);
+                max = Math.max(max, surface);
+                if (max - min > maxRelief) {
+                    return new Site(max - min, deepest, wet, drop, 0, "relief (ring)", x, z);
+                }
+                int ground = gen.getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG, world, noise);
+                deepest = Math.max(deepest, surface - ground);
+                if (surface > ground) wet++;
+                // ground is the first free y, so the solid top is one below it.
+                drop = Math.max(drop, floorY - (ground - 1));
+                if (surface - ground > maxWater) {
+                    return new Site(max - min, deepest, wet, drop, 0, "water (ring)", x, z);
+                }
+            }
+        }
+
+        return new Site(max - min, deepest, wet, drop, floorY, null, 0, 0);
+    }
+
+    /**
+     * Point {@code k} of the sixteen on the perimeter of a square of half-width {@code edge}:
+     * the four corners first, then the midpoints, then the rest, so a slope is caught early.
+     */
+    private static int[] ringPoint(int k, int edge) {
+        int half = edge / 2;
+        int[][] ring = {
+                {-edge, -edge}, {edge, edge}, {edge, -edge}, {-edge, edge},
+                {0, -edge}, {0, edge}, {-edge, 0}, {edge, 0},
+                {-half, -edge}, {half, -edge}, {-half, edge}, {half, edge},
+                {-edge, -half}, {-edge, half}, {edge, -half}, {edge, half},
+        };
+        return ring[k];
     }
 
 

@@ -83,7 +83,21 @@ public class DebugCommand {
                                                 StringArgumentType.getString(ctx, "size")))
                                         .then(CommandManager.literal("scan")
                                                 .executes(ctx -> onPlacementScan(ctx,
-                                                        StringArgumentType.getString(ctx, "size")))))))
+                                                        StringArgumentType.getString(ctx, "size"), false, -1, 0)))
+                                        .then(CommandManager.literal("hunt")
+                                                .executes(ctx -> onPlacementScan(ctx,
+                                                        StringArgumentType.getString(ctx, "size"), true, -1, 0))
+                                                .then(CommandManager.argument("relief",
+                                                                com.mojang.brigadier.arguments.IntegerArgumentType.integer(1, 64))
+                                                        .executes(ctx -> onPlacementScan(ctx,
+                                                                StringArgumentType.getString(ctx, "size"), true,
+                                                                com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "relief"), 0))
+                                                        .then(CommandManager.argument("mindrop",
+                                                                        com.mojang.brigadier.arguments.IntegerArgumentType.integer(0, 64))
+                                                                .executes(ctx -> onPlacementScan(ctx,
+                                                                        StringArgumentType.getString(ctx, "size"), true,
+                                                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "relief"),
+                                                                        com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "mindrop")))))))))
                 .then(CommandManager.literal("vault")
                         .executes(ctx -> onVault(ctx, false))
                         .then(CommandManager.literal("open")
@@ -149,15 +163,23 @@ public class DebugCommand {
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
         MazeStructure.Site verdict = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, MazeStructure.reliefAllowance(size),
+                at.getX(), at.getZ(), size, 0, MazeStructure.reliefAllowance(size),
                 MazeStructure.maxWaterDepth());
         MazeStructure.Site truth = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                at.getX(), at.getZ(), size, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        // The same ground, surveyed over what actually gets built: the maze plus its
+        // flattened ring. The gap between the two numbers is the overhang risk.
+        MazeStructure.Site built = MazeStructure.surveyFloor(gen, world, noise,
+                at.getX(), at.getZ(), size, style.margin,
+                MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
 
         int allowed = MazeStructure.reliefAllowance(size);
         src.sendFeedback(() -> Text.literal("relief  " + truth.relief()
                         + " across the footprint, allowed " + allowed)
                 .formatted(truth.relief() <= allowed ? Formatting.GREEN : Formatting.RED), false);
+        src.sendFeedback(() -> Text.literal("footprint relief " + built.relief()
+                        + " including the " + style.margin + "-block ring (surveyed: no)")
+                .formatted(built.relief() <= allowed ? Formatting.GREEN : Formatting.YELLOW), false);
         src.sendFeedback(() -> Text.literal("water   " + truth.water()
                         + " deep at worst, allowed " + MazeStructure.maxWaterDepth()
                         + "  (" + truth.wet() + " of 25 samples wet)")
@@ -193,7 +215,8 @@ public class DebugCommand {
      * table rather than from my intuition, which has already been wrong once in this
      * conversation.</p>
      */
-    private static int onPlacementScan(CommandContext<ServerCommandSource> ctx, String sizeId) {
+    private static int onPlacementScan(CommandContext<ServerCommandSource> ctx, String sizeId,
+                                       boolean hunt, int reliefOverride, int minDrop) {
         ServerCommandSource src = ctx.getSource();
         ServerPlayerEntity player = src.getPlayer();
         if (player == null) {
@@ -219,7 +242,21 @@ public class DebugCommand {
             src.sendError(Text.literal("A scan is already running."));
             return 0;
         }
-        running = new Scan(src, world, structure, size, id, player.getBlockPos());
+        int allowance = reliefOverride > 0 ? reliefOverride : MazeStructure.reliefAllowance(size);
+        running = new Scan(src, world, structure, size, style.margin, id,
+                player.getBlockPos(), hunt, allowance, minDrop);
+        if (hunt) {
+            src.sendFeedback(() -> Text.literal("hunting for the nearest site " + id
+                            + " could stand on at relief " + allowance
+                            + (allowance > MazeStructure.reliefAllowance(size)
+                                    ? " but NOT at the " + MazeStructure.reliefAllowance(size)
+                                      + " in force, so the site actually shows what the change buys"
+                                    : "")
+                            + (minDrop > 0 ? ", with a drop of at least " + minDrop : "")
+                            + ", a slice per tick")
+                    .formatted(Formatting.GRAY), false);
+            return 1;
+        }
         src.sendFeedback(() -> Text.literal("scanning " + id + ": walking outward until "
                         + SCAN_TARGET + " sites of its biome are found, a slice per tick"
                         + " - this can take a minute for a small biome")
@@ -239,7 +276,28 @@ public class DebugCommand {
      * entire subject was not holding the tick. Measuring the problem is not a licence to
      * reproduce it.</p>
      */
-    private static final long SCAN_BUDGET_NANOS = 20_000_000L;
+    private static final long SCAN_BUDGET_NANOS = 10_000_000L;
+
+    /**
+     * Minimum real time between two slices.
+     *
+     * <p>Two attempts at this failed before the arithmetic was done. A per-tick budget alone
+     * bounds nothing: when the server falls behind it runs catch-up ticks back to back, and the
+     * budget fires on every one. A fixed 50 ms gap between slices bounds nothing either, and
+     * that one is the instructive failure — it assumes a slice can stop when the budget says
+     * so, but the loop can only stop <em>between sites</em>, and one site in the right biome
+     * costs about 330 ms of height queries. A 10 ms budget with a 50 ms gap therefore produced
+     * slices of 330 ms every 380: eighty-seven percent of the thread, which is exactly what
+     * the logs showed (22.6 seconds of work in 23 seconds of wall clock).</p>
+     *
+     * <p>So the pacing is proportional instead of fixed: after a slice costing T, nothing runs
+     * for 4 × T. Whatever the granularity, the scan gets a fifth of the thread and no more.</p>
+     */
+    private static final int SCAN_REST_MULTIPLIER = 4;
+
+    /** When the last slice ended, and what it cost, for the pacing above. */
+    private static long lastSlice;
+    private static long lastSliceCost;
 
     /**
      * In-biome sites a scan tries to collect before it reports.
@@ -261,7 +319,11 @@ public class DebugCommand {
         final ServerWorld world;
         final Structure structure;
         final MazeSize size;
+        final int margin;
         final String id;
+        final boolean hunt;
+        final int allowance;
+        final int minDrop;
         final BlockPos origin;
         final java.util.List<int[]> found = new java.util.ArrayList<>();
         final java.util.ArrayDeque<int[]> pending = new java.util.ArrayDeque<>();
@@ -291,13 +353,17 @@ public class DebugCommand {
         }
 
         Scan(ServerCommandSource src, ServerWorld world, Structure structure, MazeSize size,
-             String id, BlockPos origin) {
+             int margin, String id, BlockPos origin, boolean hunt, int allowance, int minDrop) {
             this.src = src;
             this.world = world;
             this.structure = structure;
             this.size = size;
+            this.margin = margin;
             this.id = id;
             this.origin = origin;
+            this.hunt = hunt;
+            this.allowance = allowance;
+            this.minDrop = minDrop;
         }
     }
 
@@ -308,6 +374,8 @@ public class DebugCommand {
     private static void advanceScan() {
         Scan scan = running;
         if (scan == null) return;
+        long now = System.nanoTime();
+        if (now - lastSlice < lastSliceCost * SCAN_REST_MULTIPLIER) return;
         ServerWorld world = scan.world;
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
@@ -328,9 +396,61 @@ public class DebugCommand {
             // prefilter is four noise samples, so asking in this order is what turns a
             // 28-second command into a few hundred milliseconds of total work: for a cherry
             // grove it skips 224 sites out of 225 before spending anything.
+            if (scan.hunt) {
+                if (!MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler, sea, x, z)) {
+                    scan.nanos += System.nanoTime() - started;
+                    continue;
+                }
+                MazeStructure.Site real = MazeStructure.surveyFloor(gen, world, noise, x, z,
+                        scan.size, 0, scan.allowance, MazeStructure.maxWaterDepth());
+                var biomeHere = gen.getBiomeSource().getBiome(BiomeCoords.fromBlock(x),
+                        BiomeCoords.fromBlock(real.ok() ? real.floorY() : sea),
+                        BiomeCoords.fromBlock(z), sampler);
+                // Asking for a LOOSER allowance than the game's means one thing only: show me
+                // a site the proposal would admit and the rule in force would not. Without
+                // this, the hunt hands back the first site that merely passes, which at a
+                // looser allowance is usually one the current rule already accepts - it did
+                // exactly that, returning a relief-8 site when asked for 14, and a relief-8
+                // site says nothing whatsoever about raising the tolerance to 14.
+                boolean provesSomething = scan.allowance <= MazeStructure.reliefAllowance(scan.size)
+                        || real.relief() > MazeStructure.reliefAllowance(scan.size);
+                if (real.ok() && provesSomething
+                        && scan.structure.getValidBiomes().contains(biomeHere)) {
+                    MazeStructure.Site measured = MazeStructure.surveyFloor(gen, world, noise,
+                            x, z, scan.size, scan.margin,
+                            MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                    if (measured.drop() < scan.minDrop) {
+                        scan.nanos += System.nanoTime() - started;
+                        continue;
+                    }
+                    running = null;
+                    int fy = real.floorY();
+                    try {
+                        ServerPlayerEntity who = scan.src.getPlayer();
+                        if (who != null) {
+                            who.requestTeleport(x + 0.5, fy + 1, z + 0.5);
+                            who.fallDistance = 0.0f;
+                        }
+                        scan.src.sendFeedback(() -> Text.literal("found a site at " + x + ", "
+                                        + fy + ", " + z + " - interior relief " + real.relief()
+                                        + " of " + scan.allowance + " allowed"
+                                        + "; including the built ring " + measured.relief()
+                                        + "; drop below the floor at the ring " + measured.drop()
+                                        + ". Run /maze debug place here.")
+                                .formatted(Formatting.GOLD), false);
+                    } catch (Exception e) {
+                        MazeCraft.LOGGER.warn("[MazeCraft] hunt finished but could not report", e);
+                    }
+                    return;
+                }
+                scan.nanos += System.nanoTime() - started;
+                continue;
+            }
             if (MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler, sea, x, z)) {
                 MazeStructure.Site s = MazeStructure.surveyFloor(gen, world, noise, x, z,
-                        scan.size, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                        scan.size, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                boolean acceptedToday = s.relief() <= MazeStructure.reliefAllowance(scan.size)
+                        && s.water() <= MazeStructure.maxWaterDepth();
                 var biome = gen.getBiomeSource().getBiome(BiomeCoords.fromBlock(x),
                         BiomeCoords.fromBlock(s.floorY()), BiomeCoords.fromBlock(z), sampler);
                 if (scan.structure.getValidBiomes().contains(biome)) {
@@ -338,15 +458,29 @@ public class DebugCommand {
                     // Kept paired, one entry per site: the decision tables ask about relief AND
                     // water of the SAME site, so separately sorted lists would answer a
                     // question nobody asked.
-                    scan.found.add(new int[]{s.relief(), s.water(), s.wet()});
+                    // The same twenty-five samples plus the sixteen on the built ring, so
+                    // this row can only ever be lower than the one above it.
+                    MazeStructure.Site wide = MazeStructure.surveyFloor(gen, world, noise,
+                            x, z, scan.size, scan.margin,
+                            MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                    scan.found.add(new int[]{s.relief(), s.water(), s.wet(), wide.relief(),
+                            acceptedToday ? wide.drop() : -1});
                     if (s.water() > MazeStructure.maxWaterDepth()) scan.wetRefusals++;
                 }
             }
             scan.nanos += System.nanoTime() - started;
         }
-        if (!scan.wants()) {
+        lastSlice = System.nanoTime();
+        lastSliceCost = lastSlice - now;
+        if (scan.hunt ? scan.examined >= SCAN_MAX_SITES : !scan.wants()) {
             running = null;
             try {
+                if (scan.hunt) {
+                    scan.src.sendFeedback(() -> Text.literal("no site within "
+                                    + (scan.ring * SCAN_STEP) + " blocks passes the rules for "
+                                    + scan.id).formatted(Formatting.GRAY), false);
+                    return;
+                }
                 reportScan(scan);
             } catch (Exception e) {
                 MazeCraft.LOGGER.warn("[MazeCraft] scan finished but could not be reported", e);
@@ -405,6 +539,28 @@ public class DebugCommand {
                 new int[]{allowed, 12, 14, 16, 18, 20},
                 (site, t) -> site[0] <= t
                         && site[1] <= MazeStructure.maxWaterDepth())).formatted(Formatting.GOLD), false);
+        // The row alpha.10 turns on: the same sites judged over the footprint that is
+        // actually built, ring included. The drop from the row above is the price of never
+        // leaving a maze hanging in the air.
+        src.sendFeedback(() -> Text.literal(table("built   ", found, matched,
+                new int[]{allowed, 12, 14, 16, 18, 20},
+                (site, t) -> site[3] <= t
+                        && site[1] <= MazeStructure.maxWaterDepth())).formatted(Formatting.AQUA), false);
+        // THE question, asked directly instead of through a tolerance table: of the sites
+        // generation accepts as it stands, how many would have ground further below their
+        // floor than the foundation can reach? Those, and only those, hang in the air.
+        int[] drops = found.stream().mapToInt(p -> p[4]).filter(d -> d >= 0).sorted().toArray();
+        int hanging = (int) java.util.Arrays.stream(drops).filter(d -> d > MazePiece.FOUNDATION_DEPTH).count();
+        if (drops.length == 0) {
+            src.sendFeedback(() -> Text.literal("overhang  no site here is accepted as it stands")
+                    .formatted(Formatting.GRAY), false);
+        } else {
+            src.sendFeedback(() -> Text.literal("overhang  " + hanging + " of " + drops.length
+                            + " accepted sites drop more than " + MazePiece.FOUNDATION_DEPTH
+                            + " below their floor at the ring (median " + drops[drops.length / 2]
+                            + ", worst " + drops[drops.length - 1] + ")")
+                    .formatted(hanging == 0 ? Formatting.GREEN : Formatting.RED), false);
+        }
         src.sendFeedback(() -> Text.literal(table("depth   ", found, matched,
                 new int[]{MazeStructure.maxWaterDepth(), 4, 6, 8, 12},
                 (site, t) -> site[0] <= allowed
@@ -494,7 +650,41 @@ public class DebugCommand {
         ServerWorld world = src.getWorld();
         BlockPos origin = BlockPos.ofFloored(src.getPosition());
         long seed = world.getRandom().nextLong();
-        int floorY = origin.getY() - 1;
+
+        // Say, loudly, whether generation would ever choose this spot.
+        //
+        // This command forces a maze at the player's feet and runs no placement test at all,
+        // which is the point of it — but it means what you are looking at is not necessarily
+        // something the game can produce. A maze forced onto ground with a relief of 49, five
+        // times the tolerance, came out as a slab hanging in the air, and that screenshot was
+        // taken as evidence against a relief setting it had never exercised. A debug tool that
+        // can be mistaken for the real thing has to say so itself.
+        MazeStructure.Site check = MazeStructure.surveyFloor(
+                world.getChunkManager().getChunkGenerator(), world,
+                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(), size, 0,
+                MazeStructure.reliefAllowance(size), MazeStructure.maxWaterDepth());
+        MazeStructure.Site measured = MazeStructure.surveyFloor(
+                world.getChunkManager().getChunkGenerator(), world,
+                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(), size,
+                style.margin, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        if (check.ok()) {
+            src.sendFeedback(() -> Text.literal("[DEBUG] this site PASSES the placement rules"
+                            + " (interior relief " + check.relief() + " of "
+                            + MazeStructure.reliefAllowance(size) + " allowed; including the built"
+                            + " ring " + measured.relief() + "; drop below the floor at the ring "
+                            + measured.drop() + ")")
+                    .formatted(Formatting.GREEN), false);
+        } else {
+            src.sendFeedback(() -> Text.literal("[DEBUG] WARNING: generation would REFUSE this site"
+                            + " (" + check.rejected() + " test; relief " + measured.relief()
+                            + " for an allowance of " + MazeStructure.reliefAllowance(size)
+                            + "). What you are about to see is NOT something the game can produce.")
+                    .formatted(Formatting.RED), false);
+        }
+
+        // Sit it on the floor generation would have chosen when the site is a real one, so a
+        // legitimate test looks like the real thing rather than like the player's feet.
+        int floorY = check.ok() ? check.floorY() : origin.getY() - 1;
 
         MazePiece piece = new MazePiece(style, size, seed, origin.getX(), floorY, origin.getZ(), -1);
         BlockBox box = piece.getBoundingBox();
@@ -503,8 +693,8 @@ public class DebugCommand {
 
         lastPlaced = piece;
         src.sendFeedback(() -> Text.literal("[DEBUG] Placed " + size.id() + " " + style.id() + " maze ("
-                + size.span() + "×" + size.span() + ") centered on " + origin.getX() + " " + floorY + " " + origin.getZ()
-                + " — seed " + seed).formatted(Formatting.LIGHT_PURPLE), true);
+                + size.span() + "x" + size.span() + ") centered on " + origin.getX() + " " + floorY + " " + origin.getZ()
+                + " - seed " + seed).formatted(Formatting.LIGHT_PURPLE), true);
         return 1;
     }
 
@@ -549,8 +739,8 @@ public class DebugCommand {
         BlockPos entrance = maze.entranceOutsidePos();
         boolean solved = state.isSolved(hit.key());
         src.sendFeedback(() -> Text.literal("[DEBUG] " + maze.getSize().id() + " " + maze.getStyle().id()
-                + " maze — " + (solved ? "CONQUERED" : "locked")
-                + " — chest " + chest.toShortString() + " — entrance " + entrance.toShortString())
+                + " maze - " + (solved ? "CONQUERED" : "locked")
+                + " - chest " + chest.toShortString() + " - entrance " + entrance.toShortString())
                 .formatted(Formatting.LIGHT_PURPLE), false);
         return 1;
     }
@@ -571,7 +761,7 @@ public class DebugCommand {
             BlockPos gate = maze.gateBlocks(k).get(0);
             src.sendFeedback(() -> Text.literal("[DEBUG] Gate " + k + (k == maze.gateCount() - 1 ? " (plaza)" : "")
                     + ": " + (open ? "OPEN" : "closed") + " at " + gate.toShortString()
-                    + " — lever at " + maze.leverPos(k).toShortString())
+                    + " - lever at " + maze.leverPos(k).toShortString())
                     .formatted(open ? Formatting.GREEN : Formatting.LIGHT_PURPLE), false);
         }
         return 1;
@@ -601,7 +791,7 @@ public class DebugCommand {
         if (!maze.hasVault() || maze.vaultEntrance() == null) {
             src.sendError(Text.literal("[DEBUG] This maze has no vault ("
                     + maze.getSize().id() + " " + maze.getStyle().id()
-                    + ") — only colossal mazes have one, Kronos excepted."));
+                    + ") - only colossal mazes have one, Kronos excepted."));
             return 0;
         }
         MazeState state = MazeState.get(world);
@@ -612,7 +802,7 @@ public class DebugCommand {
         src.sendFeedback(() -> Text.literal("[DEBUG] Vault stair at " + stair.toShortString()
                 + ", floor at " + floor.toShortString()
                 + ", chest at " + maze.vaultChestPos().toShortString()
-                + " — door " + door).formatted(Formatting.LIGHT_PURPLE), false);
+                + " - door " + door).formatted(Formatting.LIGHT_PURPLE), false);
 
         StringBuilder code = new StringBuilder();
         for (int digit : maze.vaultCode()) code.append(digit);
@@ -730,7 +920,7 @@ public class DebugCommand {
             BlockPos door = maze.entranceOutsidePos();
             final int n = looked;
             src.sendFeedback(() -> Text.literal("[DEBUG] Colossal " + maze.getStyle().id()
-                    + " maze at " + maze.centerPos().toShortString() + " — entrance "
+                    + " maze at " + maze.centerPos().toShortString() + " - entrance "
                     + door.toShortString() + " (" + n + " large mazes looked at)")
                     .formatted(Formatting.LIGHT_PURPLE), false);
             ServerPlayerEntity player = src.getPlayer();
@@ -747,7 +937,7 @@ public class DebugCommand {
         src.sendError(Text.literal("[DEBUG] No colossal maze found"
                 + (ranOut ? " (out of time after " + (COLOSSAL_BUDGET_NANOS / 1_000_000_000L) + "s)"
                           : " within " + (reach / 1000) + "k blocks of you")
-                + " — " + looked + " large mazes looked at, " + empty + " probes found nothing"
+                + " - " + looked + " large mazes looked at, " + empty + " probes found nothing"
                 + (unreadable > 0 ? ", " + unreadable + " unreadable" : "")
                 + " (" + where + "). Hunting a natural colossal maze is slow by nature: the"
                 + " generator throws out almost every candidate it tests, so examining a few"
