@@ -2,6 +2,59 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.8] — 2026-10-20
+
+### Fixed
+- **Ariadne's Compass had a blind ring around the player, and two styles looked like a
+  worldgen bug because of it.** Since alpha.7 a search is one bounded sweep, and nine of them
+  cover the ground: one centred on the player, eight on a ring at 1.75 of a sweep's reach. The
+  reach was computed from a spacing of 40 chunks, read off the one structure set file I had
+  opened — but the maze sets are spaced **24 chunks for a small maze, 32 for a medium, 40
+  for a large**. For a small maze the ring was therefore placed 13 440 blocks out while the
+  discs were only 4 608 blocks wide, leaving an unsearched annulus over four thousand blocks
+  across, immediately around the player. Small mazes are the ones a new player hunts, so this
+  was the common case. The reach is now read from each step's own spread grid at the moment of
+  the search; nine sweeps comb 10 800 blocks for a small maze, 18 000 for a large and 30 000
+  for Kronos, with no gap at any size. Costs nothing: a sweep examines 625 candidate sites
+  whatever the spacing, so only the distance those chances span was ever wrong.
+- **The water rule is back where it was.** alpha.7's notes said swamp mazes were being refused
+  because a swamp stands in water, and a tolerance of two blocks had been added for them. The
+  tolerance was then measured against the styles that work, and the claim did not survive: a
+  swamp site is as likely to carry a maze as a desert site, and deserts are found without
+  trouble. Swamp mazes were missing because of the blind ring above, not because of the
+  ground. Raising the tolerance further would have tripled them, hidden the real bug, and let
+  mazes anywhere in the mod sit across a river.
+
+### Changed
+- **The terrain survey samples the four corners of a footprint first**, then the edges, then
+  the middle, instead of walking it row by row. Row order spends its first queries along one
+  edge, which says little about the slope of the whole site; the corners bracket it at once.
+  Measured over 200 000 simulated sites: 40 % fewer height queries, 21.5 down to 13.0 per
+  site. The worst search in the mod — a hedge maze, whose biome covers a quarter of the
+  map — went from holding a dedicated server 3.1 seconds to around 1.1. This changes what a
+  site costs, never whether it is accepted: both orders returned the same verdict and the same
+  floor height on 200 000 random terrains, with no exceptions.
+
+### Added
+- `/maze debug placement <style> [size]` — asks the placement rules, at the player's feet,
+  whether a maze could stand there, and when the answer is no, which test refused and by how
+  much. It calls the same code worldgen calls, with the generator the world was made with, so
+  what it prints is what generation decided rather than a second implementation of the rules.
+- `/maze debug placement <style> <size> scan` — the same question asked of 225 sites around
+  the player and answered with a distribution: how much of the area is in the style's biomes,
+  the spread of relief and water, and a table of how many sites each candidate tolerance would
+  admit. One site is an anecdote; this is what a rule gets changed on. It walks the grid a
+  slice per tick rather than all at once — the first version ran inline and put a dedicated
+  server 28 seconds behind, which is a poor way to study a performance problem.
+
+### Notes
+- The note in alpha.7 about swamp and cherry grove was half wrong, and this is the correction:
+  **swamp was never a worldgen problem.** Cherry grove still is, but not for the reason given
+  there either. It is not the relief tolerance — it is that the biome is tiny: a scan of 225
+  sites centred inside a cherry grove found **one** site in the biome. No tolerance fixes a
+  biome that is not there, so the fix will be a denser spread grid for that style, and that is
+  a change the compass could not have survived before today.
+
 ## [1.0.0-alpha.7] — 2026-10-20
 
 ### Fixed

@@ -5,7 +5,11 @@ import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryKeys;
+import net.minecraft.registry.entry.RegistryEntry;
 import net.minecraft.registry.tag.TagKey;
+import net.minecraft.structure.StructureSet;
+import net.minecraft.world.gen.chunk.placement.RandomSpreadStructurePlacement;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.gen.structure.Structure;
@@ -109,9 +113,54 @@ public final class StructureSearch {
                 from.getZ() + (int) Math.round(Math.sin(angle) * out));
     }
 
-    /** Blocks one sweep of this radius reaches, for a set spaced {@code spacing} chunks apart. */
-    public static int reach(int radius, int spacing) {
-        return radius * spacing * 16;
+    /**
+     * Blocks one sweep of this radius reaches, read from the spread grid the structures in this
+     * tag are actually placed on.
+     *
+     * <p>This used to be a constant 40 chunks, written from the one structure set file I
+     * happened to open. The maze sets are <b>24 for a small maze, 32 for a medium, 40 for a
+     * large</b> and 200 for Kronos, so the constant was right for exactly one of the four — and
+     * the sweep ring, which is placed at 1.75 reaches out, was therefore placed 13 440 blocks
+     * away from discs only 4 608 blocks wide. For small mazes the nine sweeps left a blind
+     * annulus more than four thousand blocks across, right where the player is standing. Two
+     * styles looked unfindable and I spent a day measuring the worldgen rules; the geometry I
+     * had checked was only ever valid for large mazes, which are the one size nobody tested.</p>
+     *
+     * <p>The number of candidate sites a sweep examines — and so its cost — depends only on the
+     * radius, never on the spacing: 625 chances at radius 12, whatever the size. Only the
+     * distance those chances span changes, which is exactly what the ring needs to know.</p>
+     */
+    public static int reach(ServerWorld world, TagKey<Structure> tag, int radius) {
+        return radius * spacingOf(world, tag) * 16;
+    }
+
+    /** Fallback when a tag matches no random-spread set: the widest maze grid. */
+    private static final int DEFAULT_SPACING = 40;
+
+    /**
+     * The tightest spread grid among the structures of this tag, in chunks.
+     *
+     * <p>The tightest, not the average: a tag holding several sets is searched ring by ring in
+     * each set's own grid, so the distance the whole call is <em>guaranteed</em> to have covered
+     * is the one from the densest grid. Assuming more would put the next sweep past ground
+     * nothing has looked at. This matters for Ariadne's Thread, whose tag holds all 48.</p>
+     */
+    private static int spacingOf(ServerWorld world, TagKey<Structure> tag) {
+        var structures = world.getRegistryManager().get(RegistryKeys.STRUCTURE);
+        var tagged = structures.getEntryList(tag).orElse(null);
+        if (tagged == null) return DEFAULT_SPACING;
+        int tightest = Integer.MAX_VALUE;
+        for (StructureSet set : world.getRegistryManager().get(RegistryKeys.STRUCTURE_SET)) {
+            if (!(set.placement() instanceof RandomSpreadStructurePlacement spread)) continue;
+            for (StructureSet.WeightedEntry weighted : set.structures()) {
+                for (RegistryEntry<Structure> entry : tagged) {
+                    if (entry.value() == weighted.structure().value()) {
+                        tightest = Math.min(tightest, spread.getSpacing());
+                    }
+                }
+            }
+        }
+        return tightest == Integer.MAX_VALUE ? DEFAULT_SPACING : tightest;
     }
 
     /** The sweep stored under this key, clamped: bad data restarts the search rather than hanging. */

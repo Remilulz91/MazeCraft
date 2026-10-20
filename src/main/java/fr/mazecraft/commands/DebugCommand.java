@@ -10,8 +10,13 @@ import fr.mazecraft.protection.MazeState;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
+import fr.mazecraft.structure.MazeStructure;
 import fr.mazecraft.structure.MazeStyle;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.world.biome.source.BiomeCoords;
+import net.minecraft.world.gen.chunk.ChunkGenerator;
+import net.minecraft.world.gen.noise.NoiseConfig;
 import net.minecraft.registry.tag.TagKey;
 import net.minecraft.world.Heightmap;
 import net.minecraft.world.gen.structure.Structure;
@@ -68,6 +73,17 @@ public class DebugCommand {
                         .executes(DebugCommand::onLevers))
                 .then(CommandManager.literal("colossal")
                         .executes(DebugCommand::onColossal))
+                .then(CommandManager.literal("placement")
+                        .then(CommandManager.argument("style", StringArgumentType.word())
+                                .suggests(STYLE_SUGGESTIONS)
+                                .executes(ctx -> onPlacement(ctx, MazeSize.SMALL.id()))
+                                .then(CommandManager.argument("size", StringArgumentType.word())
+                                        .suggests(SIZE_SUGGESTIONS)
+                                        .executes(ctx -> onPlacement(ctx,
+                                                StringArgumentType.getString(ctx, "size")))
+                                        .then(CommandManager.literal("scan")
+                                                .executes(ctx -> onPlacementScan(ctx,
+                                                        StringArgumentType.getString(ctx, "size")))))))
                 .then(CommandManager.literal("vault")
                         .executes(ctx -> onVault(ctx, false))
                         .then(CommandManager.literal("open")
@@ -79,6 +95,309 @@ public class DebugCommand {
                                 .then(CommandManager.argument("style", StringArgumentType.word())
                                         .suggests(STYLE_SUGGESTIONS)
                                         .executes(ctx -> onPlace(ctx, StringArgumentType.getString(ctx, "style"))))));
+    }
+
+    /**
+     * DEBUG: asks the placement rules, at the player's feet, whether a maze of this style and
+     * size could stand here — and when the answer is no, which test refused and by how much.
+     *
+     * <p>Built because two styles out of sixteen turned out to be nearly unfindable on a
+     * server, and my explanation for it was a correlation over eight compass searches. A
+     * correlation is not a reason to change how every maze in the mod generates. This asks the
+     * rule itself, through the same {@link MazeStructure#surveyFloor} that worldgen calls and
+     * the same chunk generator the world was made with, so what it prints is what generation
+     * decided, not a second implementation of it that agrees today and drifts tomorrow.</p>
+     */
+    private static int onPlacement(CommandContext<ServerCommandSource> ctx, String sizeId) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        MazeStyle style = MazeStyle.fromId(StringArgumentType.getString(ctx, "style"));
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (style == null || size == null) {
+            src.sendError(Text.literal("Unknown style or size."));
+            return 0;
+        }
+
+        ServerWorld world = src.getWorld();
+        BlockPos at = player.getBlockPos();
+        String id = style.isKronos() ? "maze_kronos" : "maze_" + style.id() + "_" + size.step().id();
+        Structure structure = world.getRegistryManager().get(RegistryKeys.STRUCTURE)
+                .get(MazeCraft.id(id));
+        if (structure == null) {
+            src.sendError(Text.literal("No structure " + id + " in the registry."));
+            return 0;
+        }
+
+        src.sendFeedback(() -> Text.literal("=== placement " + id + " @ "
+                + at.getX() + ", " + at.getZ() + " ===").formatted(Formatting.LIGHT_PURPLE), false);
+
+        // 1. Biome, read from the structure's own biome list rather than a copy of it here.
+        boolean biomeOk = structure.getValidBiomes().contains(world.getBiome(at));
+        src.sendFeedback(() -> Text.literal("biome   " + world.getBiome(at).getKey()
+                        .map(k -> k.getValue().toString()).orElse("?")
+                        + (biomeOk ? "  ACCEPTED" : "  REFUSED (not in this style's list)"))
+                .formatted(biomeOk ? Formatting.GREEN : Formatting.RED), false);
+
+        // 2. Terrain. Twice: once with the real thresholds, to report the verdict, and once
+        //    with none, to report what the ground actually is. The verdict alone misleads —
+        //    it stops at the first test that fails, so "relief 13" from a judging run is a
+        //    lower bound, not the site's relief.
+        ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
+        NoiseConfig noise = world.getChunkManager().getNoiseConfig();
+        MazeStructure.Site verdict = MazeStructure.surveyFloor(gen, world, noise,
+                at.getX(), at.getZ(), size, size.maxRelief(), MazeStructure.maxWaterDepth());
+        MazeStructure.Site truth = MazeStructure.surveyFloor(gen, world, noise,
+                at.getX(), at.getZ(), size, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+
+        src.sendFeedback(() -> Text.literal("relief  " + truth.relief()
+                        + " across the footprint, allowed " + size.maxRelief())
+                .formatted(truth.relief() <= size.maxRelief() ? Formatting.GREEN : Formatting.RED), false);
+        src.sendFeedback(() -> Text.literal("water   " + truth.water()
+                        + " deep at worst, allowed " + MazeStructure.maxWaterDepth()
+                        + "  (" + truth.wet() + " of 25 samples wet)")
+                .formatted(truth.water() <= MazeStructure.maxWaterDepth() ? Formatting.GREEN : Formatting.RED), false);
+        if (verdict.ok()) {
+            src.sendFeedback(() -> Text.literal("terrain ACCEPTED, floor would be y=" + verdict.floorY())
+                    .formatted(Formatting.GREEN), false);
+        } else {
+            src.sendFeedback(() -> Text.literal("terrain REFUSED by the " + verdict.rejected()
+                            + " test, at " + verdict.x() + ", " + verdict.z())
+                    .formatted(Formatting.RED), false);
+        }
+
+        src.sendFeedback(() -> Text.literal("verdict " + (biomeOk && verdict.ok()
+                        ? "a maze of this style and size could stand here"
+                        : "no maze here"))
+                .formatted(biomeOk && verdict.ok() ? Formatting.GOLD : Formatting.GRAY), false);
+        return 1;
+    }
+
+    /** Sites sampled by a scan, on a side; 15 × 15 = 225 of them. */
+    private static final int SCAN_SIDE = 15;
+
+    /** Blocks between two sampled sites: wide enough that 225 of them cover a real landscape. */
+    private static final int SCAN_STEP = 80;
+
+    /**
+     * DEBUG: the same question as {@link #onPlacement}, asked of 225 sites around the player
+     * instead of one, and answered with a distribution.
+     *
+     * <p>One site is an anecdote. Standing in a swamp and reading "relief 13, allowed 10" says
+     * that <em>this</em> spot is too uneven; it does not say whether one swamp site in three is
+     * fine or none of them are, and those two call for opposite fixes. This walks a grid, keeps
+     * the sites whose biome matches, measures each one with no thresholds, and prints how many
+     * would be accepted at each candidate tolerance. The tolerance then gets chosen from the
+     * table rather than from my intuition, which has already been wrong once in this
+     * conversation.</p>
+     */
+    private static int onPlacementScan(CommandContext<ServerCommandSource> ctx, String sizeId) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        MazeStyle style = MazeStyle.fromId(StringArgumentType.getString(ctx, "style"));
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (style == null || size == null) {
+            src.sendError(Text.literal("Unknown style or size."));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        String id = style.isKronos() ? "maze_kronos" : "maze_" + style.id() + "_" + size.step().id();
+        Structure structure = world.getRegistryManager().get(RegistryKeys.STRUCTURE)
+                .get(MazeCraft.id(id));
+        if (structure == null) {
+            src.sendError(Text.literal("No structure " + id + " in the registry."));
+            return 0;
+        }
+
+        if (running != null) {
+            src.sendError(Text.literal("A scan is already running."));
+            return 0;
+        }
+        running = new Scan(src, world, structure, size, id, player.getBlockPos());
+        src.sendFeedback(() -> Text.literal("scanning " + id + ": " + (SCAN_SIDE * SCAN_SIDE)
+                        + " sites, a slice per tick - the result follows in a moment")
+                .formatted(Formatting.GRAY), false);
+        return 1;
+    }
+
+    /** A scan in progress: the grid is walked a slice at a time, never all in one tick. */
+    private static Scan running;
+
+    /**
+     * How long a scan may hold the server thread in one tick.
+     *
+     * <p>Twenty milliseconds of a fifty-millisecond tick. The first version of this command had
+     * no budget at all and ran the whole grid inline: 225 sites, 11 250 height queries, and a
+     * dedicated server <b>28 seconds behind</b> — half the watchdog, in the one session whose
+     * entire subject was not holding the tick. Measuring the problem is not a licence to
+     * reproduce it.</p>
+     */
+    private static final long SCAN_BUDGET_NANOS = 20_000_000L;
+
+    private static final class Scan {
+        final ServerCommandSource src;
+        final ServerWorld world;
+        final Structure structure;
+        final MazeSize size;
+        final String id;
+        final BlockPos origin;
+        final java.util.List<int[]> found = new java.util.ArrayList<>();
+        int index;
+        int inBiome;
+        int wetRefusals;
+        long nanos;
+
+        Scan(ServerCommandSource src, ServerWorld world, Structure structure, MazeSize size,
+             String id, BlockPos origin) {
+            this.src = src;
+            this.world = world;
+            this.structure = structure;
+            this.size = size;
+            this.id = id;
+            this.origin = origin;
+        }
+    }
+
+    static {
+        ServerTickEvents.END_SERVER_TICK.register(server -> advanceScan());
+    }
+
+    private static void advanceScan() {
+        Scan scan = running;
+        if (scan == null) return;
+        ServerWorld world = scan.world;
+        ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
+        NoiseConfig noise = world.getChunkManager().getNoiseConfig();
+        // The biome source, not world.getBiome: asking the world would load a chunk per site,
+        // and worldgen does not ask the world either.
+        var sampler = noise.getMultiNoiseSampler();
+        int sea = gen.getSeaLevel();
+        int side = SCAN_SIDE;
+        int half = side / 2;
+
+        long deadline = System.nanoTime() + SCAN_BUDGET_NANOS;
+        while (scan.index < side * side && System.nanoTime() < deadline) {
+            long started = System.nanoTime();
+            int i = scan.index / side - half;
+            int j = scan.index % side - half;
+            scan.index++;
+            int x = scan.origin.getX() + i * SCAN_STEP;
+            int z = scan.origin.getZ() + j * SCAN_STEP;
+
+            // Prefilter first, survey second. The survey is fifty height queries and the
+            // prefilter is four noise samples, so asking in this order is what turns a
+            // 28-second command into a few hundred milliseconds of total work: for a cherry
+            // grove it skips 224 sites out of 225 before spending anything.
+            if (MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler, sea, x, z)) {
+                MazeStructure.Site s = MazeStructure.surveyFloor(gen, world, noise, x, z,
+                        scan.size, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                var biome = gen.getBiomeSource().getBiome(BiomeCoords.fromBlock(x),
+                        BiomeCoords.fromBlock(s.floorY()), BiomeCoords.fromBlock(z), sampler);
+                if (scan.structure.getValidBiomes().contains(biome)) {
+                    scan.inBiome++;
+                    // Kept paired, one entry per site: the decision tables ask about relief AND
+                    // water of the SAME site, so separately sorted lists would answer a
+                    // question nobody asked.
+                    scan.found.add(new int[]{s.relief(), s.water(), s.wet()});
+                    if (s.water() > MazeStructure.maxWaterDepth()) scan.wetRefusals++;
+                }
+            }
+            scan.nanos += System.nanoTime() - started;
+        }
+        if (scan.index >= side * side) {
+            running = null;
+            try {
+                reportScan(scan);
+            } catch (Exception e) {
+                MazeCraft.LOGGER.warn("[MazeCraft] scan finished but could not be reported", e);
+            }
+        }
+    }
+
+    private static void reportScan(Scan scan) {
+        ServerCommandSource src = scan.src;
+        MazeSize size = scan.size;
+        java.util.List<int[]> found = scan.found;
+        int matched = scan.inBiome;
+        int wetRefusals = scan.wetRefusals;
+        long ms = scan.nanos / 1_000_000L;
+        String id = scan.id;
+
+        int sites = SCAN_SIDE * SCAN_SIDE;
+        int blocks = (SCAN_SIDE - 1) * SCAN_STEP;
+        src.sendFeedback(() -> Text.literal("=== scan " + id + ": " + sites + " sites over "
+                + blocks + " blocks, " + ms + " ms of work ===").formatted(Formatting.LIGHT_PURPLE), false);
+        src.sendFeedback(() -> Text.literal("biome   " + matched + " of " + sites
+                + " in this style's biomes").formatted(Formatting.GRAY), false);
+        if (matched == 0) {
+            src.sendFeedback(() -> Text.literal("No site here is in the right biome - the style "
+                    + "is limited by where its biome is, not by the terrain rules.")
+                    .formatted(Formatting.GOLD), false);
+            return;
+        }
+
+        // Percentiles over copies, so the paired list keeps its pairing.
+        int[] reliefs = found.stream().mapToInt(p -> p[0]).sorted().toArray();
+        int[] waters = found.stream().mapToInt(p -> p[1]).sorted().toArray();
+        src.sendFeedback(() -> Text.literal("relief  min " + reliefs[0]
+                        + ", p25 " + reliefs[reliefs.length / 4]
+                        + ", median " + reliefs[reliefs.length / 2])
+                .formatted(Formatting.GRAY), false);
+        int[] wets = found.stream().mapToInt(p -> p[2]).sorted().toArray();
+        int refused = wetRefusals;
+        src.sendFeedback(() -> Text.literal("water   depth median " + waters[waters.length / 2]
+                        + ", deepest " + waters[waters.length - 1]
+                        + "; wet samples median " + wets[wets.length / 2] + " of 25"
+                        + "; " + refused + " site(s) refused on water")
+                .formatted(Formatting.GRAY), false);
+
+        // Three decision tables, one per knob, each holding the other two rules as they are.
+        // Which knob to turn is the whole question: a cherry grove is refused for relief and a
+        // swamp for water, so one table would have answered half of it.
+        //
+        // The wet-samples table exists because depth may simply be the wrong discriminator for
+        // a swamp. A site with twenty-four dry samples and one seven-deep pond in a corner is
+        // perfectly buildable - the foundation fills it - while a site wet right across is a
+        // lake. Counting wet samples separates those two; a depth cap cannot.
+        src.sendFeedback(() -> Text.literal(table("relief  ", found, matched,
+                new int[]{size.maxRelief(), 12, 14, 16, 18, 20},
+                (site, t) -> site[0] <= t
+                        && site[1] <= MazeStructure.maxWaterDepth())).formatted(Formatting.GOLD), false);
+        src.sendFeedback(() -> Text.literal(table("depth   ", found, matched,
+                new int[]{MazeStructure.maxWaterDepth(), 4, 6, 8, 12},
+                (site, t) -> site[0] <= size.maxRelief()
+                        && site[1] <= t)).formatted(Formatting.GOLD), false);
+        // ASCII: these lines get pasted out of the client log, where a Windows code page
+        // turns anything else into mojibake.
+        src.sendFeedback(() -> Text.literal(table("wet max ", found, matched,
+                new int[]{0, 4, 8, 12, 18, 25},
+                (site, t) -> site[0] <= size.maxRelief()
+                        && site[2] <= t)).formatted(Formatting.GOLD), false);
+    }
+
+    /** One decision row: how many of the surveyed sites each candidate value would admit. */
+    private interface Rule {
+        boolean accepts(int[] site, int value);
+    }
+
+    private static String table(String label, java.util.List<int[]> sites, int total,
+                                int[] values, Rule rule) {
+        StringBuilder out = new StringBuilder(label);
+        for (int value : values) {
+            int pass = 0;
+            for (int[] site : sites) {
+                if (rule.accepts(site, value)) pass++;
+            }
+            out.append("  ").append(value).append(": ").append(pass * 100 / total).append('%');
+        }
+        return out.toString();
     }
 
     private static int onInfo(CommandContext<ServerCommandSource> ctx) {

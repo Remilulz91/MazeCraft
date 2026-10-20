@@ -58,8 +58,8 @@ public class AriadneThreadItem extends Item {
      */
     private static final int LOCATE_RADIUS = 3;
 
-    /** Blocks one search reaches ({@code spacing} is 40 chunks on every maze set). */
-    private static final int REACH = StructureSearch.reach(LOCATE_RADIUS, 40);
+    // The reach is read from the tag's own spread grids at call time: the 48 maze sets are
+    // spaced 24, 32 and 40 chunks apart depending on size, not 40 across the board.
 
     private static final TagKey<Structure> MAZES = TagKey.of(RegistryKeys.STRUCTURE, Identifier.of("mazecraft", "mazes"));
 
@@ -138,7 +138,8 @@ public class AriadneThreadItem extends Item {
         BlockPos from = player.getBlockPos();
         BlockPos found = StructureSearch.locate(world, MAZES, from, LOCATE_RADIUS, "any maze");
         if (found != null && solved.isSolved(new net.minecraft.util.math.ChunkPos(found).toLong())) {
-            found = StructureSearch.locate(world, MAZES, from.add(REACH, 0, 0), LOCATE_RADIUS, "any maze");
+            int reach = StructureSearch.reach(world, MAZES, LOCATE_RADIUS);
+            found = StructureSearch.locate(world, MAZES, from.add(reach, 0, 0), LOCATE_RADIUS, "any maze");
             if (found != null && solved.isSolved(new net.minecraft.util.math.ChunkPos(found).toLong())) {
                 found = null;
             }

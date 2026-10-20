@@ -59,9 +59,6 @@ public class AriadneCompassItem extends Item {
      */
     private static final int SEARCH_RADIUS = 12;
 
-    /** Blocks one sweep reaches from its own origin. */
-    private static final int SWEEP_REACH = StructureSearch.reach(SEARCH_RADIUS, 40);
-
     /** Cooldown between two searches: locating a structure is expensive for the server. */
     private static final int COOLDOWN = 100;
 
@@ -200,9 +197,13 @@ public class AriadneCompassItem extends Item {
 
         int sweep = StructureSearch.storedSweep(stack, SWEEP_KEY);
         BlockPos here = user.getBlockPos();
-        BlockPos found = StructureSearch.locate(serverWorld,
-                TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id(current.tag())),
-                StructureSearch.sweepOrigin(here, sweep, SWEEP_REACH),
+        TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id(current.tag()));
+        // The reach is read from this step's own spread grid, which is 24 chunks for a small
+        // maze and 40 for a large one. Assuming one value for all four was what put the ring
+        // of sweeps beyond the ground they were supposed to border.
+        int reach = StructureSearch.reach(serverWorld, tag, SEARCH_RADIUS);
+        BlockPos found = StructureSearch.locate(serverWorld, tag,
+                StructureSearch.sweepOrigin(here, sweep, reach),
                 SEARCH_RADIUS, current.tag());
 
         // A maze somebody already emptied is not a place to send anyone — but it is still worth

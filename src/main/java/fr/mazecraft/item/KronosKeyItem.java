@@ -63,9 +63,6 @@ public class KronosKeyItem extends Item {
      */
     private static final int SEARCH_RADIUS = 4;
 
-    /** Blocks one sweep reaches ({@code spacing} is 200 chunks on the Kronos set). */
-    private static final int SWEEP_REACH = StructureSearch.reach(SEARCH_RADIUS, 200);
-
     private static final int COOLDOWN = 100;
 
     private static final String OWNER_KEY = "KronosOwner";
@@ -185,7 +182,8 @@ public class KronosKeyItem extends Item {
         TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id("kronos"));
         int sweep = StructureSearch.storedSweep(stack, SWEEP_KEY);
         BlockPos found = StructureSearch.locate(serverWorld, tag,
-                StructureSearch.sweepOrigin(user.getBlockPos(), sweep, SWEEP_REACH),
+                StructureSearch.sweepOrigin(user.getBlockPos(), sweep,
+                        StructureSearch.reach(serverWorld, tag, SEARCH_RADIUS)),
                 SEARCH_RADIUS, "kronos");
         if (found == null) {
             // One sweep per use, so a miss is not an answer yet — it is a reason to look at the
