@@ -2,6 +2,46 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.9] — 2026-10-20
+
+### Changed
+- **Cherry grove mazes are placed on a grid twice as tight** (spacing 24/32/40 chunks becomes
+  12/16/20, separations 6/9/11). A scan of 12 311 sites found one in 205 inside a cherry
+  grove, and only 3 % of those flat enough to build on — against 9 % for a hedge maze in a
+  biome covering a quarter of the map. A cherry maze was roughly ninety times rarer than a
+  hedge one, and the ladder needs all sixteen styles to yield the Key of Kronos. A tighter
+  grid does not change how often a given spot qualifies; it changes how often one is tried,
+  so a cherry grove walked into now stands a far better chance of holding a maze. The
+  separations were set against each size's real footprint, so two cherry mazes still cannot
+  land on each other.
+
+### Added
+- `/maze debug placement <style> <size> scan` walks outward until it has found **60 sites of
+  the style's biome**, instead of covering a fixed square. Biomes differ in size by two orders
+  of magnitude: the fixed square gave 55 usable samples in a forest and <b>one</b> in a cherry
+  grove, and one sample is not a distribution — it is what sent this release looking at the
+  wrong knob in the first place.
+
+### Notes
+- **The relief tolerance was raised for cherry grove during this release, and reverted before
+  it shipped.** Four extra blocks, capped below the figure 0.8.0 had already rejected, checked
+  two independent ways: the height of the exposed cut face, and its steepness relative to the
+  platform. Both said it was safe. Built in game, a small cherry maze on a hillside came out
+  as a slab of ground hanging in the air.
+  Both checks were blind to the same thing. The terrain survey samples out to the maze's own
+  half-span, the build lays its flattened ring eight blocks further out again, and the
+  foundation fills only twelve blocks downward — so on terraced ground all twenty-five
+  samples can land on terrace tops, report a modest relief, and miss the cliff that starts
+  past the last of them. Raising the tolerance does not buy steeper mazes, it buys floating
+  ones, and it would do so in every style. The number stays where it was.
+- **Mazes on steep ground can therefore overhang, in any style.** It is smaller than what that
+  experiment produced, but the mechanism is there whenever a site is accepted near the
+  tolerance. Fixing it means surveying the footprint that actually gets built, ring included,
+  which makes the test stricter for every style at once — so it will be measured before it is
+  changed, not after.
+- Cherry grove stays the rare style, and water is still refused outright: no maze stands in
+  water.
+
 ## [1.0.0-alpha.8] — 2026-10-20
 
 ### Fixed

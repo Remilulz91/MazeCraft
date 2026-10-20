@@ -149,13 +149,15 @@ public class DebugCommand {
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
         MazeStructure.Site verdict = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, size.maxRelief(), MazeStructure.maxWaterDepth());
+                at.getX(), at.getZ(), size, MazeStructure.reliefAllowance(size),
+                MazeStructure.maxWaterDepth());
         MazeStructure.Site truth = MazeStructure.surveyFloor(gen, world, noise,
                 at.getX(), at.getZ(), size, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
 
+        int allowed = MazeStructure.reliefAllowance(size);
         src.sendFeedback(() -> Text.literal("relief  " + truth.relief()
-                        + " across the footprint, allowed " + size.maxRelief())
-                .formatted(truth.relief() <= size.maxRelief() ? Formatting.GREEN : Formatting.RED), false);
+                        + " across the footprint, allowed " + allowed)
+                .formatted(truth.relief() <= allowed ? Formatting.GREEN : Formatting.RED), false);
         src.sendFeedback(() -> Text.literal("water   " + truth.water()
                         + " deep at worst, allowed " + MazeStructure.maxWaterDepth()
                         + "  (" + truth.wet() + " of 25 samples wet)")
@@ -175,9 +177,6 @@ public class DebugCommand {
                 .formatted(biomeOk && verdict.ok() ? Formatting.GOLD : Formatting.GRAY), false);
         return 1;
     }
-
-    /** Sites sampled by a scan, on a side; 15 × 15 = 225 of them. */
-    private static final int SCAN_SIDE = 15;
 
     /** Blocks between two sampled sites: wide enough that 225 of them cover a real landscape. */
     private static final int SCAN_STEP = 80;
@@ -221,8 +220,9 @@ public class DebugCommand {
             return 0;
         }
         running = new Scan(src, world, structure, size, id, player.getBlockPos());
-        src.sendFeedback(() -> Text.literal("scanning " + id + ": " + (SCAN_SIDE * SCAN_SIDE)
-                        + " sites, a slice per tick - the result follows in a moment")
+        src.sendFeedback(() -> Text.literal("scanning " + id + ": walking outward until "
+                        + SCAN_TARGET + " sites of its biome are found, a slice per tick"
+                        + " - this can take a minute for a small biome")
                 .formatted(Formatting.GRAY), false);
         return 1;
     }
@@ -241,6 +241,21 @@ public class DebugCommand {
      */
     private static final long SCAN_BUDGET_NANOS = 20_000_000L;
 
+    /**
+     * In-biome sites a scan tries to collect before it reports.
+     *
+     * <p>A target, not a grid size, because the thing being measured is the <em>terrain of a
+     * style's biome</em> and biomes differ in size by two orders of magnitude. A fixed
+     * 225-site square gave 55 usable samples in a forest and <b>one</b> in a cherry grove, and
+     * one sample is what sent me looking at the relief tolerance for a style whose real
+     * problem is that its biome is tiny. The scan now walks outward until it has enough to
+     * speak, or until it has looked far enough to conclude there is nothing to find.</p>
+     */
+    private static final int SCAN_TARGET = 60;
+
+    /** Hard stop: sites examined, whether or not the target was reached. */
+    private static final int SCAN_MAX_SITES = 40_000;
+
     private static final class Scan {
         final ServerCommandSource src;
         final ServerWorld world;
@@ -249,10 +264,31 @@ public class DebugCommand {
         final String id;
         final BlockPos origin;
         final java.util.List<int[]> found = new java.util.ArrayList<>();
-        int index;
+        final java.util.ArrayDeque<int[]> pending = new java.util.ArrayDeque<>();
+        int ring = -1;
+        int examined;
         int inBiome;
         int wetRefusals;
         long nanos;
+
+        /** True while there is still ground worth looking at. */
+        boolean wants() {
+            return found.size() < SCAN_TARGET && examined < SCAN_MAX_SITES;
+        }
+
+        /** Queues the next square ring of sites outward from the player. */
+        void nextRing() {
+            ring++;
+            if (ring == 0) {
+                pending.add(new int[]{0, 0});
+                return;
+            }
+            for (int i = -ring; i <= ring; i++) {
+                for (int j = -ring; j <= ring; j++) {
+                    if (Math.max(Math.abs(i), Math.abs(j)) == ring) pending.add(new int[]{i, j});
+                }
+            }
+        }
 
         Scan(ServerCommandSource src, ServerWorld world, Structure structure, MazeSize size,
              String id, BlockPos origin) {
@@ -279,17 +315,14 @@ public class DebugCommand {
         // and worldgen does not ask the world either.
         var sampler = noise.getMultiNoiseSampler();
         int sea = gen.getSeaLevel();
-        int side = SCAN_SIDE;
-        int half = side / 2;
-
         long deadline = System.nanoTime() + SCAN_BUDGET_NANOS;
-        while (scan.index < side * side && System.nanoTime() < deadline) {
+        while (scan.wants() && System.nanoTime() < deadline) {
+            if (scan.pending.isEmpty()) scan.nextRing();
             long started = System.nanoTime();
-            int i = scan.index / side - half;
-            int j = scan.index % side - half;
-            scan.index++;
-            int x = scan.origin.getX() + i * SCAN_STEP;
-            int z = scan.origin.getZ() + j * SCAN_STEP;
+            int[] cell = scan.pending.poll();
+            scan.examined++;
+            int x = scan.origin.getX() + cell[0] * SCAN_STEP;
+            int z = scan.origin.getZ() + cell[1] * SCAN_STEP;
 
             // Prefilter first, survey second. The survey is fifty height queries and the
             // prefilter is four noise samples, so asking in this order is what turns a
@@ -311,7 +344,7 @@ public class DebugCommand {
             }
             scan.nanos += System.nanoTime() - started;
         }
-        if (scan.index >= side * side) {
+        if (!scan.wants()) {
             running = null;
             try {
                 reportScan(scan);
@@ -330,12 +363,13 @@ public class DebugCommand {
         long ms = scan.nanos / 1_000_000L;
         String id = scan.id;
 
-        int sites = SCAN_SIDE * SCAN_SIDE;
-        int blocks = (SCAN_SIDE - 1) * SCAN_STEP;
-        src.sendFeedback(() -> Text.literal("=== scan " + id + ": " + sites + " sites over "
+        int sites = scan.examined;
+        int blocks = scan.ring * SCAN_STEP;
+        src.sendFeedback(() -> Text.literal("=== scan " + id + ": " + sites + " sites out to "
                 + blocks + " blocks, " + ms + " ms of work ===").formatted(Formatting.LIGHT_PURPLE), false);
         src.sendFeedback(() -> Text.literal("biome   " + matched + " of " + sites
-                + " in this style's biomes").formatted(Formatting.GRAY), false);
+                + " in this style's biomes (1 in " + (matched == 0 ? sites : sites / matched) + ")")
+                .formatted(Formatting.GRAY), false);
         if (matched == 0) {
             src.sendFeedback(() -> Text.literal("No site here is in the right biome - the style "
                     + "is limited by where its biome is, not by the terrain rules.")
@@ -366,19 +400,20 @@ public class DebugCommand {
         // a swamp. A site with twenty-four dry samples and one seven-deep pond in a corner is
         // perfectly buildable - the foundation fills it - while a site wet right across is a
         // lake. Counting wet samples separates those two; a depth cap cannot.
+        int allowed = MazeStructure.reliefAllowance(size);
         src.sendFeedback(() -> Text.literal(table("relief  ", found, matched,
-                new int[]{size.maxRelief(), 12, 14, 16, 18, 20},
+                new int[]{allowed, 12, 14, 16, 18, 20},
                 (site, t) -> site[0] <= t
                         && site[1] <= MazeStructure.maxWaterDepth())).formatted(Formatting.GOLD), false);
         src.sendFeedback(() -> Text.literal(table("depth   ", found, matched,
                 new int[]{MazeStructure.maxWaterDepth(), 4, 6, 8, 12},
-                (site, t) -> site[0] <= size.maxRelief()
+                (site, t) -> site[0] <= allowed
                         && site[1] <= t)).formatted(Formatting.GOLD), false);
         // ASCII: these lines get pasted out of the client log, where a Windows code page
         // turns anything else into mojibake.
         src.sendFeedback(() -> Text.literal(table("wet max ", found, matched,
                 new int[]{0, 4, 8, 12, 18, 25},
-                (site, t) -> site[0] <= size.maxRelief()
+                (site, t) -> site[0] <= allowed
                         && site[2] <= t)).formatted(Formatting.GOLD), false);
     }
 

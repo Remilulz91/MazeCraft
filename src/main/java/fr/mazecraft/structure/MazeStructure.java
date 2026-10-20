@@ -238,9 +238,47 @@ public class MazeStructure extends Structure {
     /** The worldgen view of {@link #surveyFloor}: the floor Y, or empty when the site is refused. */
     private static OptionalInt findFloorY(Context context, int centerX, int centerZ, MazeSize size) {
         Site site = surveyFloor(context.chunkGenerator(), context.world(), context.noiseConfig(),
-                centerX, centerZ, size, size.maxRelief(), MAX_WATER_DEPTH);
+                centerX, centerZ, size, reliefAllowance(size), MAX_WATER_DEPTH);
         return site.ok() ? OptionalInt.of(site.floorY()) : OptionalInt.empty();
     }
+
+    /**
+     * Hillside a maze of this size may cut, in blocks.
+     *
+     * <p>Public because {@code /maze debug placement} must report the rule the game uses, not
+     * a second copy of it that agrees today. It does not vary by style, and 1.0.0-alpha.9 is
+     * the release that established it should not.</p>
+     *
+     * <p>Cherry grove mazes are roughly ninety times rarer than hedge ones — one site in 205
+     * is in the biome and only 3 % of those are flat enough — so the tolerance was raised for
+     * that style alone, by four blocks, capped below the figure 0.8.0 had rejected. Two
+     * independent checks said it was safe: the height of the exposed cut face, and its
+     * steepness relative to the platform. Built in game it produced a slab of ground
+     * <b>hanging in the air</b> off the side of a hill.</p>
+     *
+     * <p>Both checks were blind to the same thing. {@link #surveyFloor} samples the terrain out
+     * to the maze's own half-span, while the build lays its flattened ring {@code margin}
+     * blocks further out again, and the foundation fills only
+     * {@code MazePiece.FOUNDATION_DEPTH} blocks downward. On terraced ground all twenty-five
+     * samples can land on terrace tops, report a modest relief, and miss the cliff that starts
+     * just past the last of them. Raising this does not buy steeper mazes; it buys floating
+     * ones, in every style. Until the survey covers the footprint that actually gets built,
+     * this number is not the knob it looks like.</p>
+     */
+    public static int reliefAllowance(MazeSize size) {
+        return Math.min(size.maxRelief(), MAX_RELIEF);
+    }
+
+    /**
+     * The tallest cut face allowed anywhere, whatever the style asks for.
+     *
+     * <p>16, because 0.8.0 tried 18 on large mazes and it "cuts a hillside into a visible
+     * escarpment" — that sentence is about the absolute height of the exposed face, which is
+     * what the eye reads, and 16 is the figure colossal mazes already use without complaint.
+     * A per-style bonus can make a style more tolerant; it cannot push the mod past a limit
+     * that was set by looking at the result in game.</p>
+     */
+    public static final int MAX_RELIEF = 16;
 
     /**
      * What a terrain survey found, and which test refused the site.
