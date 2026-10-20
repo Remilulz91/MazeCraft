@@ -12,6 +12,8 @@ import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.mob.VindicatorEntity;
 import net.minecraft.entity.mob.ZombieEntity;
 import net.minecraft.item.Item;
+import net.minecraft.component.DataComponentTypes;
+import net.minecraft.component.type.UnbreakableComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.server.world.ServerWorld;
@@ -92,8 +94,8 @@ public final class MazeEnemies {
             equip(mob, tier);
         } else if (wearsArmor(mob)) {
             // No armor, but always a helmet: zombies / skeletons must not burn in daylight
-            mob.equipStack(EquipmentSlot.HEAD, new ItemStack(Items.LEATHER_HELMET));
-            mob.setEquipmentDropChance(EquipmentSlot.HEAD, 0.05f);
+            mob.equipStack(EquipmentSlot.HEAD, sunproof(new ItemStack(Items.LEATHER_HELMET)));
+            mob.setEquipmentDropChance(EquipmentSlot.HEAD, 0.0f);
         }
         if (persistent) mob.setPersistent();
         world.spawnEntityAndPassengers(mob);
@@ -114,9 +116,32 @@ public final class MazeEnemies {
         };
         EquipmentSlot[] slots = {EquipmentSlot.HEAD, EquipmentSlot.CHEST, EquipmentSlot.LEGS, EquipmentSlot.FEET};
         for (int i = 0; i < 4; i++) {
-            mob.equipStack(slots[i], new ItemStack(set[i]));
-            mob.setEquipmentDropChance(slots[i], 0.05f); // rare drop: no free armor farm
+            ItemStack piece = new ItemStack(set[i]);
+            mob.equipStack(slots[i], i == 0 ? sunproof(piece) : piece);
+            // Rare drop, so no free armour farm — and never for the helmet, which is
+            // unbreakable: survival has no other source of unbreakable gear and a maze
+            // should not become one.
+            mob.setEquipmentDropChance(slots[i], i == 0 ? 0.0f : 0.05f);
         }
+    }
+
+    /**
+     * Makes a helmet unbreakable, so its wearer keeps it.
+     *
+     * <p>The helmet was always there to stop a zombie or a skeleton burning at noon, and it
+     * worked — for a while. A helmet worn in sunlight takes durability damage every few
+     * seconds; when it finally breaks, vanilla strips the slot and the mob goes up in flames.
+     * A maze is a day-long walk, so by the afternoon the corridors were full of burning mobs
+     * and the daylight guard had quietly expired.</p>
+     *
+     * <p>Unbreakable rather than fire-resistant: the mob should still be killable by fire the
+     * player sets, it just should not spontaneously ignite because the sun found it through a
+     * hedge. Every helmet this touches has its drop chance set to zero: survival has no other
+     * source of unbreakable gear, and a maze must not become one.</p>
+     */
+    private static ItemStack sunproof(ItemStack helmet) {
+        helmet.set(DataComponentTypes.UNBREAKABLE, new UnbreakableComponent(false));
+        return helmet;
     }
 
     /** Turns a freshly spawned mob into a champion: name, extra health, enchanted gear (scaled by maze size). */
@@ -144,8 +169,9 @@ public final class MazeEnemies {
             for (int i = 0; i < slots.length; i++) {
                 ItemStack stack = net.minecraft.enchantment.EnchantmentHelper.enchant(
                         random, new ItemStack(items[i]), size.championEnchantLevel(), world.getRegistryManager(), Optional.empty());
-                mob.equipStack(slots[i], stack);
-                mob.setEquipmentDropChance(slots[i], 0.25f);
+                boolean head = slots[i] == EquipmentSlot.HEAD;
+                mob.equipStack(slots[i], head ? sunproof(stack) : stack);
+                mob.setEquipmentDropChance(slots[i], head ? 0.0f : 0.25f);
             }
         }
     }

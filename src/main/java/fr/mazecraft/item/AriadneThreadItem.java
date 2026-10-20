@@ -43,8 +43,23 @@ public class AriadneThreadItem extends Item {
     private static final int COOLDOWN_TICKS = 100;
     /** Blocks of path shown inside a maze. */
     private static final int PATH_SHOWN = 48;
-    /** Search radius for the nearest maze (chunks). Same order as explorer maps. */
-    private static final int LOCATE_RADIUS = 64;
+    /**
+     * Search radius for the nearest maze, in rings of each structure set's spread grid — not in
+     * chunks, which is how this was read until a dedicated server died of it twice. See
+     * {@link StructureSearch}.
+     *
+     * <p>The thread searches the {@code #mazecraft:mazes} tag, which holds <b>48</b> structures
+     * with a spread grid each, so the rings are walked once per set. At 64 that was 48 × 16,641
+     * candidate sites inside one tick — worse than the compass, which is the one that actually
+     * crashed. At 3 it is 48 × 49, and the reach is still 1,920 blocks: the thread looks for
+     * <em>any</em> maze, and with 48 sets spaced 40 chunks apart there is nearly always one
+     * inside that. Reaching further is the compass's job, and the compass has the sweep
+     * counter for it.</p>
+     */
+    private static final int LOCATE_RADIUS = 3;
+
+    /** Blocks one search reaches ({@code spacing} is 40 chunks on every maze set). */
+    private static final int REACH = StructureSearch.reach(LOCATE_RADIUS, 40);
 
     private static final TagKey<Structure> MAZES = TagKey.of(RegistryKeys.STRUCTURE, Identifier.of("mazecraft", "mazes"));
 
@@ -112,7 +127,22 @@ public class AriadneThreadItem extends Item {
 
     /** Outside: point toward the nearest maze of this dimension. */
     private boolean towardMaze(ServerWorld world, ServerPlayerEntity player) {
-        BlockPos found = world.locateStructure(MAZES, player.getBlockPos(), LOCATE_RADIUS, false);
+        // Walk past the ones already emptied, the same way the compass does: the nearest maze
+        // on a server is often one somebody else has finished, and sending a player on a long
+        // walk to an open chest is worse than telling them there is nothing nearby.
+        //
+        // Two calls at most, and the second one only when the first landed on a conquered maze.
+        // Walking further than that is the compass's job: it has a sweep counter for exactly
+        // this, and the thread is the short-range item of the two.
+        MazeState solved = MazeState.get(world);
+        BlockPos from = player.getBlockPos();
+        BlockPos found = StructureSearch.locate(world, MAZES, from, LOCATE_RADIUS, "any maze");
+        if (found != null && solved.isSolved(new net.minecraft.util.math.ChunkPos(found).toLong())) {
+            found = StructureSearch.locate(world, MAZES, from.add(REACH, 0, 0), LOCATE_RADIUS, "any maze");
+            if (found != null && solved.isSolved(new net.minecraft.util.math.ChunkPos(found).toLong())) {
+                found = null;
+            }
+        }
         if (found == null) {
             player.sendMessage(Text.translatable("mazecraft.thread.none").formatted(Formatting.GRAY), true);
             return false;

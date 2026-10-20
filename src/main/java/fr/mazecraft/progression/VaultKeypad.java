@@ -121,7 +121,7 @@ public final class VaultKeypad {
         // message and no clue — which is indistinguishable, from the player's side, from the
         // keypad being broken.
         if (MazeCraft.isDebugBuild()) {
-            MazeCraft.LOGGER.info("[MazeCraft] keypad press key={} at {} by the {} path — maze: {}",
+            MazeCraft.LOGGER.info("[MazeCraft] keypad press key={} at {} by the {} path, maze: {}",
                     key, pos.toShortString(), path,
                     found != null ? "natural" : piece != null ? "placed" : "NONE");
         }

@@ -2,6 +2,7 @@ package fr.mazecraft.item;
 
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.progression.MazeProgress;
+import fr.mazecraft.protection.MazeState;
 import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazeStyle;
 import net.minecraft.component.DataComponentTypes;
@@ -23,6 +24,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.Hand;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.minecraft.world.gen.structure.Structure;
@@ -48,13 +50,28 @@ import java.util.List;
  */
 public class AriadneCompassItem extends Item {
 
-    /** Search radius, in chunks — the same as vanilla {@code /locate}. */
-    private static final int SEARCH_RADIUS = 100;
+    /**
+     * Radius of ONE sweep, in rings of the structure set's spread grid — not in chunks. See
+     * {@link StructureSearch} for why that distinction cost two servers.
+     *
+     * <p>12 rings of a maze set's 40-chunk spacing is 625 candidate sites and 7,680 blocks,
+     * which is a sweep a tick can afford. It replaces 100, which was 40,401 sites.</p>
+     */
+    private static final int SEARCH_RADIUS = 12;
+
+    /** Blocks one sweep reaches from its own origin. */
+    private static final int SWEEP_REACH = StructureSearch.reach(SEARCH_RADIUS, 40);
 
     /** Cooldown between two searches: locating a structure is expensive for the server. */
     private static final int COOLDOWN = 100;
 
     private static final String TARGET_KEY = "MazeTarget";
+
+    /** Which sweep the next use runs, stored on the stack so the search can be resumed. */
+    private static final String SWEEP_KEY = "MazeSweep";
+
+    /** A maze found but already conquered, kept in case the whole search turns up nothing else. */
+    private static final String CLEARED_KEY = "MazeCleared";
 
     public AriadneCompassItem(Settings settings) {
         super(settings);
@@ -105,11 +122,36 @@ public class AriadneCompassItem extends Item {
         return data == null ? "" : data.copyNbt().getString(TARGET_KEY);
     }
 
+    /** Sets the target, and starts its search over whenever the target actually changed. */
     private static void store(ItemStack stack, Target target) {
+        if (target.key().equals(storedKey(stack))) return;
         NbtCompound nbt = new NbtCompound();
         nbt.putString(TARGET_KEY, target.key());
-        stack.apply(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT,
-                current -> NbtComponent.of(merge(current.copyNbt(), nbt)));
+        nbt.putInt(SWEEP_KEY, 0);
+        stack.apply(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT, current -> {
+            NbtCompound base = current.copyNbt();
+            base.remove(CLEARED_KEY);
+            return NbtComponent.of(merge(base, nbt));
+        });
+    }
+
+    private static BlockPos storedCleared(ItemStack stack) {
+        NbtComponent data = stack.get(DataComponentTypes.CUSTOM_DATA);
+        if (data == null) return null;
+        NbtCompound nbt = data.copyNbt();
+        return nbt.contains(CLEARED_KEY) ? BlockPos.fromLong(nbt.getLong(CLEARED_KEY)) : null;
+    }
+
+    /** Records where the search stands: which sweep comes next, and the best miss so far. */
+    private static void storeSweep(ItemStack stack, int sweep, BlockPos cleared) {
+        NbtCompound nbt = new NbtCompound();
+        nbt.putInt(SWEEP_KEY, sweep);
+        if (cleared != null) nbt.putLong(CLEARED_KEY, cleared.asLong());
+        stack.apply(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT, current -> {
+            NbtCompound base = current.copyNbt();
+            if (cleared == null) base.remove(CLEARED_KEY);
+            return NbtComponent.of(merge(base, nbt));
+        });
     }
 
     private static NbtCompound merge(NbtCompound base, NbtCompound extra) {
@@ -156,37 +198,69 @@ public class AriadneCompassItem extends Item {
         store(stack, current);
         user.getItemCooldownManager().set(this, COOLDOWN);
 
-        BlockPos found = locate(serverWorld, current, user.getBlockPos());
-        if (found == null) {
-            player.sendMessage(Text.translatable("mazecraft.compass.not_found",
-                    current.label().copy().formatted(Formatting.AQUA)).formatted(Formatting.GRAY), false);
-            world.playSound(null, user.getBlockPos(), SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(),
-                    SoundCategory.PLAYERS, 0.6f, 0.7f);
+        int sweep = StructureSearch.storedSweep(stack, SWEEP_KEY);
+        BlockPos here = user.getBlockPos();
+        BlockPos found = StructureSearch.locate(serverWorld,
+                TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id(current.tag())),
+                StructureSearch.sweepOrigin(here, sweep, SWEEP_REACH),
+                SEARCH_RADIUS, current.tag());
+
+        // A maze somebody already emptied is not a place to send anyone — but it is still worth
+        // remembering, so a world where every one of them is done points somewhere in the end
+        // rather than claiming there is none. The start chunk locateStructure returns is exactly
+        // what MazeState is keyed on, so this costs no chunk load and no structure read.
+        BlockPos cleared = storedCleared(stack);
+        if (found != null && MazeState.get(serverWorld).isSolved(new ChunkPos(found).toLong())) {
+            if (cleared == null) cleared = found;
+            found = null;
+        }
+
+        if (found != null) {
+            storeSweep(stack, 0, null);
+            announce(serverWorld, player, current, found, "mazecraft.compass.found", Formatting.GOLD);
+            world.playSound(null, here, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
+                    SoundCategory.PLAYERS, 0.7f, 1.2f);
             return TypedActionResult.success(stack, false);
         }
 
-        int distance = (int) Math.sqrt(user.getBlockPos().getSquaredDistance(
-                new BlockPos(found.getX(), user.getBlockY(), found.getZ())));
-        player.sendMessage(Text.translatable("mazecraft.compass.found",
-                current.label().copy().formatted(Formatting.AQUA),
-                Text.literal(String.valueOf(distance)).formatted(Formatting.WHITE),
-                Text.literal(String.valueOf(found.getX())).formatted(Formatting.WHITE),
-                Text.literal(String.valueOf(found.getZ())).formatted(Formatting.WHITE))
-                .formatted(Formatting.GOLD), false);
-        world.playSound(null, user.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
-                SoundCategory.PLAYERS, 0.7f, 1.2f);
-        drawBearing(serverWorld, user, found);
+        if (sweep < StructureSearch.LAST_SWEEP) {
+            storeSweep(stack, sweep + 1, cleared);
+            player.sendMessage(Text.translatable("mazecraft.compass.sweeping",
+                    current.label().copy().formatted(Formatting.AQUA),
+                    Text.literal(String.valueOf(sweep + 1)).formatted(Formatting.WHITE),
+                    Text.literal(String.valueOf(StructureSearch.LAST_SWEEP + 1)).formatted(Formatting.WHITE))
+                    .formatted(Formatting.GRAY), false);
+            world.playSound(null, here, SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(),
+                    SoundCategory.PLAYERS, 0.5f, 1.3f);
+            return TypedActionResult.success(stack, false);
+        }
+
+        storeSweep(stack, 0, null);
+        if (cleared != null) {
+            announce(serverWorld, player, current, cleared, "mazecraft.compass.cleared", Formatting.YELLOW);
+            world.playSound(null, here, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME,
+                    SoundCategory.PLAYERS, 0.5f, 0.9f);
+            return TypedActionResult.success(stack, false);
+        }
+        player.sendMessage(Text.translatable("mazecraft.compass.not_found",
+                current.label().copy().formatted(Formatting.AQUA)).formatted(Formatting.GRAY), false);
+        world.playSound(null, here, SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(),
+                SoundCategory.PLAYERS, 0.6f, 0.7f);
         return TypedActionResult.success(stack, false);
     }
 
-    /**
-     * Locates the structure of this exact style and size. Every step has its own structure tag
-     * ({@code #mazecraft:step/<style>_<size>}) holding a single structure, which is what lets a
-     * tag-based lookup target one precise step.
-     */
-    private static BlockPos locate(ServerWorld world, Target target, BlockPos from) {
-        TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id(target.tag()));
-        return world.locateStructure(tag, from, SEARCH_RADIUS, false);
+    private static void announce(ServerWorld world, ServerPlayerEntity player, Target target,
+                                 BlockPos found, String key, Formatting colour) {
+        BlockPos here = player.getBlockPos();
+        int distance = (int) Math.sqrt(here.getSquaredDistance(
+                new BlockPos(found.getX(), here.getY(), found.getZ())));
+        player.sendMessage(Text.translatable(key,
+                target.label().copy().formatted(Formatting.AQUA),
+                Text.literal(String.valueOf(distance)).formatted(Formatting.WHITE),
+                Text.literal(String.valueOf(found.getX())).formatted(Formatting.WHITE),
+                Text.literal(String.valueOf(found.getZ())).formatted(Formatting.WHITE))
+                .formatted(colour), false);
+        drawBearing(world, player, found);
     }
 
     /** A short line of particles from the player toward the maze, so the bearing is readable. */

@@ -2,6 +2,48 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.7] — 2026-10-20
+
+### Fixed
+- **Ariadne's Compass, Ariadne's Thread and the Key of Kronos could kill a dedicated server.**
+  The radius passed to `locateStructure` is not a radius in chunks, which is how all three of
+  them read it. It counts rings on the structure set's own spread grid, so the ground swept is
+  the radius times the set's spacing — 40 chunks for a maze, 200 for Kronos. Vanilla's
+  `/locate` passes 100, which is where the number came from, and at that spacing it means
+  40 401 candidate sites examined inside a single server tick, four times over for the
+  compass's retry loop. A measurement taken on a real server puts one candidate site at about
+  1 ms, nearly all of it vanilla's own synchronous chunk lookup: 154 seconds in one tick,
+  against a watchdog that kills the server at 60. It did, twice. The worst of the three was
+  never the compass but the Key of Kronos, at 160 801 sites per right-click — it had simply
+  never been fired on a server, because nobody had reached the endgame on one yet.
+- **Guardians lost their helmets and burned at dawn.** Their headgear had an ordinary drop
+  chance, so a helmet knocked off in a fight left its wearer bare under the sun and a maze
+  quietly emptied itself by morning. Helmets are unbreakable now, and never drop.
+- **Neither the compass nor the thread sends anyone to a maze that has been conquered.** On a
+  server the nearest maze of a style is often one somebody cleared last week: the chest is
+  open, the champion is dead, and the walk was for nothing. Both items walk past it. If every
+  maze within reach has been done, the compass says so and points at the nearest one anyway,
+  rather than pretending there is none.
+
+### Changed
+- **One use of the compass is one bounded search.** Reach is no longer bought in a single
+  ruinous call: a right-click sweeps 7 680 blocks and remembers on the stack where it stopped,
+  so clicking again looks at fresh ground further out, and nine clicks comb 18 000 blocks. The
+  ring of eight sweeps sits at 1.75 reaches out rather than a natural-looking 2 — measured,
+  not reasoned: at 2 the discs meet at a single point each and leave a hole on all eight
+  bisectors, wide enough for a maze to hide from every one of the nine clicks. The Key of
+  Kronos works the same way at 12 800 blocks a sweep. The thread keeps to one short look,
+  1 920 blocks, since reaching further is the compass's job.
+- **A search that runs long now says so in the log, in milliseconds.** The first server crash
+  arrived with nothing in front of it at all; the second one could at least be measured.
+
+### Notes
+- **Swamp and Cherry Grove mazes are very hard to find**, which matters more than it sounds:
+  the ladder needs all sixteen styles to yield the Key of Kronos. A site is rejected if any of
+  its twenty-five terrain samples stands in water — which a swamp does everywhere — or
+  if the ground varies by more than ten blocks across the footprint, which a cherry grove on a
+  mountain slope does. Both are being looked at for the next release.
+
 ## [1.0.0-alpha.6] — 2026-10-08
 
 ### Added

@@ -133,7 +133,7 @@ public final class StructureAvoidance {
                     if (Math.abs(start.x - center.x) > radius || Math.abs(start.z - center.z) > radius) continue;
                     if (start.equals(center)) continue; // ourselves
                     if (!placement.applyFrequencyReduction(start.x, start.z, seed)) continue;
-                    if (anyStructureFitsBiome(context, set, start)) return true;
+                    if (anyStructureFitsBiome(context, set, start, underground)) return true;
                 }
             }
         }
@@ -179,12 +179,37 @@ public final class StructureAvoidance {
         return best;
     }
 
-    private static boolean anyStructureFitsBiome(Structure.Context context, StructureSet set, ChunkPos start) {
+    /**
+     * Heights at which a biome is sampled, relative to sea level.
+     *
+     * <p>This used to be "sea level, and the real surface" — and the real surface meant a call
+     * to {@code ChunkGenerator.getHeight}, which on a noise generator <b>builds a whole
+     * NoiseChunk</b> to answer. That call sat in the innermost loop of the avoidance check, so
+     * one candidate maze site cost a hundred of them, and a compass search asks about forty
+     * thousand candidate sites. On a dedicated server that is not slow, it is a watchdog kill:
+     * the crash report points straight at {@code anyStructureFitsBiome → getHeight → new
+     * NoiseChunk}, buried under a density-function hash recursion.</p>
+     *
+     * <p>Fixed heights instead. A biome lookup is a noise sample — microseconds, no chunk — and
+     * four of them span the ground a surface structure can stand on, from a swamp at sea level
+     * to a plateau well above it. The trade is honest: this no longer samples the exact terrain
+     * height, so on unusual terrain it can read a biome the structure would not actually have
+     * used. It errs on the side of sampling <em>more</em> biomes than before, and a false match
+     * only makes the maze step aside — it can never put a maze on top of a village.</p>
+     */
+    private static final int[] SAMPLE_OFFSETS = {0, 40, 80, 120};
+
+    /** Extra depth sampled for Kronos, whose neighbours (ancient cities) are far underground. */
+    private static final int DEEP_SAMPLE = -50;
+
+    private static boolean anyStructureFitsBiome(Structure.Context context, StructureSet set,
+                                                 ChunkPos start, boolean underground) {
         int x = start.getCenterX();
         int z = start.getCenterZ();
-        int surface = context.chunkGenerator().getHeight(x, z, Heightmap.Type.WORLD_SURFACE_WG,
-                context.world(), context.noiseConfig());
-        int[] heights = { context.chunkGenerator().getSeaLevel(), surface };
+        int sea = context.chunkGenerator().getSeaLevel();
+        int[] heights = new int[SAMPLE_OFFSETS.length + (underground ? 1 : 0)];
+        for (int i = 0; i < SAMPLE_OFFSETS.length; i++) heights[i] = sea + SAMPLE_OFFSETS[i];
+        if (underground) heights[SAMPLE_OFFSETS.length] = DEEP_SAMPLE;
         for (int y : heights) {
             RegistryEntry<Biome> biome = context.biomeSource().getBiome(
                     BiomeCoords.fromBlock(x), BiomeCoords.fromBlock(y), BiomeCoords.fromBlock(z),

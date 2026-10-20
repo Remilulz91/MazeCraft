@@ -4,6 +4,9 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import fr.mazecraft.MazeCraft;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.biome.Biome;
+import net.minecraft.world.biome.source.BiomeCoords;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.util.math.Direction;
@@ -119,6 +122,15 @@ public class MazeStructure extends Structure {
         // than it saves.
         if (!style.isKronos() && coversWorldSpawn(centerX, centerZ)) return Optional.empty();
 
+        // Wrong biome? Stop here, before anything expensive.
+        //
+        // Vanilla checks a structure's biome AFTER getStructurePosition has returned, which is
+        // fine for a structure that costs one height query to place and ruinous for this one:
+        // every candidate site ran the full avoidance sweep and a 25-point terrain survey, and
+        // was then thrown away because a hedge maze cannot stand in a desert. Fifteen styles
+        // out of sixteen paid in full for an answer that was already known.
+        if (!biomeCouldMatch(context, centerX, centerZ)) return Optional.empty();
+
         // The size is fixed by the structure. It is never downgraded when the terrain is poor:
         // a "medium" structure that quietly generated a small maze would hand the player the
         // wrong progression step. A spot that doesn't fit simply gets no maze.
@@ -180,6 +192,33 @@ public class MazeStructure extends Structure {
     }
 
     /**
+     * Could this style's biome be the one here?
+     *
+     * <p>Sampled at several fixed heights rather than at the terrain surface, for the same
+     * reason {@link StructureAvoidance} does: asking a noise generator for the real surface
+     * height builds an entire NoiseChunk, and the whole point of this check is to be cheap
+     * enough to run before the expensive work.</p>
+     *
+     * <p>Deliberately generous — it says yes if <em>any</em> of the sampled heights matches.
+     * A false yes only costs the work that used to be done unconditionally; a false no would
+     * silently delete a maze site, so the check is built so that the heights it misses are
+     * ones no maze could stand on anyway.</p>
+     */
+    private boolean biomeCouldMatch(Context context, int x, int z) {
+        int sea = context.chunkGenerator().getSeaLevel();
+        int[] heights = style.isKronos()
+                ? new int[]{KRONOS_MIN_FLOOR, KRONOS_MAX_FLOOR, sea}
+                : new int[]{sea, sea + 40, sea + 80, sea + 120};
+        for (int y : heights) {
+            RegistryEntry<Biome> biome = context.biomeSource().getBiome(
+                    BiomeCoords.fromBlock(x), BiomeCoords.fromBlock(y), BiomeCoords.fromBlock(z),
+                    context.noiseConfig().getMultiNoiseSampler());
+            if (getValidBiomes().contains(biome)) return true;
+        }
+        return false;
+    }
+
+    /**
      * Samples the terrain on a 5×5 grid over the footprint. Returns the floor Y, or empty
      * if there is water or more relief than {@link MazeSize#maxRelief()} allows.
      */
@@ -192,18 +231,27 @@ public class MazeStructure extends Structure {
                 int x = centerX + i * half / 2;
                 int z = centerZ + j * half / 2;
                 int surface = gen.getHeight(x, z, Heightmap.Type.WORLD_SURFACE_WG, context.world(), context.noiseConfig());
+                min = Math.min(min, surface);
+                max = Math.max(max, surface);
+                // Bail the moment the ground is too uneven, instead of finishing the survey
+                // and checking afterwards. Same answer, fewer samples — and a sample here is a
+                // getHeight, which on a noise generator builds a whole NoiseChunk. Most sites
+                // are rejected, and a rejected site now costs a handful of them instead of
+                // fifty, which is what makes a compass search survivable on a server.
+                if (max - min > size.maxRelief()) {
+                    return OptionalInt.empty(); // too hilly
+                }
+                // The water test needs a second NoiseChunk, so it waits until the relief test
+                // has had its say: a site rejected for relief — which is most of them — now
+                // costs one height query at the sample that rejected it instead of two. Both
+                // tests answer "no site here", so which one speaks first changes nothing.
                 int ground = gen.getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG, context.world(), context.noiseConfig());
                 if (surface != ground) {
                     return OptionalInt.empty(); // water (lake, river, ocean) in the footprint
                 }
-                min = Math.min(min, surface);
-                max = Math.max(max, surface);
                 sum += surface;
                 n++;
             }
-        }
-        if (max - min > size.maxRelief()) {
-            return OptionalInt.empty(); // too hilly
         }
         // getHeight returns the first air block → the floor replaces the surface block below it
         return OptionalInt.of(Math.round((float) sum / n) - 1);

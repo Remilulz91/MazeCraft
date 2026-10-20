@@ -47,12 +47,31 @@ import java.util.UUID;
  */
 public class KronosKeyItem extends Item {
 
-    /** Search radius, in chunks. Generous: there is one of these in a very large area. */
-    private static final int SEARCH_RADIUS = 200;
+    /**
+     * Radius of ONE sweep, in rings of the Kronos set's spread grid — not in chunks. See
+     * {@link StructureSearch}.
+     *
+     * <p>This was 200, with the comment "generous: there is one of these in a very large area".
+     * It was not generous, it was a loaded gun: the Kronos set is spaced <b>200 chunks</b>
+     * apart, so 200 rings meant 160,801 candidate sites and 640,000 blocks swept inside a
+     * single tick — four times worse than the compass that killed the server twice, in the one
+     * item every player eventually holds. Nobody had reached the endgame on a server yet, which
+     * is the only reason it had not crashed there too.</p>
+     *
+     * <p>4 rings is 81 sites and 12,800 blocks a sweep. Nine sweeps comb 30,000 blocks, which
+     * for a structure this rare is the right reach — bought one affordable tick at a time.</p>
+     */
+    private static final int SEARCH_RADIUS = 4;
+
+    /** Blocks one sweep reaches ({@code spacing} is 200 chunks on the Kronos set). */
+    private static final int SWEEP_REACH = StructureSearch.reach(SEARCH_RADIUS, 200);
 
     private static final int COOLDOWN = 100;
 
     private static final String OWNER_KEY = "KronosOwner";
+
+    /** Which sweep the next use runs, stored on the stack so the search can be resumed. */
+    private static final String SWEEP_KEY = "KronosSweep";
 
     public KronosKeyItem(Settings settings) {
         super(settings);
@@ -164,13 +183,30 @@ public class KronosKeyItem extends Item {
 
         user.getItemCooldownManager().set(this, COOLDOWN);
         TagKey<Structure> tag = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id("kronos"));
-        BlockPos found = serverWorld.locateStructure(tag, user.getBlockPos(), SEARCH_RADIUS, false);
+        int sweep = StructureSearch.storedSweep(stack, SWEEP_KEY);
+        BlockPos found = StructureSearch.locate(serverWorld, tag,
+                StructureSearch.sweepOrigin(user.getBlockPos(), sweep, SWEEP_REACH),
+                SEARCH_RADIUS, "kronos");
         if (found == null) {
+            // One sweep per use, so a miss is not an answer yet — it is a reason to look at the
+            // next patch of ground. Only the ninth miss means there is really nothing here.
+            if (sweep < StructureSearch.LAST_SWEEP) {
+                StructureSearch.storeSweep(stack, SWEEP_KEY, sweep + 1);
+                player.sendMessage(Text.translatable("mazecraft.kronos.sweeping",
+                        Text.literal(String.valueOf(sweep + 1)).formatted(Formatting.WHITE),
+                        Text.literal(String.valueOf(StructureSearch.LAST_SWEEP + 1)).formatted(Formatting.WHITE))
+                        .formatted(Formatting.GRAY), false);
+                world.playSound(null, user.getBlockPos(), SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(),
+                        SoundCategory.PLAYERS, 0.5f, 1.2f);
+                return TypedActionResult.success(stack, false);
+            }
+            StructureSearch.storeSweep(stack, SWEEP_KEY, 0);
             player.sendMessage(Text.translatable("mazecraft.kronos.not_found").formatted(Formatting.GRAY), false);
             world.playSound(null, user.getBlockPos(), SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(),
                     SoundCategory.PLAYERS, 0.6f, 0.6f);
             return TypedActionResult.success(stack, false);
         }
+        StructureSearch.storeSweep(stack, SWEEP_KEY, 0);
 
         int distance = (int) Math.sqrt(user.getBlockPos().getSquaredDistance(
                 new BlockPos(found.getX(), user.getBlockY(), found.getZ())));
