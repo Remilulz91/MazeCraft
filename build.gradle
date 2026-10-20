@@ -111,8 +111,29 @@ publishing {
 // Release channel is derived from the version string: alpha/beta/stable.
 publishMods {
     file = remapJar.archiveFile
+    // Only THIS version's section of the changelog, not the whole file.
+    //
+    // It used to send CHANGELOG.md entire. That is wrong twice over: a Modrinth version's
+    // body should describe that version, and the field is capped at 65 536 characters. The
+    // file crossed the cap at 1.0.0-alpha.9 (65 678) and the publish failed with
+    // "Field version_body failed validation with error: length" - after the GitHub release
+    // had already been created, so the two stores disagreed about what had shipped.
+    def changelogVersion = project.mod_version.toString()
     changelog = providers.fileContents(rootProject.layout.projectDirectory.file("CHANGELOG.md"))
-            .asText.orElse("See CHANGELOG.md")
+            .asText
+            .map { full ->
+                def want = "## [" + changelogVersion + "]"
+                def out = new StringBuilder()
+                boolean inSection = false
+                for (String line : full.readLines()) {
+                    if (line.startsWith(want)) { inSection = true; continue }
+                    if (inSection && line.startsWith("## [")) { break }
+                    if (inSection) { out.append(line).append('\n') }
+                }
+                def section = out.toString().trim()
+                section.isEmpty() ? "See CHANGELOG.md for the full history." : section
+            }
+            .orElse("See CHANGELOG.md")
     modLoaders.add("fabric")
 
     def v = project.mod_version.toString()
@@ -138,5 +159,24 @@ publishMods {
         optional {
             slug = "modmenu"
         }
+    }
+}
+
+/** Prints exactly what will be sent to Modrinth as this version's changelog. */
+tasks.register("printChangelog") {
+    def version = project.mod_version.toString()
+    def file = rootProject.layout.projectDirectory.file("CHANGELOG.md").asFile
+    doLast {
+        def want = "## [" + version + "]"
+        def out = new StringBuilder()
+        boolean inSection = false
+        for (String line : file.readLines("UTF-8")) {
+            if (line.startsWith(want)) { inSection = true; continue }
+            if (inSection && line.startsWith("## [")) { break }
+            if (inSection) { out.append(line).append('\n') }
+        }
+        def section = out.toString().trim()
+        println "--- changelog for " + version + ": " + section.length() + " characters (Modrinth allows 65536) ---"
+        println section
     }
 }
