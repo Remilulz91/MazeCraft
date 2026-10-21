@@ -37,19 +37,46 @@ import net.minecraft.world.gen.structure.Structure;
  */
 public final class StructureSearch {
 
-    /** Last sweep offered: sweep 0 on the item's holder, then a ring of eight around them. */
-    public static final int LAST_SWEEP = 8;
+    /**
+     * Last sweep offered: sweep 0 on the holder, a ring of eight around them, then a ring of
+     * sixteen further out.
+     *
+     * <p>The second ring exists for the rare styles. Measured over three scans from cherry
+     * groves thousands of blocks apart — and they agreed, 1 site in 237, 238 and 249 — a cherry
+     * grove covers about one position in 241 and five percent of those are flat enough, which
+     * puts a cherry maze at 0.022 % of positions against 2 % for a hedge one. Nine sweeps find
+     * one 71 % of the time; three players in ten found nothing, and since the sweep counter
+     * then resets onto the same nine origins, clicking again searched the same ground and was
+     * guaranteed to fail. Twenty-five sweeps take that to 97 %.</p>
+     *
+     * <p>It costs nothing. A sweep examines the same 625 candidate sites whatever ring it sits
+     * on, so the server pays per click exactly what it paid before; the player simply keeps
+     * clicking on a style that is genuinely rare, which is what rare ought to feel like. The
+     * alternative was to loosen the terrain rule for cherry grove, which buys a comparable
+     * improvement but changes the world to do it.</p>
+     */
+    public static final int LAST_SWEEP = 24;
 
     /**
-     * How far out the ring of eight sits, in units of one sweep's own reach.
+     * How far out each ring sits, in units of one sweep's own reach, and how many sweeps it
+     * holds.
      *
-     * <p>1.75, and the value is load-bearing. At 2 the eight discs touch the middle one at a
-     * single point each, which leaves a hole on all eight bisectors starting a hair outside the
-     * middle sweep's rim: a maze sitting in one of those holes is missed by all nine uses. At
-     * 1.75 there is no uncovered point within 2.35 sweeps — measured over the whole disc, not
-     * reasoned about — and nothing past 2.75 sweeps is reached at all.</p>
+     * <p>Both distances are measured over the whole disc rather than reasoned about, because
+     * reasoning got the first one wrong: the obvious value for the inner ring is 2, and at 2
+     * the eight discs touch the middle one at a single point each and leave a hole on all
+     * eight bisectors, starting a hair outside the middle sweep's rim. 1.75 leaves no
+     * uncovered point within 2.35 sweeps.</p>
+     *
+     * <p>The outer ring is 3.1, which carries continuous coverage out to 3.8 sweeps. 3.2
+     * reaches 3.9 and was the first candidate, but its tightest point sits 0.9984 of a sweep
+     * from the nearest origin — a margin of 0.2 %, which is not a margin, it is a coincidence.
+     * 3.1 holds 2.9 % clear for a tenth of a sweep less reach. Past 3.4 the outer discs
+     * detach from the inner ring entirely and the thing has a hole in it again.</p>
      */
-    private static final double RING = 1.75;
+    private static final double RING_1 = 1.75;
+    private static final int RING_1_COUNT = 8;
+    private static final double RING_2 = 3.1;
+    private static final int RING_2_COUNT = 16;
 
     /**
      * Above this, a search goes in the log as a warning whatever the build.
@@ -105,8 +132,18 @@ public final class StructureSearch {
      */
     public static BlockPos sweepOrigin(BlockPos from, int sweep, int reach) {
         if (sweep <= 0) return from;
-        double angle = Math.PI * 2.0 * (sweep - 1) / LAST_SWEEP;
-        double out = reach * RING;
+        double angle;
+        double out;
+        if (sweep <= RING_1_COUNT) {
+            angle = Math.PI * 2.0 * (sweep - 1) / RING_1_COUNT;
+            out = reach * RING_1;
+        } else {
+            // Offset by half a step so the outer origins sit between the inner ones rather
+            // than behind them, which is what closes the gaps on the inner ring's bisectors.
+            angle = Math.PI * 2.0 * (sweep - RING_1_COUNT - 1) / RING_2_COUNT
+                    + Math.PI / RING_2_COUNT;
+            out = reach * RING_2;
+        }
         return new BlockPos(
                 from.getX() + (int) Math.round(Math.cos(angle) * out),
                 from.getY(),
@@ -129,6 +166,17 @@ public final class StructureSearch {
      * <p>The number of candidate sites a sweep examines — and so its cost — depends only on the
      * radius, never on the spacing: 625 chances at radius 12, whatever the size. Only the
      * distance those chances span changes, which is exactly what the ring needs to know.</p>
+     *
+     * <p>This figure is a <b>lower bound</b> on what a sweep really reaches, and deliberately
+     * so. {@code locateStructure} walks concentric <em>square</em> rings of grid cells, so the
+     * ground it covers is a square of this half-width, not a disc of this radius — its corners
+     * extend about 1.4 times further — and a structure sits anywhere inside its cell, which
+     * adds up to one more cell again. The ring geometry below treats each sweep as the disc
+     * inscribed in that square, so every point it calls covered genuinely is, and some it
+     * writes off as out of range are reached anyway. A cherry maze found on sweep 17 sat
+     * slightly beyond the nominal reach of that sweep, which is how this was pinned down.
+     * Erring in this direction is the only safe one: the cost of underestimating is a few
+     * redundant sweeps, the cost of overestimating is a blind ring.</p>
      */
     public static int reach(ServerWorld world, TagKey<Structure> tag, int radius) {
         return radius * spacingOf(world, tag) * 16;

@@ -2,6 +2,34 @@
 
 All notable changes to MazeCraft will be documented in this file.
 
+## [1.0.0-alpha.11] — 2026-10-21
+
+### Changed
+- **Ariadne's Compass sweeps twenty-five times instead of nine**, over two rings instead of
+  one. Three scans launched from cherry groves thousands of blocks apart agreed closely — one
+  position in 237, 238 and 249 is cherry grove, and five to six percent of those are flat
+  enough to build on — which puts a cherry maze at 0.022 % of positions against 2 % for a
+  hedge one. Nine sweeps found one 71 % of the time, and the three players in ten who found
+  nothing were then stuck: the sweep counter reset onto the same nine origins, so clicking
+  again searched identical ground and could only fail. Twenty-five sweeps reach 97 %.
+  It costs nothing. A sweep examines the same 625 candidate sites whichever ring it sits on,
+  so the server pays per click exactly what it paid before; the player simply keeps clicking
+  on a style that really is rare. The Key of Kronos shares the counter and gains the same
+  reach. Compasses already in the world keep their stored sweep.
+- The outer ring sits at **3.1** sweeps out, carrying continuous coverage to 3.8. 3.2 reaches
+  3.9 and was the first candidate, but its tightest point lies 0.9984 of a sweep from the
+  nearest origin: 0.2 % of margin is a coincidence, not a margin. 3.1 holds 2.9 % clear for a
+  tenth of a sweep less reach. Measured over the whole disc, as the inner ring's 1.75 was —
+  the obvious value there was 2, and 2 leaves a hole on all eight bisectors.
+
+### Notes
+- This release changes no placement rule and no generated block. The styles that were hard to
+  find were hard to find because of how the compass searched, not because of where mazes can
+  stand: cherry grove's terrain is accepted about as often as a hedge maze's, and the whole of
+  the gap between them is the size of the biome.
+- Confirmed in game before release: the maze turned up on **sweep 17**, a sweep that did not
+  exist in 1.0.0-alpha.10.
+
 ## [1.0.0-alpha.10] — 2026-10-20
 
 ### Fixed
