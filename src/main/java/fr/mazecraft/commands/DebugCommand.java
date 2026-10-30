@@ -9,7 +9,8 @@ import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.landmark.CherryPagoda;
 import fr.mazecraft.landmark.Landmark;
-import fr.mazecraft.landmark.PagodaPiece;
+import fr.mazecraft.landmark.LandmarkPiece;
+import fr.mazecraft.landmark.LandmarkStair;
 import fr.mazecraft.protection.MazeState;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
@@ -17,7 +18,6 @@ import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazeStructure;
 import fr.mazecraft.structure.MazeTemplates;
 import fr.mazecraft.structure.MazeStyle;
-import fr.mazecraft.structure.PagodaStair;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.world.biome.source.BiomeCoords;
@@ -102,7 +102,7 @@ public class DebugCommand {
                                                 IntegerArgumentType.getInteger(ctx, "lift"))))))
                 .then(CommandManager.literal("shaft")
                         .then(CommandManager.argument("depth", IntegerArgumentType.integer(1,
-                                        PagodaStair.MAX_DEPTH))
+                                        LandmarkStair.MAX_DEPTH))
                                 .executes(DebugCommand::onShaft)))
                 .then(CommandManager.literal("placement")
                         .then(CommandManager.argument("style", StringArgumentType.word())
@@ -996,8 +996,8 @@ public class DebugCommand {
         long seed = world.getRandom().nextLong();
         MazePiece maze = new MazePiece(CherryPagoda.STYLE, size, seed,
                 at.getX(), floorY, at.getZ(), Random.create(seed).nextInt(4));
-        PagodaPiece pagoda = new PagodaPiece(new BlockPos(at.getX(), floorY, at.getZ()),
-                pad.floorY(), floorY, facing);
+        LandmarkPiece pagoda = new LandmarkPiece(landmark,
+                new BlockPos(at.getX(), floorY, at.getZ()), pad.floorY(), floorY, facing);
         // The maze first, then the building: within a chunk generation runs them in this order,
         // and the shaft has to be cut through the roof after the roof exists.
         maze.generate(world, world.getStructureAccessor(), gen, Random.create(seed),
@@ -1145,9 +1145,10 @@ public class DebugCommand {
                     + MazeTemplates.CHERRY_PAGODA.id().getPath() + ".nbt"));
             return 0;
         }
-        int bottom = PagodaStair.GROUND_Y - depth;
-        int levels = PagodaStair.digDown(world, placement, bottom, 0, null);
-        BlockPos pole = PagodaStair.pole(placement, bottom);
+        var descent = CherryPagoda.INSTANCE.descent();
+        int bottom = descent.groundY() - depth;
+        int levels = LandmarkStair.digDown(world, placement, descent, bottom, 0, null);
+        BlockPos pole = LandmarkStair.pole(placement, descent, bottom);
         src.sendFeedback(() -> Text.literal("[DEBUG] pagoda facing " + facing + "; stair carried down "
                         + levels + " levels, foot of the pole at " + pole.getX() + " " + pole.getY()
                         + " " + pole.getZ())

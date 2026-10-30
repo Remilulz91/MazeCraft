@@ -1,6 +1,6 @@
 package fr.mazecraft.protection;
 
-import fr.mazecraft.landmark.PagodaPiece;
+import fr.mazecraft.landmark.LandmarkPiece;
 import fr.mazecraft.structure.MazeFinder;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
@@ -86,16 +86,17 @@ public final class MazeRepair {
      * through it did not. Repairing the siblings here, after the maze and in the children's own
      * order, restores at repair time exactly the invariant generation relies on.</p>
      *
-     * <p>Written as a loop over the children rather than a call to the pagoda, so the fifteen
-     * landmarks still to come need nothing here: a piece that knows how to repair itself is
-     * repaired.</p>
+     * <p>Every landmark is a {@link LandmarkPiece}, so the fifteen buildings still to come need
+     * nothing here. That is the reason they share one class: when this said {@code PagodaPiece}
+     * a second building would have been skipped silently, and a skipped landmark piece is a
+     * staircase deleted.</p>
      */
     private static void repairSiblings(ServerWorld world, MazeFinder.MazeHit hit,
                                        BlockBox chunkBox) {
         for (StructurePiece piece : hit.start().getChildren()) {
-            if (piece instanceof PagodaPiece pagoda
-                    && pagoda.getBoundingBox().intersects(chunkBox)) {
-                pagoda.repairShaft(world, chunkBox);
+            if (piece instanceof LandmarkPiece landmark
+                    && landmark.getBoundingBox().intersects(chunkBox)) {
+                landmark.repairShaft(world, chunkBox);
             }
         }
     }

@@ -2,7 +2,8 @@ package fr.mazecraft.landmark;
 
 import fr.mazecraft.structure.MazeStyle;
 import fr.mazecraft.structure.MazeTemplates;
-import fr.mazecraft.structure.PagodaStair;
+import fr.mazecraft.structure.SlabSpiral;
+import net.minecraft.block.Blocks;
 
 /**
  * The Japanese pagoda of the cherry groves, and the maze under it.
@@ -10,8 +11,11 @@ import fr.mazecraft.structure.PagodaStair;
  * <p>The building is a hand-built template: the maze is a grid whose rules are arithmetic and can
  * be proved, a pagoda is not — architecture is judged by looking at it, which is the one thing
  * the code side of this project cannot do. So it was built in game, saved as a template, and is
- * only placed from here. Its staircase, read out of that template rather than invented, is in
- * {@link PagodaStair}.</p>
+ * only placed from here.</p>
+
+ * <p>Its staircase was read out of that template rather than invented, and then turned out not
+ * to need reading: {@link #DESCENT} states it as a direction and a phase, and {@link SlabSpiral}
+ * shows that those two numbers reproduce every one of the builder's steps exactly.</p>
  *
  * <p>Numbers, and why they are what they are:</p>
  * <ul>
@@ -44,10 +48,29 @@ public final class CherryPagoda implements Landmark {
      * Template level the player stands on when they walk in: the ground floor, where the
      * staircase starts.
      */
-    public static final int GROUND_Y = PagodaStair.GROUND_Y;
+    public static final int GROUND_Y = 3;
 
     /** Height of the template, for the piece's bounding box. */
     public static final int TEMPLATE_HEIGHT = 39;
+
+    /**
+     * The staircase, as the builder drew it.
+     *
+     * <p>A pole of andesite wall at template (12, 12) with two polished andesite slabs winding
+     * round it per level, from the ground floor to the top room — twenty-nine levels, no
+     * exception, so the pattern is the rule the whole staircase obeys rather than an observation
+     * about the part that was measured.</p>
+     *
+     * <p>{@code (-1, 3)} is not a guess and not a fit: searched over both directions and all
+     * eight phases against eighty levels and both half steps of each, it is the only pair that
+     * reproduces the template. Which is why a building with no staircase of its own needs
+     * nothing more than a different pair here.</p>
+     */
+    private static final Descent DESCENT = Descent.of(12, 12, GROUND_Y,
+            new SlabSpiral(-1, 3),
+            Blocks.POLISHED_ANDESITE_SLAB,
+            Blocks.ANDESITE_WALL.getDefaultState(),
+            Blocks.POLISHED_ANDESITE.getDefaultState());
 
     /**
      * How far below the terrain's top solid block the template's level 0 goes.
@@ -82,8 +105,23 @@ public final class CherryPagoda implements Landmark {
     }
 
     @Override
-    public int stairTopTemplateY() {
-        return GROUND_Y;
+    public MazeStyle style() {
+        return STYLE;
+    }
+
+    @Override
+    public MazeTemplates.Piece piece() {
+        return PIECE;
+    }
+
+    @Override
+    public int templateHeight() {
+        return TEMPLATE_HEIGHT;
+    }
+
+    @Override
+    public Descent descent() {
+        return DESCENT;
     }
 
     @Override

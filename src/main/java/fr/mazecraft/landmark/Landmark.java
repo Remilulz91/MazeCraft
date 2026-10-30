@@ -2,6 +2,8 @@ package fr.mazecraft.landmark;
 
 import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazeStructure;
+import fr.mazecraft.structure.MazeStyle;
+import fr.mazecraft.structure.MazeTemplates;
 import net.minecraft.world.HeightLimitView;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 import net.minecraft.world.gen.noise.NoiseConfig;
@@ -24,6 +26,24 @@ import java.util.OptionalInt;
  * it" — so the next building is a new file and nothing else touched.</p>
  */
 public interface Landmark {
+
+    /**
+     * The style whose mazes this building is the way into.
+     *
+     * <p>Also this landmark's name on disk. A piece saved in a chunk has to find its way back to
+     * the building it belongs to when the chunk is read again, and the style is the one thing
+     * that is already unique per landmark and already has a stable id.</p>
+     */
+    MazeStyle style();
+
+    /** The template placed on the surface. */
+    MazeTemplates.Piece piece();
+
+    /** Height of the template, for the piece's bounding box. */
+    int templateHeight();
+
+    /** Where the way down is cut through the building, and what it is made of. */
+    Descent descent();
 
     /** Half-width of the building's own footprint, in blocks. */
     int half();
@@ -140,7 +160,9 @@ public interface Landmark {
     int originY(int padFloorY);
 
     /** Template level the staircase starts at. */
-    int stairTopTemplateY();
+    default int stairTopTemplateY() {
+        return descent().groundY();
+    }
 
     /** World height of the top of the staircase. */
     default int stairTopY(int padFloorY) {

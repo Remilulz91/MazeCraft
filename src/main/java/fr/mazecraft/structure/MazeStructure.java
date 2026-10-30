@@ -210,7 +210,7 @@ public class MazeStructure extends Structure {
             // staircase and the only way in is sealed by the thing it leads to.
             return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector -> {
                 collector.addPiece(maze);
-                collector.addPiece(new fr.mazecraft.landmark.PagodaPiece(
+                collector.addPiece(new fr.mazecraft.landmark.LandmarkPiece(landmark,
                         new BlockPos(centerX, y, centerZ), pad.floorY(), y, facing));
             }));
         }

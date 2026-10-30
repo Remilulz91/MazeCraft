@@ -1424,10 +1424,15 @@ public class MazePiece extends StructurePiece {
         return target - ((floorY - bottom) * 2 + 1);
     }
 
-    /** The eight cells round a 3 × 3 shaft: one step per half block makes a walkable spiral. */
-    private static final int[][] SHAFT_SPIRAL = {
-            {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
-    };
+    /**
+     * The eight cells round a 3 × 3 shaft: one step per half block makes a walkable spiral.
+     *
+     * <p>The same ring the landmarks' staircases wind round — {@link SlabSpiral} shows that the
+     * pagoda's hand-built stair is this one with a direction and a phase. Held in one place so
+     * the two cannot drift; the index arithmetic below is still written out here, which is a
+     * duplication worth removing one day but not while it works.</p>
+     */
+    private static final int[][] SHAFT_SPIRAL = SlabSpiral.RING;
 
     /**
      * True when {@code pos} is inside the crypt's room — not its stairwell, not its walls.
