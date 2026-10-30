@@ -307,6 +307,13 @@ public class MazePiece extends StructurePiece {
                 originX() + o[0], floorY - CRYPT_FLOOR + 1, originZ() + o[1]);
     }
 
+    /** True for the nine columns of the crypt's stairwell: the 3 × 3 around its middle. */
+    private boolean isCryptShaft(int lx, int lz) {
+        if (!hasCrypt()) return false;
+        int[] o = cryptOrigin();
+        return o != null && Math.abs(lx - o[0]) <= 1 && Math.abs(lz - o[1]) <= 1;
+    }
+
     /** The dead end at the top of the crypt's stair, at feet height. */
     public BlockPos cryptEntrance() {
         int[] o = cryptOrigin();
@@ -944,6 +951,26 @@ public class MazePiece extends StructurePiece {
             for (int z = z0; z <= z1; z++) {
                 int lx = x - originX();
                 int lz = z - originZ();
+
+                // The crypt's stairwell, left EXACTLY as it is found on a repair — the whole
+                // column, every pass, not just the slabs. The stair is state now: it falls away
+                // when the guardian is met and is written again when it dies (see
+                // collapseCryptStair), and a pass that knows nothing about that state must not
+                // touch it.
+                //
+                // It has to be here and not inside buildCrypt, which was the first attempt and
+                // destroyed the stair rather than preserving it. Four separate writes land in
+                // this column before buildCrypt is ever called or after it starts: the maze's
+                // own floor closes the top of the shaft at floorY, buildUnderside closes it a
+                // block lower, emptying the crypt airs the slabs between the floor and the
+                // ceiling, and the ceiling row plugs the mouth with style.pillar. At generation
+                // the spiral runs last and takes all four back; skip the spiral alone and they
+                // all stand, which seals the crypt on the first chunk reload.
+                //
+                // Nine columns in the middle of one dead end. Nothing above them is reachable
+                // by the decoration spillage this pass exists to clear.
+                if (repairing && isCryptShaft(lx, lz)) continue;
+
                 boolean inside = layout.isInside(lx, lz);
                 boolean isWall = inside && layout.isWall(lx, lz);
                 boolean isPillar = inside && layout.isPillar(lx, lz);
@@ -1004,7 +1031,7 @@ public class MazePiece extends StructurePiece {
 
                 // 2e. The crypt at the end of a maze entered through its middle. After the floor
                 //     above, because its stair is cut up through that floor.
-                if (hasCrypt()) buildCrypt(world, pos, x, z, lx, lz, placeChest, repairing);
+                if (hasCrypt()) buildCrypt(world, pos, x, z, lx, lz, placeChest);
 
                 // 3. Walls, pillars, and clearing above
                 if (style.enclosed) {
@@ -1272,7 +1299,7 @@ public class MazePiece extends StructurePiece {
      * with and the vault then inherited.</p>
      */
     private void buildCrypt(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
-                            int lx, int lz, boolean placeChest, boolean repairing) {
+                            int lx, int lz, boolean placeChest) {
         int[] o = cryptOrigin();
         if (o == null) return;
         int dx = lx - o[0], dz = lz - o[1];
@@ -1342,12 +1369,6 @@ public class MazePiece extends StructurePiece {
             }
             return;
         }
-        // Not on a repair. The stair is no longer a fixed part of the room: it falls away when
-        // the guardian is met and comes back when it dies (see collapseCryptStair), so it is
-        // state, like the vault's door and the chest, and a pass that knows nothing about that
-        // state must leave it exactly as it found it. Writing it back here would hand the player
-        // their perch again the first time the chunk reloaded mid-fight.
-        if (repairing) return;
         int bottom = floor + 1;
         int rot = cryptSpiralRotation(bottom);
         // Top down would pull the lantern hanging under the dead end's ceiling off its support,
