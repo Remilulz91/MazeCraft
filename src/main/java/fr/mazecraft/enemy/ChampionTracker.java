@@ -62,6 +62,7 @@ public final class ChampionTracker {
                 }
                 t.bar().setPercent(living.getHealth() / living.getMaxHealth());
                 keepToThePlaza(t.world(), living);
+                shutTheCrypt(t.world(), living);
                 for (ServerPlayerEntity player : new ArrayList<>(t.bar().getPlayers())) {
                     if (player.isRemoved() || player.getWorld() != t.world() || player.squaredDistanceTo(living) > BAR_RANGE_SQ) {
                         t.bar().removePlayer(player);
@@ -127,9 +128,12 @@ public final class ChampionTracker {
         MazeFinder.MazeHit hit = home == null ? null : MazeFinder.find(world, home, 0);
         if (hit == null) hit = MazeFinder.find(world, where, 0);
         if (hit == null || !hit.piece().hasCrypt()) return;
+        // The stair first, and outside the guard below: a crypt whose chest somehow already
+        // existed must still get its way out back.
+        hit.piece().restoreCryptStair(world);
         if (!hit.piece().placeCryptChest(world)) return;
         BlockPos chest = hit.piece().chestPos();
-        // A short flight: the crypt's ceiling is seven blocks up, and a rocket with the arena's
+        // A short flight: the crypt's ceiling is eight blocks up, and a rocket with the arena's
         // two seconds detonates in the roof. Cherry pink and the pale wood of the pagoda.
         Fanfare.burst(world, chest, 3.0, 1, 0xF8C3D3, 0xE4B98C);
         for (ServerPlayerEntity player : world.getPlayers()) {
@@ -137,6 +141,42 @@ public final class ChampionTracker {
                 player.sendMessage(Text.translatable("mazecraft.crypt.opens")
                         .formatted(Formatting.GOLD, Formatting.BOLD), false);
             }
+        }
+    }
+
+    /**
+     * Takes the crypt's stair away once a player is in the room with its guardian.
+     *
+     * <p>The spiral is a block wide and winds round a pole, so nothing with a hitbox can follow
+     * anybody up it: three steps up and the guardian cannot be reached, cannot reach, and the
+     * fight is target practice. {@code MazePiece.collapseCryptStair} says what is done about it
+     * and why sealing the top instead would fix nothing.</p>
+     *
+     * <p>Here is only the <em>when</em>, and it is not the obvious one. The guardian is spawned
+     * when the last lever is pulled, which is minutes of walking from the crypt; collapsing the
+     * stair then would take it away before anybody had come down it. So the trigger is a player
+     * standing in the room — not on the stair, which is why {@code isInCryptRoom} tests the
+     * room's open volume and nothing else.</p>
+     *
+     * <p>Costs one lookup per tracked champion per five ticks, and only for a champion whose
+     * maze has a crypt at all; {@code collapseCryptStair} returns false once there is nothing
+     * left to take away, so the sound and the message happen exactly once.</p>
+     */
+    private static void shutTheCrypt(ServerWorld world, LivingEntity champion) {
+        BlockPos tagged = MazeEnemies.homeOf(champion);
+        MazeFinder.MazeHit hit = MazeFinder.find(world,
+                tagged != null ? tagged : champion.getBlockPos(), 0);
+        if (hit == null || !hit.piece().hasCrypt()) return;
+        for (ServerPlayerEntity player : world.getPlayers()) {
+            if (!hit.piece().isInCryptRoom(player.getBlockPos())) continue;
+            if (hit.piece().collapseCryptStair(world)) {
+                world.playSound(null, player.getBlockPos(),
+                        net.minecraft.sound.SoundEvents.BLOCK_STONE_BREAK,
+                        net.minecraft.sound.SoundCategory.BLOCKS, 2.0f, 0.5f);
+                player.sendMessage(Text.translatable("mazecraft.crypt.shuts")
+                        .formatted(Formatting.DARK_RED), false);
+            }
+            return;
         }
     }
 

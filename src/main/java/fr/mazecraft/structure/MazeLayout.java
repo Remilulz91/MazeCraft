@@ -70,7 +70,16 @@ public final class MazeLayout {
     /** The dead end the progression leads to when {@link #fromPlaza}, or null. */
     private int[] goalCell;
 
-    /** Cells the goal dead end keeps from the outer wall, so the room under it fits inside. */
+    /**
+     * Cells the goal dead end keeps from the outer wall, so the room under it fits inside.
+     *
+     * <p>Three is not a round number, it is the crypt's. The room is {@code CRYPT_RADIUS + 1}
+     * blocks from its middle to the outside of its skin — ten — and the middle of cell
+     * {@code cx} is at {@code 4 * cx + 2}, so the skin stays inside the maze from {@code cx = 2}
+     * onwards. Three leaves a cell in hand. It matters because a column outside the maze's
+     * bounding box is never visited by the build pass: a crypt that overhangs is not clipped
+     * neatly, it is simply missing on that side, skin included.</p>
+     */
     private static final int GOAL_CLEARANCE = 3;
 
     private MazeLayout(int cells, int plazaRadius) {
@@ -598,8 +607,16 @@ public final class MazeLayout {
      * leaving the maze with no progression at all; a goal somewhere imperfect beats none.</p>
      */
     private int farthestDeadEnd(int[] depth) {
-        int found = farthestDeadEnd(depth, GOAL_CLEARANCE);
-        return found >= 0 ? found : farthestDeadEnd(depth, 0);
+        // One cell at a time rather than straight to zero. The old fallback gave up the whole
+        // margin the moment the full one could not be met, which put the crypt's middle two
+        // blocks from the outer wall and most of the room outside the maze's box, unbuilt. The
+        // clearance is a room's half-width, so losing one cell of it costs four blocks of
+        // overhang; losing all three costs the room.
+        for (int clearance = GOAL_CLEARANCE; clearance > 0; clearance--) {
+            int found = farthestDeadEnd(depth, clearance);
+            if (found >= 0) return found;
+        }
+        return farthestDeadEnd(depth, 0);
     }
 
     private int farthestDeadEnd(int[] depth, int clearance) {

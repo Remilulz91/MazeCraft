@@ -135,6 +135,35 @@ public class PagodaPiece extends StructurePiece {
         PagodaStair.digDown(world, placement, bottomTy, MazePiece.WALL_HEIGHT, chunkBox);
     }
 
+    /**
+     * Cuts the shaft again, after the maze's repair pass has rebuilt the rock it goes through.
+     *
+     * <p>This exists because of a bug that only ever appeared in a naturally generated world.
+     * {@code MazeRepair} rebuilds a maze inside a chunk the first time that chunk is fully
+     * loaded, to clear what neighbouring chunks' decorations spilled into it — and it rebuilt
+     * only the {@link MazePiece}, which is the piece it knew about. The rebuild writes the
+     * maze's own floor, roof and air over everything in its volume, so the bottom of this
+     * staircase — the pole and the four levels of slabs between the maze's floor and its
+     * ceiling — was quietly deleted the first time somebody walked up to the pagoda. What was
+     * left was the part of the shaft <em>above</em> the maze's roof, which the maze does not
+     * reach: a stub of andesite hanging out of the ceiling with no way down.</p>
+     *
+     * <p>None of the testing could see it. A maze placed with {@code /maze debug pagoda} is not
+     * registered in the structure accessor, so {@code MazeFinder} never finds it and the repair
+     * pass never runs on it; every test before this one was a placed maze.</p>
+     *
+     * <p>Only the shaft. The levelling and the template are the building on the surface, which
+     * nothing overwrites and which a player may well have changed; re-placing them on a chunk
+     * reload would undo that.</p>
+     */
+    public void repairShaft(StructureWorldAccess world, BlockBox chunkBox) {
+        MazeTemplates.Placement placement = placement(world);
+        if (placement == null) return;
+        int bottomTy = CherryPagoda.GROUND_Y
+                - CherryPagoda.INSTANCE.descent(padFloorY, mazeFloorY);
+        PagodaStair.digDown(world, placement, bottomTy, MazePiece.WALL_HEIGHT, chunkBox);
+    }
+
     /** Where the template sits, recomputed from the pole so it cannot drift from the shaft. */
     private MazeTemplates.Placement placement(StructureWorldAccess world) {
         var templates = world.toServerWorld().getStructureTemplateManager();

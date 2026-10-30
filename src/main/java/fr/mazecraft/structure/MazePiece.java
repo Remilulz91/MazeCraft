@@ -247,13 +247,25 @@ public class MazePiece extends StructurePiece {
     /**
      * Half-width of the crypt, and how far below the maze floor it sits.
      *
-     * <p>Fifteen blocks across outside, thirteen of room, and seven blocks of head room — taller
-     * than the vault's four, because something is going to be fought in here. The ceiling stays
-     * at the vault's five below the maze floor so the stair down is the same length and reads the
-     * same; the floor goes two deeper instead.</p>
+     * <p>Nineteen blocks across outside, seventeen of room, and seven blocks of head room —
+     * taller than the vault's four, and more than twice its floor, because something is going to
+     * be fought in here and, since the stair falls away when the fight starts, there is nowhere
+     * to fight it from except the floor. Thirteen by thirteen was the arena of Kronos, which is
+     * the same size sunk into a plaza four times wider; a closed box of that size is not the
+     * same room.</p>
+     *
+     * <p>The ceiling stays at the vault's five below the maze floor, so the stair down is the
+     * same length and reads the same; the floor goes deeper instead. Seven of head room and not
+     * ten on purpose: the collapse drops whoever is on the spiral, and the room's height is
+     * exactly how far they fall. Seven costs about three hearts, ten would cost five.</p>
+     *
+     * <p>How big it may be is bounded, and not by taste: {@code MazeLayout.GOAL_CLEARANCE} keeps
+     * the goal dead end three cells — fourteen blocks — from the outer wall, and a column
+     * outside the maze's own bounding box is never visited by the build pass at all. Radius plus
+     * the skin must stay under that, so the ceiling is 13.</p>
      */
-    private static final int CRYPT_RADIUS = 7;
-    private static final int CRYPT_FLOOR = 12, CRYPT_CEIL = 5;
+    private static final int CRYPT_RADIUS = 9;
+    private static final int CRYPT_FLOOR = 13, CRYPT_CEIL = 5;
 
     /** Stands in the cache for "asked, and this maze has no crypt". */
     private static final int[] NO_CRYPT = new int[0];
@@ -992,7 +1004,7 @@ public class MazePiece extends StructurePiece {
 
                 // 2e. The crypt at the end of a maze entered through its middle. After the floor
                 //     above, because its stair is cut up through that floor.
-                if (hasCrypt()) buildCrypt(world, pos, x, z, lx, lz, placeChest);
+                if (hasCrypt()) buildCrypt(world, pos, x, z, lx, lz, placeChest, repairing);
 
                 // 3. Walls, pillars, and clearing above
                 if (style.enclosed) {
@@ -1260,15 +1272,25 @@ public class MazePiece extends StructurePiece {
      * with and the vault then inherited.</p>
      */
     private void buildCrypt(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
-                            int lx, int lz, boolean placeChest) {
+                            int lx, int lz, boolean placeChest, boolean repairing) {
         int[] o = cryptOrigin();
         if (o == null) return;
         int dx = lx - o[0], dz = lz - o[1];
         int d = Math.max(Math.abs(dx), Math.abs(dz));
-        if (d > CRYPT_RADIUS) return;
+        if (d > CRYPT_RADIUS + 1) return;
 
         int floor = floorY - CRYPT_FLOOR;
         int ceiling = floorY - CRYPT_CEIL;
+
+        // The sides of the skin, one block out from the wall. The floor and ceiling were sealed
+        // when the rooms got their rock, and the sides were missed — which left the one thing
+        // the seal exists for still exposed: the wall's pilasters are {@code style.pillar}, logs
+        // for the cherry style, and a lava flow in the cave outside meets them directly. Stone
+        // on four sides and kindling on the other two is not a sealed room.
+        if (d == CRYPT_RADIUS + 1) {
+            for (int y = floor - 1; y <= ceiling + 1; y++) seal(world, pos, x, y, z);
+            return;
+        }
         BlockState shell = style.wallBase;
         BlockState air = Blocks.AIR.getDefaultState();
         boolean wall = d == CRYPT_RADIUS;
@@ -1303,8 +1325,9 @@ public class MazePiece extends StructurePiece {
         seal(world, pos, x, ceiling + 1, z);
 
         if (!wall) {
-            // Four lights hung off the diagonals, clear of the stair and of the middle.
-            if (Math.abs(dx) == 4 && Math.abs(dz) == 4) {
+            // Lights hung off the diagonals, clear of the stair and of the middle: two rings
+            // of four now the room is seventeen across, or the far corners sit in the dark.
+            if (Math.abs(dx) == Math.abs(dz) && (Math.abs(dx) == 4 || Math.abs(dx) == 8)) {
                 world.setBlockState(pos.set(x, ceiling - 1, z),
                         style.hangingLight != null ? style.hangingLight : style.light,
                         Block.NOTIFY_LISTENERS);
@@ -1319,6 +1342,12 @@ public class MazePiece extends StructurePiece {
             }
             return;
         }
+        // Not on a repair. The stair is no longer a fixed part of the room: it falls away when
+        // the guardian is met and comes back when it dies (see collapseCryptStair), so it is
+        // state, like the vault's door and the chest, and a pass that knows nothing about that
+        // state must leave it exactly as it found it. Writing it back here would hand the player
+        // their perch again the first time the chunk reloaded mid-fight.
+        if (repairing) return;
         int bottom = floor + 1;
         int rot = cryptSpiralRotation(bottom);
         // Top down would pull the lantern hanging under the dead end's ceiling off its support,
@@ -1363,6 +1392,86 @@ public class MazePiece extends StructurePiece {
     };
 
     /**
+     * True when {@code pos} is inside the crypt's room — not its stairwell, not its walls.
+     *
+     * <p>The room, deliberately: the stair is what this is used to take away, so "is somebody in
+     * here" must not become true because somebody is standing on the stair. The test is the
+     * open volume between the floor and the underside of the ceiling, inside the walls.</p>
+     */
+    public boolean isInCryptRoom(BlockPos pos) {
+        int[] o = cryptOrigin();
+        if (o == null) return false;
+        if (pos.getY() < floorY - CRYPT_FLOOR || pos.getY() >= floorY - CRYPT_CEIL) return false;
+        return Math.abs(pos.getX() - (originX() + o[0])) < CRYPT_RADIUS
+                && Math.abs(pos.getZ() - (originZ() + o[1])) < CRYPT_RADIUS;
+    }
+
+    /**
+     * Takes the crypt's stair away, and puts it back.
+     *
+     * <p>Why there is a mechanism here at all: the spiral is a perch. It is a block wide and
+     * climbs round a pole, which nothing with a hitbox can follow, so a player standing three
+     * steps up fights the guardian from somewhere it can never reach and the fight is not a
+     * fight. The first fix that suggests itself — seal the top of the stairwell when the
+     * guardian wakes — fixes nothing, because the player is already on the stairs when it
+     * closes and the stairs are the problem.</p>
+     *
+     * <p>So the stair goes. Whoever is on it drops into the room, which is the whole height of
+     * the room at worst and about three hearts, and the chimney above is left smooth: no way
+     * back up until the guardian falls, at which point {@link #restoreCryptStair} writes the
+     * spiral again alongside the chest and the fireworks.</p>
+     *
+     * <p>It cannot be done at the moment the guardian is spawned, which is when the last lever
+     * is pulled, minutes of walking away: the stair would be gone before anybody had used it and
+     * the crypt would be a hole nobody could get out of. It happens when a player is actually in
+     * the room — see {@code ChampionTracker.shutTheCrypt}.</p>
+     *
+     * @return true if anything actually changed, so the caller only makes a noise about it once
+     */
+    public boolean collapseCryptStair(ServerWorld world) {
+        return writeCryptStair(world, false);
+    }
+
+    /** Puts the spiral back, when the guardian of the crypt has fallen. */
+    public boolean restoreCryptStair(ServerWorld world) {
+        return writeCryptStair(world, true);
+    }
+
+    private boolean writeCryptStair(ServerWorld world, boolean present) {
+        int[] o = cryptOrigin();
+        if (o == null) return false;
+        int bottom = floorY - CRYPT_FLOOR + 1;
+        // The same rotation the build pass used, from the same inputs, so the restored stair is
+        // the one that was there rather than one that happens to fit.
+        int rot = cryptSpiralRotation(bottom);
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+        BlockState air = Blocks.AIR.getDefaultState();
+        boolean changed = false;
+        for (int y = bottom; y <= floorY; y++) {
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dz = -1; dz <= 1; dz++) {
+                    BlockState want = air;
+                    if (present) {
+                        for (int half = 0; half < 2; half++) {
+                            int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
+                                    SHAFT_SPIRAL.length)];
+                            if (step[0] != dx || step[1] != dz) continue;
+                            want = vaultSlab().with(SlabBlock.TYPE,
+                                    half == 0 ? SlabType.BOTTOM : SlabType.TOP);
+                        }
+                    }
+                    pos.set(originX() + o[0] + dx, y, originZ() + o[1] + dz);
+                    if (world.getBlockState(pos).equals(want)) continue;
+                    // SKIP_DROPS: a slab taken out from under a player must not become an item.
+                    world.setBlockState(pos, want, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    /**
      * One column of the vault of a colossal maze.
      *
      * <p>Written exactly like the hoard of Asterion, and for the same reason: a room this size
@@ -1381,10 +1490,19 @@ public class MazePiece extends StructurePiece {
         int[] o = vaultOrigin();
         if (o == null) return;
         int dx = lx - o[0], dz = lz - o[1];
-        if (dx < VAULT_X0 || dx > VAULT_X1 || dz < VAULT_Z0 || dz > VAULT_Z1) return;
+        if (dx < VAULT_X0 - 1 || dx > VAULT_X1 + 1 || dz < VAULT_Z0 - 1 || dz > VAULT_Z1 + 1) return;
 
         int floor = floorY - VAULT_FLOOR;
         int ceiling = floorY - VAULT_CEIL;
+
+        // The sides of the skin, one block out, for the same reason as the crypt's: this room's
+        // floor is style.plaza and its ceiling carries style.pillar beams, both of which are
+        // wood for the cherry style, and only the top and bottom of it were ever sealed.
+        if (dx < VAULT_X0 || dx > VAULT_X1 || dz < VAULT_Z0 || dz > VAULT_Z1) {
+            for (int y = floor - 1; y <= ceiling + 1; y++) seal(world, pos, x, y, z);
+            return;
+        }
+
         BlockState shell = style.wallBase;
         BlockState air = Blocks.AIR.getDefaultState();
 

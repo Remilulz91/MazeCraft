@@ -118,9 +118,10 @@ public final class CherryPagoda implements Landmark {
 
     @Override
     public int floorLimit() {
-        // The crypt hangs twelve blocks under the maze floor, so this is really a limit of -44
-        // on the deepest block the whole thing owns. Still a guard that cannot fire -- maxStair
-        // binds first, always -- but a guard that is wrong by a room's height is not a guard.
+        // The crypt hangs thirteen blocks under the maze floor and its skin one more, so this
+        // is really a limit of -46 on the deepest block the whole thing owns -- still twelve
+        // clear of the bedrock roof. A guard that cannot fire (maxStair binds first, always),
+        // but a guard that is wrong by a room's height is not a guard.
         return -32;
     }
 

@@ -1,12 +1,15 @@
 package fr.mazecraft.protection;
 
+import fr.mazecraft.landmark.PagodaPiece;
 import fr.mazecraft.structure.MazeFinder;
 import it.unimi.dsi.fastutil.longs.LongLinkedOpenHashSet;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.registry.RegistryKey;
+import net.minecraft.structure.StructurePiece;
 import net.minecraft.server.world.ServerWorld;
+import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.ChunkPos;
 import net.minecraft.world.World;
 
@@ -60,13 +63,40 @@ public final class MazeRepair {
     /** @return true if the chunk contained a maze (and was repaired / marked). */
     private static boolean repairChunk(ServerWorld world, ChunkPos pos, MazeState state) {
         boolean any = false;
+        BlockBox chunkBox = new BlockBox(pos.getStartX(), world.getBottomY(), pos.getStartZ(),
+                pos.getEndX(), world.getTopY() - 1, pos.getEndZ());
         for (MazeFinder.MazeHit hit : MazeFinder.findInChunk(world, pos)) {
             any = true;
             if (state.isSolved(hit.key())) continue;
             long mazeKey = hit.key();
             hit.piece().repair(world, pos, gate -> state.isGateOpen(mazeKey, gate));
+            repairSiblings(world, hit, chunkBox);
         }
         if (any) state.markRepaired(pos.toLong());
         return any;
+    }
+
+    /**
+     * The rest of the structure, rebuilt after the maze and in the order it was generated in.
+     *
+     * <p>A maze is not always alone in its {@code StructureStart}: a cherry maze is buried under
+     * a pagoda, and the pagoda's staircase is cut down through the maze's roof <em>after</em>
+     * that roof is laid. That order is what makes the way in exist, and the repair pass above
+     * was breaking it — it rebuilt the maze and stopped, so the roof went back and the hole
+     * through it did not. Repairing the siblings here, after the maze and in the children's own
+     * order, restores at repair time exactly the invariant generation relies on.</p>
+     *
+     * <p>Written as a loop over the children rather than a call to the pagoda, so the fifteen
+     * landmarks still to come need nothing here: a piece that knows how to repair itself is
+     * repaired.</p>
+     */
+    private static void repairSiblings(ServerWorld world, MazeFinder.MazeHit hit,
+                                       BlockBox chunkBox) {
+        for (StructurePiece piece : hit.start().getChildren()) {
+            if (piece instanceof PagodaPiece pagoda
+                    && pagoda.getBoundingBox().intersects(chunkBox)) {
+                pagoda.repairShaft(world, chunkBox);
+            }
+        }
     }
 }
