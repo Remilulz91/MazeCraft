@@ -51,6 +51,7 @@ public final class MazeAmbush {
         List<EntityType<? extends MobEntity>> pool = MazeEnemies.pool(maze.getStyle());
         Random random = world.getRandom();
         int spawned = 0;
+        boolean bossSpawned = false;
         for (int i = 0; i < count; i++) {
             BlockPos pos = findSpot(world, player, maze, random);
             if (pos == null) continue;
@@ -80,12 +81,20 @@ public final class MazeAmbush {
                 // Saved in the maze state: the chest stays locked until this boss dies,
                 // even if it wanders into unloaded chunks or the server restarts
                 boss.addCommandTag(MazeEnemies.MAZE_TAG_PREFIX + mazeKey);
+                BlockPos home = maze.chestPos();
+                boss.addCommandTag(MazeEnemies.HOME_TAG_PREFIX + home.getX() + ","
+                        + home.getY() + "," + home.getZ());
                 fr.mazecraft.protection.MazeState.get(world).setChampion(mazeKey, true);
                 ChampionTracker.track(world, boss);
+                bossSpawned = true;
                 if (!exempt) boss.setTarget(player);
                 poof(world, pos);
                 spawned++;
+                // In a crypt the champion wakes at the far end of the maze, minutes of walking
+                // from the lever that woke it, so "rises to guard the treasure" in front of the
+                // player would be a lie. It is also the better moment: you hear it, then you go.
                 String appears = maze.getStyle().isKronos() ? "mazecraft.kronos.appears"
+                        : maze.hasCrypt() ? "mazecraft.champion.stirs"
                         : minotaur ? "mazecraft.minotaur.appears" : "mazecraft.champion.appears";
                 player.sendMessage(Text.translatable(appears)
                         .formatted(Formatting.DARK_RED, Formatting.BOLD), false);
@@ -93,6 +102,14 @@ public final class MazeAmbush {
                     world.playSound(null, pos, fr.mazecraft.entity.ModSounds.MINOTAUR_ROAR, SoundCategory.HOSTILE, 3.0f, 0.5f);
                 }
             }
+        }
+
+        // No champion, no chest -- and the champion can be off in the config or fail to find a
+        // spot. The crypt's chest arrives with the guardian's death, so without a guardian it
+        // would never arrive at all and the maze could not be finished. Opening the last gate
+        // puts it there instead.
+        if (last && maze.hasCrypt() && !bossSpawned) {
+            maze.placeCryptChest(world);
         }
 
         if (spawned > 0) {
@@ -120,7 +137,11 @@ public final class MazeAmbush {
 
     /** A free spot on the central plaza, a few blocks from the chest (the champion guards it). */
     private static BlockPos plazaSpot(ServerWorld world, MazePiece maze) {
-        BlockPos chest = maze.chestPos();
+        // Where the treasure is, which is the plaza for the fifteen styles you walk into and the
+        // crypt for a maze entered through its middle. The champion guards the prize, so it goes
+        // where the prize is -- and ChampionTracker leashes it to chestPos() anyway, so spawning
+        // it anywhere else would only have it walk here.
+        BlockPos chest = maze.hasCrypt() ? maze.chestPos() : maze.centerPos();
         int[][] offsets = {{0, -3}, {0, 3}, {-3, 0}, {3, 0}, {2, 2}, {-2, -2}, {2, -2}, {-2, 2}};
         for (int[] o : offsets) {
             BlockPos pos = chest.add(o[0], 0, o[1]);

@@ -85,7 +85,7 @@ public final class KronosArena {
 
         KronosWalls.clearFrenzy(hit.key());
         hit.piece().openHoard(world);
-        celebrate(world, hit.piece().chestPos());
+        Fanfare.burst(world, hit.piece().chestPos(), 5.0, 2, 0xFFD700, 0x4F9B7F);
 
         for (ServerPlayerEntity player : world.getPlayers()) {
             if (player.getBlockPos().isWithinDistance(where, 48)) {
@@ -93,30 +93,6 @@ public final class KronosArena {
                         .formatted(Formatting.GOLD, Formatting.BOLD), false);
             }
         }
-    }
-
-    /** Fireworks over the arena, gold and verdigris. */
-    private static void celebrate(ServerWorld world, BlockPos centre) {
-        for (int i = 0; i < 12; i++) {
-            ItemStack rocket = new ItemStack(Items.FIREWORK_ROCKET);
-            rocket.set(DataComponentTypes.FIREWORKS, new FireworksComponent(2, List.of(
-                    new FireworkExplosionComponent(
-                            i % 2 == 0 ? FireworkExplosionComponent.Type.LARGE_BALL
-                                       : FireworkExplosionComponent.Type.STAR,
-                            IntList.of(0xFFD700, 0x4F9B7F),
-                            IntList.of(0xFFFFFF),
-                            true, true))));
-            double angle = Math.PI * 2 * i / 12.0;
-            world.spawnEntity(new FireworkRocketEntity(world,
-                    centre.getX() + 0.5 + Math.cos(angle) * 5.0,
-                    centre.getY() - 1.0,
-                    centre.getZ() + 0.5 + Math.sin(angle) * 5.0,
-                    rocket));
-        }
-        world.playSound(null, centre, SoundEvents.UI_TOAST_CHALLENGE_COMPLETE,
-                SoundCategory.PLAYERS, 1.0f, 1.0f);
-        world.playSound(null, centre, SoundEvents.BLOCK_VAULT_OPEN_SHUTTER,
-                SoundCategory.BLOCKS, 2.0f, 0.5f);
     }
 
     private static void enforce(ServerWorld world, MazePiece maze, long mazeKey) {

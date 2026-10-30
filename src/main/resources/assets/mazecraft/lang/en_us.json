@@ -67,6 +67,8 @@
   "config.mazecraft.enemyMultiplier": "Enemy multiplier",
   "config.mazecraft.enemyMultiplier.tooltip": "Number of guardians and ambush mobs (0 = none, 1 = default, 2 = double).",
   "mazecraft.champion.name": "Maze Champion",
+  "mazecraft.champion.stirs": "Far off at the end of the maze, something wakes.",
+  "mazecraft.crypt.opens": "The guardian falls. A chest rises from the floor of the crypt.",
   "mazecraft.champion.appears": "The Maze Champion rises to guard the treasure!",
   "mazecraft.ambush": "Ambush!",
   "advancements.mazecraft.defeat_champion.title": "Champion Slayer",

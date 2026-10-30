@@ -36,6 +36,32 @@ public final class MazeEnemies {
     public static final String CHAMPION_TAG = "mazecraft_champion";
     /** Command tag prefix linking a champion to its maze: prefix + maze key. */
     public static final String MAZE_TAG_PREFIX = "mazecraft_maze_";
+
+    /**
+     * Where a champion belongs, written on the champion itself as "x,y,z".
+     *
+     * <p>Both the leash and the crypt's chest used to find the maze by asking where the champion
+     * <em>is</em>, which fails exactly when it matters: a champion that has got outside the
+     * maze's box returns no maze, so the leash stops pulling it back and the chest that arrives
+     * on its death never arrives. For the leash that was an annoyance; for the crypt it is a
+     * maze that cannot be finished, since there is no chest to open. Carrying the home position
+     * means neither question depends on where the thing has wandered to.</p>
+     */
+    public static final String HOME_TAG_PREFIX = "mazecraft_home_";
+
+    /** The home written on this champion, or null. */
+    public static net.minecraft.util.math.BlockPos homeOf(net.minecraft.entity.Entity entity) {
+        for (String tag : entity.getCommandTags()) {
+            if (!tag.startsWith(HOME_TAG_PREFIX)) continue;
+            String[] parts = tag.substring(HOME_TAG_PREFIX.length()).split(",");
+            if (parts.length != 3) continue;
+            try {
+                return new net.minecraft.util.math.BlockPos(Integer.parseInt(parts[0]),
+                        Integer.parseInt(parts[1]), Integer.parseInt(parts[2]));
+            } catch (NumberFormatException ignored) { }
+        }
+        return null;
+    }
     /** Command tag carried by patrol mobs (used to cap how many are alive). */
     public static final String PATROL_TAG = "mazecraft_patrol";
 

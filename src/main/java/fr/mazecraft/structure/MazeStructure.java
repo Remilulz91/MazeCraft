@@ -159,9 +159,68 @@ public class MazeStructure extends Structure {
             }));
         }
 
-        if (style.enclosed) {
+        // A style reached through a building on the surface. The one generic branch the landmark
+        // package needs: everything particular to the building is behind `landmark`, so the next
+        // one is a new file in fr.mazecraft.landmark and nothing changed here.
+        //
+        // Same shape as the Kronos branch above, and for the same reason: a buried maze plus a
+        // surface piece that is the way into it. What differs is which end is the fixed point.
+        // Kronos puts its shaft against the doorway in the maze's outer wall; here the stairs
+        // come out in the middle of the maze, so the building is placed around the plaza rather
+        // than beside it.
+        fr.mazecraft.landmark.Landmark landmark = fr.mazecraft.landmark.Landmarks.of(style);
+        if (landmark != null) {
+            if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
+            // Ground for the building, judged on the building's own footprint — not the maze's.
+            Site pad = landmark.site(context.chunkGenerator(), context.world(),
+                    context.noiseConfig(), centerX, centerZ);
+            if (!pad.ok()) return Optional.empty();
+
+            // One large in COLOSSAL_CHANCE becomes a colossal one, exactly as it does for the
+            // surface styles. A colossal is a VARIANT of the large step, not a step of its own
+            // (MazeSize.step maps it to LARGE), so falling back to large when it does not fit
+            // costs the player nothing — which is why this one downgrade is allowed and a
+            // large quietly becoming a medium is not.
+            //
+            // Expect it to be rare to the point of myth for now. A colossal footprint is 221
+            // blocks across, and the ceiling has to clear the lowest ground anywhere in it;
+            // over that much terrain there is almost always a dip. The ceiling rule is the
+            // thing to change if colossal pagodas should really exist.
+            MazeSize actual = size;
+            if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
+                    && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
+                    && landmark.floorY(context.chunkGenerator(), context.world(),
+                            context.noiseConfig(), centerX, centerZ, MazeSize.COLOSSAL,
+                            pad.floorY()).isPresent()) {
+                actual = MazeSize.COLOSSAL;
+            }
+            final MazeSize chosen = actual;
+
+            // How deep the maze goes, which the terrain decides rather than a constant.
+            OptionalInt floorY = landmark.floorY(context.chunkGenerator(), context.world(),
+                    context.noiseConfig(), centerX, centerZ, chosen, pad.floorY());
+            if (floorY.isEmpty()) return Optional.empty();
+            int y = floorY.getAsInt();
+            int entrance = context.random().nextInt(4);
+            Direction facing = Direction.fromHorizontal(context.random().nextInt(4));
+            MazePiece maze = new MazePiece(style, chosen, mazeSeed, centerX, y, centerZ, entrance);
+            // The maze first and the building second, because within one chunk the pieces
+            // generate in the order they are added here, and the shaft has to be cut through the
+            // maze's roof after that roof has been laid. The other way round, the roof plugs the
+            // staircase and the only way in is sealed by the thing it leads to.
+            return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector -> {
+                collector.addPiece(maze);
+                collector.addPiece(new fr.mazecraft.landmark.PagodaPiece(
+                        new BlockPos(centerX, y, centerZ), pad.floorY(), y, facing));
+            }));
+        }
+
+        if (style.isNether()) {
             // Nether: buried in the rock like a fortress, at the height where the rock is the
             // most solid (never hanging over the lava sea). No colossal mazes down here.
+            //
+            // isNether(), not enclosed: this branch is about a lava sea at Y=31 and a bedrock
+            // roof from Y=123, which is a fact about the Nether, not about having a roof.
             if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
             OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size,
                     NETHER_MIN_FLOOR, NETHER_MAX_FLOOR);
@@ -305,10 +364,35 @@ public class MazeStructure extends Structure {
      *
      * @param wet      how many of the samples stood in any water at all
      * @param rejected the test that refused, or null when the site is good
+     * @param lowest   the lowest surface among the samples taken, which is the number a buried
+     *                 maze turns on: its roof has to pass under the lowest ground anywhere over
+     *                 its footprint, not under the ground at its middle. Exact only on a survey
+     *                 that ran to the end — see the note above about early returns.
      */
-    public record Site(int relief, int water, int wet, int drop, int floorY, String rejected, int x, int z) {
+    public record Site(int relief, int water, int wet, int drop, int floorY, String rejected,
+                       int x, int z, int lowest) {
         public boolean ok() {
             return rejected == null;
+        }
+
+        /**
+         * Does {@link #floorY} mean anything?
+         *
+         * <p>Only on a survey that ran to the end. The floor is the average of all twenty-five
+         * samples, so a survey that stopped at the sample which broke a rule has no floor to
+         * report and carries <b>0</b> — a sentinel that looks exactly like a height, which is
+         * how a refused site put a pagoda at y = 0, in a cavern a hundred blocks below the maze
+         * it was supposed to lead down to. Anything that wants a height from a survey that may
+         * have been refused should survey again with {@link #NO_LIMIT} thresholds instead of
+         * reading this.</p>
+         */
+        public boolean hasFloor() {
+            return rejected == null;
+        }
+
+        /** The highest surface among the samples taken. */
+        public int highest() {
+            return lowest + relief;
         }
     }
 
@@ -328,7 +412,25 @@ public class MazeStructure extends Structure {
                                    net.minecraft.world.gen.noise.NoiseConfig noise,
                                    int centerX, int centerZ, MazeSize size, int ringMargin,
                                    int maxRelief, int maxWater) {
-        int half = size.span() / 2;
+        return surveyFloor(gen, world, noise, centerX, centerZ, size.span() / 2, ringMargin,
+                maxRelief, maxWater);
+    }
+
+    /**
+     * The same survey over an arbitrary footprint, for something that is not a maze.
+     *
+     * <p>A surface landmark is judged on <b>its own</b> footprint, not the maze's. The cherry
+     * pagoda is 26 by 25; the medium maze that goes under it is 101 by 101. Asking for flat
+     * ground across a hundred blocks when all that has to stand up is a twenty-six block
+     * building is what made the cherry style cover 0.022 % of the world — the maze is going
+     * underground precisely so that it stops being the thing the terrain has to accommodate.</p>
+     *
+     * @param half half-width of the footprint in blocks
+     */
+    public static Site surveyFloor(ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+                                   net.minecraft.world.gen.noise.NoiseConfig noise,
+                                   int centerX, int centerZ, int half, int ringMargin,
+                                   int maxRelief, int maxWater) {
         int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE, sum = 0, n = 0, deepest = 0, wet = 0;
         for (int[] offset : SAMPLE_ORDER) {
             {
@@ -343,7 +445,7 @@ public class MazeStructure extends Structure {
                 // are rejected, and a rejected site now costs a handful of them instead of
                 // fifty, which is what makes a compass search survivable on a server.
                 if (max - min > maxRelief) {
-                    return new Site(max - min, deepest, wet, 0, 0, "relief", x, z);
+                    return new Site(max - min, deepest, wet, 0, 0, "relief", x, z, min);
                 }
                 // The water test needs a second NoiseChunk, so it waits until the relief test
                 // has had its say: a site rejected for relief — which is most of them — now
@@ -357,7 +459,7 @@ public class MazeStructure extends Structure {
                 deepest = Math.max(deepest, surface - ground);
                 if (surface > ground) wet++;
                 if (surface - ground > maxWater) {
-                    return new Site(max - min, deepest, wet, 0, 0, "water", x, z);
+                    return new Site(max - min, deepest, wet, 0, 0, "water", x, z, min);
                 }
                 sum += surface;
                 n++;
@@ -394,7 +496,7 @@ public class MazeStructure extends Structure {
                 min = Math.min(min, surface);
                 max = Math.max(max, surface);
                 if (max - min > maxRelief) {
-                    return new Site(max - min, deepest, wet, drop, 0, "relief (ring)", x, z);
+                    return new Site(max - min, deepest, wet, drop, 0, "relief (ring)", x, z, min);
                 }
                 int ground = gen.getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG, world, noise);
                 deepest = Math.max(deepest, surface - ground);
@@ -402,12 +504,12 @@ public class MazeStructure extends Structure {
                 // ground is the first free y, so the solid top is one below it.
                 drop = Math.max(drop, floorY - (ground - 1));
                 if (surface - ground > maxWater) {
-                    return new Site(max - min, deepest, wet, drop, 0, "water (ring)", x, z);
+                    return new Site(max - min, deepest, wet, drop, 0, "water (ring)", x, z, min);
                 }
             }
         }
 
-        return new Site(max - min, deepest, wet, drop, floorY, null, 0, 0);
+        return new Site(max - min, deepest, wet, drop, floorY, null, 0, 0, min);
     }
 
     /**
@@ -542,39 +644,211 @@ public class MazeStructure extends Structure {
      */
     private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ, MazeSize size,
                                                 int minFloor, int maxFloor) {
-        ChunkGenerator gen = context.chunkGenerator();
-        int half = size.span() / 2 + 4;
-        var columns = new java.util.ArrayList<net.minecraft.world.gen.chunk.VerticalBlockSample>();
-        for (int i = -2; i <= 2; i++) {
-            for (int j = -2; j <= 2; j++) {
-                columns.add(gen.getColumnSample(centerX + i * half / 2, centerZ + j * half / 2,
-                        context.world(), context.noiseConfig()));
-            }
-        }
-        // Relative to the floor. No lava allowed at maze level; lava far below is fine (pillars).
-        int[] probes = {-3, -1, 1, 3, MazePiece.ROOF_DY + 1, MazePiece.ROOF_DY + 3};
+        var columns = burialColumns(context.chunkGenerator(), context.world(), context.noiseConfig(),
+                centerX, centerZ, size);
         int bestY = -1;
         float bestRatio = -1f;
         int offset = context.random().nextInt(2); // vary the parity between mazes
         for (int y = minFloor + offset; y <= maxFloor; y += 2) {
-            int solid = 0, total = 0;
-            boolean lava = false;
-            for (var column : columns) {
-                for (int dy : probes) {
-                    var state = column.getState(y + dy);
-                    if (!state.getFluidState().isEmpty()) lava = true;
-                    if (!state.isAir() && state.getFluidState().isEmpty()) solid++;
-                    total++;
-                }
-            }
-            if (lava) continue;
-            float ratio = (float) solid / total;
+            if (netherFluid(columns, y)) continue;
+            float ratio = burialSolid(columns, y);
             if (ratio > bestRatio) {
                 bestRatio = ratio;
                 bestY = y;
             }
         }
         return bestRatio >= MIN_SOLID_RATIO ? OptionalInt.of(bestY) : OptionalInt.empty();
+    }
+
+    /**
+     * The 25 column samples the burial tests read, over the footprint plus the margin ring.
+     *
+     * <p>A column sample is one NoiseChunk column, so these twenty-five are the whole cost of a
+     * burial test however many heights it then scores: the loop over candidate floors reads
+     * them again, it does not sample again.</p>
+     */
+    private static java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> burialColumns(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ, MazeSize size) {
+        int half = size.span() / 2 + 4;
+        var columns = new java.util.ArrayList<net.minecraft.world.gen.chunk.VerticalBlockSample>();
+        for (int i = -2; i <= 2; i++) {
+            for (int j = -2; j <= 2; j++) {
+                columns.add(gen.getColumnSample(centerX + i * half / 2, centerZ + j * half / 2,
+                        world, noise));
+            }
+        }
+        return columns;
+    }
+
+    /**
+     * Share of solid rock around a floor laid at {@code y}, or -1 when a fluid is in the way.
+     *
+     * <p>The probes are relative to the floor and straddle it: below it, at walking height, and
+     * above the roof. No fluid is allowed at any of them — lava far below is fine, the support
+     * pillars reach through it — so a maze is never cut open by a lava sea in the Nether or by
+     * an aquifer in the Overworld.</p>
+     */
+    /** The six heights the solid share is counted at, relative to the floor. */
+    private static final int[] BURIAL_PROBES =
+            {-3, -1, 1, 3, MazePiece.ROOF_DY + 1, MazePiece.ROOF_DY + 3};
+
+    /**
+     * How much of what surrounds a floor laid at {@code y} is rock rather than cave.
+     *
+     * <p>This is the "is it buried, or is it hanging in a cavern" test, and it is unchanged.</p>
+     */
+    private static float burialSolid(
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+        int solid = 0, total = 0;
+        for (var column : columns) {
+            for (int dy : BURIAL_PROBES) {
+                if (!column.getState(y + dy).isAir()) solid++;
+                total++;
+            }
+        }
+        return (float) solid / total;
+    }
+
+    /**
+     * Is there a fluid where it matters, for a maze under a landmark?
+     *
+     * <p>The band is the structure's own volume and one block either side of it: its underside
+     * slab a block below the floor, its roof, and the skin of rock laid over that roof. Beyond
+     * that, there is nothing to protect — the maze is now sealed in non-flammable rock on all six
+     * faces, so a pocket of water or lava sitting behind that rock does nothing at all.</p>
+     *
+     * <p>It was briefly <b>-4 to +9</b>, on the reasoning that a column sample costs a whole
+     * NoiseChunk and reading more heights out of one is free. True, and beside the point: the
+     * cost of a wider band is not time, it is <b>refusals</b>. Any fluid at any of 350 probes
+     * rejected the height outright, and across a hundred and eight blocks of Overworld rock at
+     * these depths there is nearly always an aquifer somewhere — so the rule went from strict to
+     * unsatisfiable, and every site anybody tried came back "no floor deep enough in rock". A
+     * test whose job is to find lava that can reach the maze should look where lava can reach
+     * the maze.</p>
+     */
+    private static int burialFluid(
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+        int wet = 0;
+        for (var column : columns) {
+            for (int dy = -2; dy <= MazePiece.ROOF_DY + 2; dy++) {
+                if (!column.getState(y + dy).getFluidState().isEmpty()) wet++;
+            }
+        }
+        return wet;
+    }
+
+    /** How many probes {@link #burialFluid} reads, so a count can be read as a share. */
+    private static int burialFluidProbes(int columns) {
+        return columns * (MazePiece.ROOF_DY + 5);
+    }
+
+    /**
+     * How much of the rock around a buried maze may be fluid before the site is refused.
+     *
+     * <p>A tenth, and the number is bracketed by measurement rather than chosen. Seven sites
+     * surveyed in game: the driest height at one of them had <b>8 of 250 probes wet</b> — a
+     * puddle in one corner of a hundred-block square, behind a sealed wall of rock, which harms
+     * nothing — and at another it had <b>86 of 250</b>, which is a maze sitting inside an
+     * aquifer. Any threshold between those two separates them; a tenth has three times the
+     * margin on each side.</p>
+     *
+     * <p>Zero tolerance is what the rule said before, and it was refusing the first of those
+     * two as firmly as the second.</p>
+     */
+    private static final float MAX_WET_SHARE = 0.10f;
+
+    /**
+     * The Nether's own fluid test, left exactly as it was.
+     *
+     * <p>Six spaced probes, gaps and all. It has a lava sea under it and years of play behind it,
+     * and the band above is new and unmeasured; changing both at once would leave neither
+     * answerable.</p>
+     */
+    private static boolean netherFluid(
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+        for (var column : columns) {
+            for (int dy : BURIAL_PROBES) {
+                if (!column.getState(y + dy).getFluidState().isEmpty()) return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The <b>shallowest</b> floor between {@code minFloor} and {@code maxFloor} that is buried
+     * in enough solid rock — not the best-buried one.
+     *
+     * <p>Which is the opposite of what {@link #findBuriedFloorY} wants, and deliberately. A
+     * Nether maze is found by walking into its doorway, so where it sits only has to be solid;
+     * a maze under a landmark is reached by a staircase somebody has to walk down, and every
+     * block of depth is four more steps of spiral. So this one takes the first acceptable floor
+     * on the way down and stops. Deep is a cost here, not a virtue.</p>
+     */
+    public static OptionalInt findShallowestBuriedFloorY(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeSize size, int minFloor, int maxFloor) {
+        if (maxFloor < minFloor) return OptionalInt.empty();
+        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor).found();
+    }
+
+    /**
+     * Why a burial search answered what it did: one line per reason, so a refusal can be read
+     * instead of guessed at.
+     *
+     * @param candidates how many floor heights were in range at all
+     * @param wet        how many were refused because a fluid was in the way
+     * @param open       how many were refused for sitting in too much cave
+     * @param bestRatio  the best solid share seen among the heights no fluid refused, or -1
+     */
+    public record BurialReport(OptionalInt found, int candidates, int wet, int open,
+                               float bestRatio, int leastFluid, int fluidProbes) {
+        public String why() {
+            if (found.isPresent()) return "ok";
+            if (candidates == 0) return "no height in range";
+            if (wet == candidates) {
+                return "every height was too wet, the driest with " + leastFluid
+                        + " of " + fluidProbes + " probes in fluid (the limit is "
+                        + Math.round(fluidProbes * MAX_WET_SHARE) + ")";
+            }
+            return "best rock cover " + Math.round(bestRatio * 100) + "% of the "
+                    + MIN_SOLID_RATIO_PERCENT + "% needed";
+        }
+    }
+
+    /** {@link #MIN_SOLID_RATIO} as a percentage, for messages. */
+    public static final int MIN_SOLID_RATIO_PERCENT = 60;
+
+    public static BurialReport surveyBurial(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeSize size, int minFloor, int maxFloor) {
+        if (maxFloor < minFloor) {
+            return new BurialReport(OptionalInt.empty(), 0, 0, 0, -1f, -1, 0);
+        }
+        var columns = burialColumns(gen, world, noise, centerX, centerZ, size);
+        int candidates = 0, wet = 0, open = 0, leastFluid = Integer.MAX_VALUE;
+        float bestRatio = -1f;
+        for (int y = maxFloor; y >= minFloor; y--) {
+            candidates++;
+            int fluid = burialFluid(columns, y);
+            leastFluid = Math.min(leastFluid, fluid);
+            if (fluid > burialFluidProbes(columns.size()) * MAX_WET_SHARE) {
+                wet++;
+                continue;
+            }
+            float ratio = burialSolid(columns, y);
+            bestRatio = Math.max(bestRatio, ratio);
+            if (ratio >= MIN_SOLID_RATIO) {
+                return new BurialReport(OptionalInt.of(y), candidates, wet, open, ratio,
+                        0, burialFluidProbes(columns.size()));
+            }
+            open++;
+        }
+        return new BurialReport(OptionalInt.empty(), candidates, wet, open, bestRatio,
+                leastFluid == Integer.MAX_VALUE ? -1 : leastFluid,
+                burialFluidProbes(columns.size()));
     }
 
     /**

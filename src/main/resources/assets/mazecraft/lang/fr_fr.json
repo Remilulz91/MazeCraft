@@ -67,6 +67,8 @@
   "config.mazecraft.enemyMultiplier": "Multiplicateur d'ennemis",
   "config.mazecraft.enemyMultiplier.tooltip": "Nombre de gardiens et de mobs d'embuscade (0 = aucun, 1 = normal, 2 = double).",
   "mazecraft.champion.name": "Champion du labyrinthe",
+  "mazecraft.champion.stirs": "Loin au bout du labyrinthe, quelque chose s'éveille.",
+  "mazecraft.crypt.opens": "Le gardien tombe. Un coffre surgit du sol de la crypte.",
   "mazecraft.champion.appears": "Le Champion du labyrinthe se dresse pour garder le trésor !",
   "mazecraft.ambush": "Embuscade !",
   "advancements.mazecraft.defeat_champion.title": "Tueur de champion",

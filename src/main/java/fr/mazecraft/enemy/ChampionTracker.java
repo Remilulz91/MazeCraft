@@ -1,6 +1,8 @@
 package fr.mazecraft.enemy;
 
 import fr.mazecraft.MazeCraft;
+import fr.mazecraft.progression.Fanfare;
+import fr.mazecraft.structure.MazeFinder;
 import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerEntityEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -14,6 +16,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.BlockPos;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -87,6 +90,7 @@ public final class ChampionTracker {
                     try {
                         long key = Long.parseLong(tag.substring(MazeEnemies.MAZE_TAG_PREFIX.length()));
                         fr.mazecraft.protection.MazeState.get(world).setChampion(key, false);
+                        openCrypt(world, entity.getBlockPos(), MazeEnemies.homeOf(entity));
                     } catch (NumberFormatException ignored) { }
                 }
             }
@@ -107,6 +111,35 @@ public final class ChampionTracker {
         });
     }
 
+    /**
+     * The guardian of a crypt has fallen, so the chest arrives.
+     *
+     * <p>Driven by the death itself and not by a tick noticing an absence, for the reason the
+     * hoard of Asterion is: "the guardian used to be here and is not any more" is also exactly
+     * what a chunk unloading looks like, and a chest must not appear because somebody walked
+     * away. {@code placeCryptChest} does nothing if one is already there, so a death that is
+     * somehow seen twice costs nothing.</p>
+     */
+    private static void openCrypt(ServerWorld world, BlockPos where, BlockPos home) {
+        // Where it belongs first, where it died only as a fallback. A champion killed a step
+        // outside the maze's box finds no maze, and a crypt with no chest in it is a maze that
+        // cannot be finished.
+        MazeFinder.MazeHit hit = home == null ? null : MazeFinder.find(world, home, 0);
+        if (hit == null) hit = MazeFinder.find(world, where, 0);
+        if (hit == null || !hit.piece().hasCrypt()) return;
+        if (!hit.piece().placeCryptChest(world)) return;
+        BlockPos chest = hit.piece().chestPos();
+        // A short flight: the crypt's ceiling is seven blocks up, and a rocket with the arena's
+        // two seconds detonates in the roof. Cherry pink and the pale wood of the pagoda.
+        Fanfare.burst(world, chest, 3.0, 1, 0xF8C3D3, 0xE4B98C);
+        for (ServerPlayerEntity player : world.getPlayers()) {
+            if (player.getBlockPos().isWithinDistance(chest, 48)) {
+                player.sendMessage(Text.translatable("mazecraft.crypt.opens")
+                        .formatted(Formatting.GOLD, Formatting.BOLD), false);
+            }
+        }
+    }
+
     /** How far a champion may stray from the plaza it guards. */
     private static final double LEASH = 14.0, LEASH_HARD = 28.0;
 
@@ -125,7 +158,12 @@ public final class ChampionTracker {
     private static void keepToThePlaza(ServerWorld world, LivingEntity champion) {
         if (champion instanceof fr.mazecraft.entity.MinotaurEntity m && m.isKronos()) return;
         if (!(champion instanceof net.minecraft.entity.mob.MobEntity mob)) return;
-        var hit = fr.mazecraft.structure.MazeFinder.find(world, champion.getBlockPos(), 0);
+        // The champion's own home tag, not where it happens to be standing: a champion that has
+        // got outside the maze's box finds no maze, and the leash would give up precisely when
+        // it is needed.
+        BlockPos tagged = MazeEnemies.homeOf(champion);
+        var hit = fr.mazecraft.structure.MazeFinder.find(world,
+                tagged != null ? tagged : champion.getBlockPos(), 0);
         if (hit == null) return;
         net.minecraft.util.math.BlockPos home = hit.piece().chestPos();
         double dx = champion.getX() - (home.getX() + 0.5), dz = champion.getZ() - (home.getZ() + 0.5);

@@ -94,7 +94,11 @@ public final class MazeBarrier {
         if (mayEnter(player, maze)) return;
 
         // Shove the player back out along the line from the maze centre.
-        Vec3d centre = Vec3d.ofCenter(maze.chestPos());
+        //
+        // centerPos, not chestPos: in a maze entered through its middle the chest sits in a dead
+        // end at the far end of the maze, and pushing a player away from THAT would shove some of
+        // them further in.
+        Vec3d centre = Vec3d.ofCenter(maze.centerPos());
         Vec3d away = new Vec3d(player.getX() - centre.x, 0, player.getZ() - centre.z);
         away = away.lengthSquared() < 1.0e-4 ? new Vec3d(0, 0, 1) : away.normalize();
         Entity pushed = entity == player ? player : entity; // push the vehicle if there is one

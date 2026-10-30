@@ -134,22 +134,42 @@ public enum MazeStyle {
                     Blocks.MOSSY_COBBLESTONE.getDefaultState(), 20,
                     Blocks.GRAVEL.getDefaultState(), 15)
     ),
-    /** Cherry grove: pink hedges, cherry wood. */
+    /**
+     * Cherry grove: pink hedges, cherry wood — and the first maze with a roof over it that is
+     * not in the Nether.
+     *
+     * <p>A cherry grove covers about one position in 241, and five percent of those are flat
+     * enough for a maze, which put this style at 0.022 % of the world against 2 % for a hedge
+     * one. Three scans thousands of blocks apart agreed. The compass was taught to sweep
+     * twenty-five times to compensate, and that worked, but the underlying answer is that a
+     * cherry maze should not have to find rare <em>and</em> flat ground at all: it goes under a
+     * pagoda instead, reached by the staircase inside it, and what the biome has to provide is
+     * only somewhere to stand the building.</p>
+     *
+     * <p>Which makes it an enclosed style, so the roof is a decision rather than a default: a
+     * cherry plank ceiling with a cherry log cornice, lit by lanterns hanging over the corridors
+     * — the hall under the building rather than a cave the maze was found in.</p>
+     */
     CHERRY(
             leaves(Blocks.CHERRY_LEAVES),
             Blocks.CHERRY_LOG.getDefaultState(),
             Blocks.STONE_BRICKS.getDefaultState(),
             Blocks.DIRT_PATH.getDefaultState(),
             Blocks.CHERRY_PLANKS.getDefaultState(),
-            lantern(),
-            Blocks.DIRT.getDefaultState(),
+            // Stone, not dirt: the foundation of a buried style is also what holds it up from
+            // below and what plugs the rock around it, so it has to be rock and it has to not
+            // burn. Never seen from inside.
+            Blocks.STONE.getDefaultState(),
             Blocks.CHERRY_FENCE.getDefaultState(),
-            6,
             Mix.of(Blocks.DIRT_PATH.getDefaultState(), 50,
                     Blocks.GRAVEL.getDefaultState(), 15,
                     Blocks.PACKED_MUD.getDefaultState(), 15,
                     Blocks.STONE_BRICKS.getDefaultState(), 10,
-                    Blocks.CRACKED_STONE_BRICKS.getDefaultState(), 10)
+                    Blocks.CRACKED_STONE_BRICKS.getDefaultState(), 10),
+            Realm.LANDMARK,
+            Blocks.CHERRY_PLANKS.getDefaultState(),
+            Blocks.OCHRE_FROGLIGHT.getDefaultState(),
+            Blocks.LANTERN.getDefaultState().with(LanternBlock.HANGING, true)
     ),
     /** Swamp / mangrove: mangrove hedges, muddy roots, mud floor. Wide ring: mangroves spread. */
     SWAMP(
@@ -244,6 +264,7 @@ public enum MazeStyle {
                     Blocks.NETHER_BRICKS.getDefaultState(), 30,
                     Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
                     Blocks.RED_NETHER_BRICKS.getDefaultState(), 10),
+            Realm.NETHER,
             Blocks.NETHER_BRICKS.getDefaultState(),
             Blocks.GLOWSTONE.getDefaultState(),
             null
@@ -261,6 +282,7 @@ public enum MazeStyle {
                     Blocks.CRIMSON_HYPHAE.getDefaultState(), 20,
                     Blocks.RED_NETHER_BRICKS.getDefaultState(), 20,
                     Blocks.NETHER_BRICKS.getDefaultState(), 15),
+            Realm.NETHER,
             // Roof NOT netherrack / nether wart: weeping vines would hang from it into the corridors
             Blocks.CRIMSON_PLANKS.getDefaultState(),
             Blocks.SHROOMLIGHT.getDefaultState(),
@@ -279,6 +301,7 @@ public enum MazeStyle {
                     Blocks.WARPED_HYPHAE.getDefaultState(), 20,
                     Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
                     Blocks.NETHER_BRICKS.getDefaultState(), 15),
+            Realm.NETHER,
             Blocks.WARPED_PLANKS.getDefaultState(),
             Blocks.SHROOMLIGHT.getDefaultState(),
             null
@@ -296,6 +319,7 @@ public enum MazeStyle {
                     Blocks.POLISHED_BLACKSTONE.getDefaultState(), 25,
                     Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
                     Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 10),
+            Realm.NETHER,
             // Roof NOT blackstone / basalt / netherrack: glowstone blobs would grow under it
             Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
             Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
@@ -314,6 +338,7 @@ public enum MazeStyle {
                     Blocks.POLISHED_BASALT.getDefaultState(), 20,
                     Blocks.SMOOTH_BASALT.getDefaultState(), 20,
                     Blocks.BLACKSTONE.getDefaultState(), 20),
+            Realm.NETHER,
             Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
             Blocks.GLOWSTONE.getDefaultState(),
             null
@@ -338,6 +363,7 @@ public enum MazeStyle {
                     Blocks.DEEPSLATE_BRICKS.getDefaultState(), 30,
                     Blocks.CRACKED_DEEPSLATE_BRICKS.getDefaultState(), 20,
                     Blocks.POLISHED_BLACKSTONE.getDefaultState(), 10),
+            Realm.VAULT,
             Blocks.DEEPSLATE_TILES.getDefaultState(),
             Blocks.SHROOMLIGHT.getDefaultState(),
             Blocks.SOUL_LANTERN.getDefaultState()
@@ -361,10 +387,82 @@ public enum MazeStyle {
     public final BlockState ceilingLight;
     /** Optional lantern hanging under the roof instead of a light block in it (enclosed mazes only). */
     public final BlockState hangingLight;
+    /**
+     * Where a roofed maze is. A roof is a way of building; this is a place, and the two had been
+     * the same field.
+     *
+     * <p>{@link #enclosed} was doing both jobs, which was true for as long as every roofed maze
+     * was a Nether one. Four places read it as "is in the Nether" — the loot table prefix, the
+     * floor-height range used to bury it, and the two lines that sort the styles by dimension
+     * for the progression — and the moment a cherry maze got a roof, all four would have been
+     * wrong at once, in ways that look like content rather than like a bug: nether loot in a
+     * cherry chest, a maze buried at Y 40 to 80 looking for solid rock over a lava sea, and a
+     * step of the Overworld progression that the Overworld no longer counts. The Labyrinth of
+     * Kronos was already the counter-example — roofed, and in the Overworld — and got away with
+     * it only because a special case sits in front of each of those four reads.</p>
+     */
+    public enum Realm {
+        /** The Nether, buried in its rock and entered through a doorway that opens onto a cave. */
+        NETHER,
+        /** Buried in the Overworld, entered down a shaft to a doorway in its outer wall. */
+        VAULT,
+        /** Buried under a building, entered by the staircase inside it, which comes down in the plaza. */
+        LANDMARK
+    }
+
+    /** Null for a style with the sky over it; see {@link Realm}. */
+    private final Realm realm;
+
+    /** True for the five Nether styles. Ask this, never {@link #enclosed}, about the dimension. */
+    public boolean isNether() {
+        return realm == Realm.NETHER;
+    }
+
+    /**
+     * What the parts of an enclosed maze that are <b>not</b> seen are made of: the slab under
+     * its floor, and the support pillars that reach down from it.
+     *
+     * <p>In the Nether that is the roof block and the pillar block, as it always was. Underground
+     * it is the foundation, and the reason is fire. The cherry maze is leaves, logs and planks,
+     * and {@code buildUnderside} was laying a continuous sheet of <b>cherry planks</b> across the
+     * whole 101 by 101 underside of it, then dropping <b>cherry log</b> stilts up to eighty
+     * blocks down through whatever air and lava they met. One lava pocket anywhere under a maze
+     * that size, and the fire ran along that sheet and came up through the plaza floor, which is
+     * cherry planks too. The Nether never had the problem because netherrack does not burn.</p>
+     *
+     * <p>These are under the floor and invisible from inside, so there is nothing to trade.</p>
+     */
+    public BlockState substructure() {
+        return isNether() ? ceiling : foundation;
+    }
+
+    /**
+     * True when the way into this style's mazes is the plaza in the middle rather than a doorway
+     * in the outer wall — because a staircase comes down into it from a building on the surface.
+     *
+     * <p>Asked of the style rather than of the landmark package so that {@code MazeLayout} and
+     * {@code MazePiece}, which are shared by all sixteen styles, do not have to know that
+     * landmarks exist.</p>
+     *
+     * <p>It was nearly derived as "underground and not Kronos", which is the same answer and a
+     * trap: read from inside the constructor, while {@code KRONOS} is still being built, the
+     * static field is null and every style passes the test — including Kronos, whose margin would
+     * have gone to zero and put the foot of its shaft two blocks inside solid rock. Hence a third
+     * {@link Realm} rather than a clever predicate.</p>
+     */
+    public boolean enteredFromPlaza() {
+        return realm == Realm.LANDMARK;
+    }
+
+    /** Support pillars under an enclosed maze. See {@link #substructure}. */
+    public BlockState support() {
+        return isNether() ? pillar : foundation;
+    }
+
     /** Loot table prefix: chests/<prefix>_<size>. */
     public String lootPrefix() {
         if (this == KRONOS) return "kronos";
-        if (enclosed) return "nether_maze";
+        if (isNether()) return "nether_maze";
         return this == END ? "end_maze" : "maze";
     }
 
@@ -405,6 +503,7 @@ public enum MazeStyle {
         this.ring = ring;
         this.wallBands = null;
         this.enclosed = false;
+        this.realm = null;
         this.ceiling = null;
         this.ceilingLight = null;
         this.hangingLight = null;
@@ -425,14 +524,24 @@ public enum MazeStyle {
         this.ring = ring;
         this.wallBands = wallBands;
         this.enclosed = false;
+        this.realm = null;
         this.ceiling = null;
         this.ceilingLight = null;
         this.hangingLight = null;
     }
 
-    /** Enclosed (Nether) style. */
+    /**
+     * Enclosed style: a sealed outer wall and a roof instead of the sky.
+     *
+     * <p>The flattened ring around the maze is four blocks wide in the Nether and <b>one</b>
+     * under a landmark. A ring is the approach to a doorway — somewhere to arrive, a path laid up
+     * to the entrance — and a maze entered through its own middle has no doorway, so four blocks
+     * of walled corridor going right round it was dead space reachable from nowhere. What is left
+     * is not a corridor at all: one block of solid rock, which is the wall the hedge needs behind
+     * it and the thing that keeps a cave with lava in it from touching a maze made of leaves.</p>
+     */
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor, BlockState plaza,
-              BlockState foundation, BlockState gate, Mix ring,
+              BlockState foundation, BlockState gate, Mix ring, Realm realm,
               BlockState ceiling, BlockState ceilingLight, BlockState hangingLight) {
         this.wall = wall;
         this.pillar = pillar;
@@ -442,10 +551,11 @@ public enum MazeStyle {
         this.light = ceilingLight;
         this.foundation = foundation;
         this.gate = gate;
-        this.margin = 4;
+        this.margin = realm == Realm.LANDMARK ? 1 : 4;
         this.ring = ring;
         this.wallBands = null;
         this.enclosed = true;
+        this.realm = realm;
         this.ceiling = ceiling;
         this.ceilingLight = ceilingLight;
         this.hangingLight = hangingLight;

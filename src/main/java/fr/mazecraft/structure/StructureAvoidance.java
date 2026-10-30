@@ -47,6 +47,9 @@ public final class StructureAvoidance {
             Map.entry(Identifier.ofVanilla("end_cities"), 8),
             Map.entry(Identifier.ofVanilla("woodland_mansions"), 7),
             Map.entry(Identifier.ofVanilla("ocean_monuments"), 6),
+            // Deep and sprawling, and only a buried maze ever meets them
+            Map.entry(Identifier.ofVanilla("ancient_cities"), 8),
+            Map.entry(Identifier.ofVanilla("trial_chambers"), 6),
             // Compact: one building, no reason to sterilise 5 chunks around it
             Map.entry(Identifier.ofVanilla("trail_ruins"), 3),
             Map.entry(Identifier.ofVanilla("pillager_outposts"), 2),
@@ -89,6 +92,35 @@ public final class StructureAvoidance {
             Identifier.ofVanilla("ruined_portals")
     );
 
+    /**
+     * The buried structures a maze under a landmark must keep away from — and <b>only</b> these.
+     *
+     * <p>"It is buried, so it should avoid everything the buried list ignores" is the obvious
+     * rule and it is a disaster. {@link #IGNORED} contains <b>mineshafts</b>, which vanilla
+     * places with a spacing of one chunk and a frequency of 0.004: inside the nine chunks a
+     * medium maze would clear, that is 361 candidate cells and a <b>76 % chance</b> of a hit.
+     * Three quarters of the sites left after every other rule, gone — to avoid a tunnel one
+     * block wide that the maze overwrites and the shell plugs, and that nobody would ever know
+     * had been there.</p>
+     *
+     * <p>What is worth avoiding is what is both <b>deep and big</b>: a trial chamber at the
+     * maze's own depth, cut in half, is the thing that was actually seen in testing. Buried
+     * treasure is a chest and a mineshaft is a corridor; neither is damaged by a maze passing
+     * through, because the maze replaces what it meets.</p>
+     *
+     * <p>Strongholds are in the list for completeness and cost nothing: they are placed on
+     * concentric rings, not a spread grid, so the loop below never considers them at all.</p>
+     *
+     * <p>This costs the cherry style about a third of its remaining sites — a trial chamber is
+     * spaced 34 chunks and the maze clears ten, so roughly 38 % of positions have one near
+     * enough. That is the price of not cutting them, and it is one line to change.</p>
+     */
+    private static final Set<Identifier> DEEP_AND_BIG = Set.of(
+            Identifier.ofVanilla("trial_chambers"),
+            Identifier.ofVanilla("ancient_cities"),
+            Identifier.ofVanilla("strongholds")
+    );
+
     private StructureAvoidance() { }
 
     /** True if another structure could start close enough to overlap a maze of this size here. */
@@ -98,15 +130,35 @@ public final class StructureAvoidance {
         long seed = context.seed();
 
         int ownRank = rank(style, size);
-        // Kronos is the one maze that lives underground, so the structures a surface maze can
-        // safely ignore are exactly the ones it must not: ancient cities sit at its depth.
-        boolean underground = style.isKronos();
+
+        // Two questions, not one, and they used to be the same boolean.
+        //
+        // A surface maze ignores what is buried: mineshafts, strongholds, ancient cities, trial
+        // chambers. A buried maze must not — it sits at their depth. Kronos was the only buried
+        // maze, so one flag answered both, and the other half of it followed: Kronos has
+        // nothing on the surface, so it may ignore villages and temples.
+        //
+        // A maze under a landmark breaks that pairing. It is buried AND it puts a twenty-six
+        // block building on the surface, so it has to avoid both lists — the trial chamber at
+        // its own depth and the village its pagoda would land in. One flag could only ever get
+        // one of those right; with the pagoda it was getting the trial chamber wrong, which is
+        // the one that was cut in half in testing.
+        // Kronos keeps the rule it has always had: it avoids every one of them, mineshafts
+        // included. It is one structure in the world and can afford to be fussy.
+        boolean kronos = style.isKronos();
+        boolean underLandmark = style.enteredFromPlaza();
+        boolean buried = kronos || underLandmark;
+        boolean onSurface = !kronos;
 
         Registry<StructureSet> sets = context.dynamicRegistryManager().get(RegistryKeys.STRUCTURE_SET);
         for (Map.Entry<RegistryKey<StructureSet>, StructureSet> entry : sets.getEntrySet()) {
             Identifier id = entry.getKey().getValue();
-            if (!underground && IGNORED.contains(id)) continue;
-            if (underground && SURFACE_ONLY.contains(id)) continue;
+            if (IGNORED.contains(id)
+                    && !kronos
+                    && !(underLandmark && DEEP_AND_BIG.contains(id))) {
+                continue;
+            }
+            if (!onSurface && SURFACE_ONLY.contains(id)) continue;
             StructureSet set = entry.getValue();
             if (!(set.placement() instanceof RandomSpreadStructurePlacement placement)) continue;
 
@@ -133,7 +185,7 @@ public final class StructureAvoidance {
                     if (Math.abs(start.x - center.x) > radius || Math.abs(start.z - center.z) > radius) continue;
                     if (start.equals(center)) continue; // ourselves
                     if (!placement.applyFrequencyReduction(start.x, start.z, seed)) continue;
-                    if (anyStructureFitsBiome(context, set, start, underground)) return true;
+                    if (anyStructureFitsBiome(context, set, start, buried)) return true;
                 }
             }
         }

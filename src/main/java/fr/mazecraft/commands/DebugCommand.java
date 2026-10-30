@@ -1,17 +1,23 @@
 package fr.mazecraft.commands;
 
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import fr.mazecraft.MazeCraft;
 import fr.mazecraft.config.MazeCraftConfig;
+import fr.mazecraft.landmark.CherryPagoda;
+import fr.mazecraft.landmark.Landmark;
+import fr.mazecraft.landmark.PagodaPiece;
 import fr.mazecraft.protection.MazeState;
 import fr.mazecraft.structure.MazeFinder;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeSize;
 import fr.mazecraft.structure.MazeStructure;
+import fr.mazecraft.structure.MazeTemplates;
 import fr.mazecraft.structure.MazeStyle;
+import fr.mazecraft.structure.PagodaStair;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.minecraft.registry.RegistryKeys;
 import net.minecraft.world.biome.source.BiomeCoords;
@@ -25,7 +31,9 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.command.ServerCommandSource;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.text.Text;
+import net.minecraft.util.BlockRotation;
 import net.minecraft.util.Formatting;
+import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.BlockBox;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.ChunkPos;
@@ -73,6 +81,29 @@ public class DebugCommand {
                         .executes(DebugCommand::onLevers))
                 .then(CommandManager.literal("colossal")
                         .executes(DebugCommand::onColossal))
+                .then(CommandManager.literal("template")
+                        .then(CommandManager.argument("name", StringArgumentType.word())
+                                .executes(DebugCommand::onTemplate)))
+                .then(CommandManager.literal("depth")
+                        .executes(ctx -> onDepth(ctx, MazeSize.MEDIUM.id()))
+                        .then(CommandManager.argument("size", StringArgumentType.word())
+                                .suggests(SIZE_SUGGESTIONS)
+                                .executes(ctx -> onDepth(ctx,
+                                        StringArgumentType.getString(ctx, "size")))))
+                .then(CommandManager.literal("pagoda")
+                        .executes(ctx -> onPagoda(ctx, MazeSize.MEDIUM.id(), 0))
+                        .then(CommandManager.argument("size", StringArgumentType.word())
+                                .suggests(SIZE_SUGGESTIONS)
+                                .executes(ctx -> onPagoda(ctx,
+                                        StringArgumentType.getString(ctx, "size"), 0))
+                                .then(CommandManager.argument("lift", IntegerArgumentType.integer(-3, 3))
+                                        .executes(ctx -> onPagoda(ctx,
+                                                StringArgumentType.getString(ctx, "size"),
+                                                IntegerArgumentType.getInteger(ctx, "lift"))))))
+                .then(CommandManager.literal("shaft")
+                        .then(CommandManager.argument("depth", IntegerArgumentType.integer(1,
+                                        PagodaStair.MAX_DEPTH))
+                                .executes(DebugCommand::onShaft)))
                 .then(CommandManager.literal("placement")
                         .then(CommandManager.argument("style", StringArgumentType.word())
                                 .suggests(STYLE_SUGGESTIONS)
@@ -98,6 +129,14 @@ public class DebugCommand {
                                                                         StringArgumentType.getString(ctx, "size"), true,
                                                                         com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "relief"),
                                                                         com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(ctx, "mindrop")))))))))
+                .then(CommandManager.literal("crypt")
+                        .executes(DebugCommand::onCrypt))
+                .then(CommandManager.literal("landmark")
+                        .executes(ctx -> onLandmarkScan(ctx, MazeSize.MEDIUM.id()))
+                        .then(CommandManager.argument("size", StringArgumentType.word())
+                                .suggests(SIZE_SUGGESTIONS)
+                                .executes(ctx -> onLandmarkScan(ctx,
+                                        StringArgumentType.getString(ctx, "size")))))
                 .then(CommandManager.literal("vault")
                         .executes(ctx -> onVault(ctx, false))
                         .then(CommandManager.literal("open")
@@ -244,7 +283,7 @@ public class DebugCommand {
         }
         int allowance = reliefOverride > 0 ? reliefOverride : MazeStructure.reliefAllowance(size);
         running = new Scan(src, world, structure, size, style.margin, id,
-                player.getBlockPos(), hunt, allowance, minDrop);
+                player.getBlockPos(), hunt, allowance, minDrop, null);
         if (hunt) {
             src.sendFeedback(() -> Text.literal("hunting for the nearest site " + id
                             + " could stand on at relief " + allowance
@@ -315,6 +354,8 @@ public class DebugCommand {
     private static final int SCAN_MAX_SITES = 40_000;
 
     private static final class Scan {
+        /** Non-null for a landmark scan: measure the building's rule, not the surface one. */
+        final fr.mazecraft.landmark.Landmark landmark;
         final ServerCommandSource src;
         final ServerWorld world;
         final Structure structure;
@@ -335,7 +376,11 @@ public class DebugCommand {
 
         /** True while there is still ground worth looking at. */
         boolean wants() {
-            return found.size() < SCAN_TARGET && examined < SCAN_MAX_SITES;
+            // A landmark scan counts sites IN THE BIOME, not sites that passed. The whole point
+            // is the refusals: a scan that stopped at sixty successes would say nothing about
+            // what the other rules cost, which is the only question it is being asked.
+            int got = landmark != null ? inBiome : found.size();
+            return got < SCAN_TARGET && examined < SCAN_MAX_SITES;
         }
 
         /** Queues the next square ring of sites outward from the player. */
@@ -353,7 +398,9 @@ public class DebugCommand {
         }
 
         Scan(ServerCommandSource src, ServerWorld world, Structure structure, MazeSize size,
-             int margin, String id, BlockPos origin, boolean hunt, int allowance, int minDrop) {
+             int margin, String id, BlockPos origin, boolean hunt, int allowance, int minDrop,
+             fr.mazecraft.landmark.Landmark landmark) {
+            this.landmark = landmark;
             this.src = src;
             this.world = world;
             this.structure = structure;
@@ -446,6 +493,15 @@ public class DebugCommand {
                 scan.nanos += System.nanoTime() - started;
                 continue;
             }
+            if (scan.landmark != null) {
+                if (MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler,
+                        sea, x, z)) {
+                    scan.inBiome++;
+                    scanLandmarkSite(scan, gen, world, noise, x, z);
+                }
+                scan.nanos += System.nanoTime() - started;
+                continue;
+            }
             if (MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler, sea, x, z)) {
                 MazeStructure.Site s = MazeStructure.surveyFloor(gen, world, noise, x, z,
                         scan.size, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
@@ -481,11 +537,247 @@ public class DebugCommand {
                                     + scan.id).formatted(Formatting.GRAY), false);
                     return;
                 }
-                reportScan(scan);
+                if (scan.landmark != null) reportLandmarkScan(scan); else reportScan(scan);
             } catch (Exception e) {
                 MazeCraft.LOGGER.warn("[MazeCraft] scan finished but could not be reported", e);
             }
         }
+    }
+
+    /**
+     * DEBUG: how findable a maze under a landmark actually is, and what each rule costs.
+     *
+     * <p>Twelve sites picked by hand over two sessions said relief was the wall, then said it
+     * was water, then said it was neither. They were never a sample: a player teleports to
+     * interesting ground. This walks outward from where you stand until it has sixty positions
+     * in the right biome, judges every one of them by every rule even after one has already
+     * refused it, and prints what each rule cost.</p>
+     */
+    private static int onLandmarkScan(CommandContext<ServerCommandSource> ctx, String sizeId) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (size == null) {
+            src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
+            return 0;
+        }
+        if (running != null) {
+            src.sendError(Text.literal("[DEBUG] A scan is already running."));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        String id = "maze_" + CherryPagoda.STYLE.id() + "_" + size.id();
+        Structure structure = world.getRegistryManager().get(RegistryKeys.STRUCTURE)
+                .get(MazeCraft.id(id));
+        if (structure == null) {
+            src.sendError(Text.literal("[DEBUG] No structure " + id + " in the registry."));
+            return 0;
+        }
+        running = new Scan(src, world, structure, size, CherryPagoda.STYLE.margin, id,
+                player.getBlockPos(), false, MazeStructure.reliefAllowance(size), 0,
+                CherryPagoda.INSTANCE);
+        src.sendFeedback(() -> Text.literal("scanning for pagoda sites (" + size.id()
+                        + "): walking outward until " + SCAN_TARGET + " cherry groves are found,"
+                        + " a slice per tick. Every rule is measured on every one of them.")
+                .formatted(Formatting.GRAY), false);
+        return 1;
+    }
+
+    /** The tightest spread grid this structure is actually placed on, in chunks. */
+    private static int spacingOf(ServerWorld world, Structure structure) {
+        int tightest = Integer.MAX_VALUE;
+        for (var set : world.getRegistryManager().get(RegistryKeys.STRUCTURE_SET)) {
+            if (!(set.placement() instanceof net.minecraft.world.gen.chunk.placement
+                    .RandomSpreadStructurePlacement spread)) {
+                continue;
+            }
+            for (var weighted : set.structures()) {
+                if (weighted.structure().value() == structure) {
+                    tightest = Math.min(tightest, spread.getSpacing());
+                }
+            }
+        }
+        return tightest == Integer.MAX_VALUE ? 32 : tightest;
+    }
+
+    /** Outcomes a landmark site can have, as stored in the scan's rows. */
+    private static final int WHY_OK = 0, WHY_STAIR = 1, WHY_WET = 2, WHY_OPEN = 3;
+
+    /**
+     * One site, judged by the landmark's rules rather than the surface ones, and recorded
+     * <b>whatever</b> it did.
+     *
+     * <p>Every test is run on every site, including sites an earlier test already refused. That
+     * is the expensive choice and it is the only one that answers the question: "how many sites
+     * would pass if the relief allowance were twenty" cannot be answered from a scan that
+     * stopped measuring the moment relief said no.</p>
+     */
+    private static void scanLandmarkSite(Scan scan, ChunkGenerator gen, ServerWorld world,
+                                         NoiseConfig noise, int x, int z) {
+        Landmark landmark = scan.landmark;
+        MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, x, z,
+                landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, x, z,
+                scan.size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
+        int minFloor = Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY()));
+
+        int why;
+        int descent = -1;
+        if (minFloor > maxFloor) {
+            why = WHY_STAIR;
+        } else {
+            MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
+                    x, z, scan.size, minFloor, maxFloor);
+            if (report.found().isPresent()) {
+                why = WHY_OK;
+                descent = landmark.descent(pad.floorY(), report.found().getAsInt());
+            } else {
+                why = report.wet() == report.candidates() ? WHY_WET : WHY_OPEN;
+            }
+        }
+        // How far the ground falls somewhere in the maze's footprint: the number the stair cap
+        // is really about, and the one missing from the first run of this scan.
+        int fall = pad.floorY() - (over.lowest() - 1);
+        scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall});
+    }
+
+    /**
+     * What a landmark scan found, and above all what each rule costs.
+     *
+     * <p>The table at the end is the point of the whole command. Every row is the number of
+     * sites that would carry a pagoda <b>if the relief allowance were that</b>, with every other
+     * rule left exactly as it is — so the knob I have been refusing to turn from here can be
+     * turned on evidence instead of on a screenshot.</p>
+     */
+    private static void reportLandmarkScan(Scan scan) {
+        ServerCommandSource src = scan.src;
+        int sites = scan.examined;
+        int matched = scan.inBiome;
+        int blocks = scan.ring * SCAN_STEP;
+        long ms = scan.nanos / 1_000_000L;
+        src.sendFeedback(() -> Text.literal("=== landmark scan " + scan.id + ": " + sites
+                        + " positions out to " + blocks + " blocks, " + ms + " ms of work ===")
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        src.sendFeedback(() -> Text.literal("biome   " + matched + " of " + sites
+                        + " in a cherry grove (1 in " + (matched == 0 ? sites : sites / matched) + ")")
+                .formatted(Formatting.GRAY), false);
+        if (matched == 0 || scan.found.isEmpty()) {
+            src.sendFeedback(() -> Text.literal("No position here is in the right biome.")
+                    .formatted(Formatting.GOLD), false);
+            return;
+        }
+
+        int maxWater = scan.landmark.maxWater();
+        int allowed = scan.landmark.maxRelief();
+        int stair = 0, wet = 0, open = 0, wetFoot = 0, reliefFoot = 0, pass = 0;
+        java.util.List<Integer> reliefs = new java.util.ArrayList<>();
+        java.util.List<Integer> descents = new java.util.ArrayList<>();
+        java.util.List<Integer> falls = new java.util.ArrayList<>();
+        for (int[] row : scan.found) {
+            reliefs.add(row[0]);
+            falls.add(row[4]);
+            boolean footOk = row[0] <= allowed && row[1] <= maxWater;
+            if (row[0] > allowed) reliefFoot++;
+            else if (row[1] > maxWater) wetFoot++;
+            switch (row[2]) {
+                case WHY_STAIR -> stair++;
+                case WHY_WET -> wet++;
+                case WHY_OPEN -> open++;
+                default -> { }
+            }
+            if (footOk && row[2] == WHY_OK) {
+                pass++;
+                descents.add(row[3]);
+            }
+        }
+        java.util.Collections.sort(reliefs);
+        java.util.Collections.sort(descents);
+        java.util.Collections.sort(falls);
+        final int fReliefFoot = reliefFoot, fWetFoot = wetFoot;
+        src.sendFeedback(() -> Text.literal("pagoda  refused " + fReliefFoot + " for relief (over "
+                        + allowed + "), " + fWetFoot + " for water (over " + maxWater + ")")
+                .formatted(Formatting.GRAY), false);
+        final int fStair = stair, fWet = wet, fOpen = open;
+        src.sendFeedback(() -> Text.literal("burial  refused " + fStair + " by the stair cap, "
+                        + fWet + " too wet, " + fOpen + " too little rock")
+                .formatted(Formatting.GRAY), false);
+        src.sendFeedback(() -> Text.literal("relief  of the pagoda footprint: min " + reliefs.get(0)
+                        + ", 25% " + reliefs.get(reliefs.size() / 4)
+                        + ", median " + reliefs.get(reliefs.size() / 2)
+                        + ", 75% " + reliefs.get(reliefs.size() * 3 / 4)
+                        + ", max " + reliefs.get(reliefs.size() - 1))
+                .formatted(Formatting.GRAY), false);
+
+        int allowedFall = scan.landmark.maxStair() - 1 - scan.landmark.clearance()
+                - MazePiece.ROOF_DY;
+        src.sendFeedback(() -> Text.literal("fall    ground drop over the maze footprint: 25% "
+                        + falls.get(falls.size() / 4) + ", median " + falls.get(falls.size() / 2)
+                        + ", 75% " + falls.get(falls.size() * 3 / 4)
+                        + ", max " + falls.get(falls.size() - 1)
+                        + " (the stair cap allows " + allowedFall + ")")
+                .formatted(Formatting.GRAY), false);
+
+        final int fPass = pass;
+        int perSite = fPass == 0 ? 0 : sites / fPass;
+        src.sendFeedback(() -> Text.literal("result  " + fPass + " of " + matched
+                        + " in-biome positions carry a pagoda, so 1 position in "
+                        + (fPass == 0 ? "more than " + sites : String.valueOf(perSite)))
+                .formatted(fPass == 0 ? Formatting.RED : Formatting.GREEN), false);
+        if (!descents.isEmpty()) {
+            src.sendFeedback(() -> Text.literal("descent median " + descents.get(descents.size() / 2)
+                            + " blocks, max " + descents.get(descents.size() - 1))
+                    .formatted(Formatting.GRAY), false);
+        }
+        // What the grid turns that into: one candidate per cell, so the mean gap between two
+        // pagodas is the cell size divided by the square root of the acceptance.
+        //
+        // The spacing is READ FROM THE REGISTRY, not guessed from the size. It was guessed, and
+        // the guess was stale the moment the cherry grid moved: the scan reported one pagoda
+        // every 17 000 blocks when the real answer was 8 500. An instrument that quietly uses
+        // the number the mod used to have is worse than no instrument.
+        if (fPass > 0) {
+            int spacing = spacingOf(scan.world, scan.structure);
+            double p = (double) fPass / sites;
+            int gap = (int) Math.round(spacing * 16 / Math.sqrt(p));
+            src.sendFeedback(() -> Text.literal("spacing with the " + spacing
+                            + "-chunk grid: about one every " + gap + " blocks")
+                    .formatted(Formatting.GOLD), false);
+        }
+
+        StringBuilder table = new StringBuilder("relief  if the allowance were:");
+        for (int a : new int[]{8, 10, 12, 16, 20, 24, 32}) {
+            int n = 0;
+            for (int[] row : scan.found) {
+                if (row[0] <= a && row[1] <= maxWater && row[2] == WHY_OK) n++;
+            }
+            table.append("  ").append(a).append(": ").append(n);
+        }
+        src.sendFeedback(() -> Text.literal(table.toString()).formatted(Formatting.AQUA), false);
+
+        // The second knob, cut the same way: relief where it is, the stair cap moving.
+        //
+        // One caveat it would be dishonest to leave out. A site the cap refused was never put
+        // through the rock test at all, so these counts assume it would have passed. On this
+        // scan that assumption is worth something: of the sites that DID reach the rock test,
+        // it refused one out of thirty-five.
+        StringBuilder stairs = new StringBuilder("stair   if the cap were:");
+        for (int c : new int[]{30, 40, 50, 60, 80}) {
+            int n = 0;
+            for (int[] row : scan.found) {
+                boolean capOk = row[4] <= c - 1 - scan.landmark.clearance() - MazePiece.ROOF_DY;
+                if (row[0] <= allowed && row[1] <= maxWater && capOk
+                        && row[2] != WHY_WET && row[2] != WHY_OPEN) {
+                    n++;
+                }
+            }
+            stairs.append("  ").append(c).append(": ").append(n);
+        }
+        src.sendFeedback(() -> Text.literal(stairs.toString()).formatted(Formatting.AQUA), false);
     }
 
     private static void reportScan(Scan scan) {
@@ -591,6 +883,278 @@ public class DebugCommand {
         return out.toString();
     }
 
+    /**
+     * DEBUG: places a hand-built template at the player's feet, turned to face the way the
+     * player is facing. The fast loop for judging a piece: no maze to find first.
+     */
+    private static int onTemplate(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        String name = StringArgumentType.getString(ctx, "name");
+        var piece = new MazeTemplates.Piece(MazeCraft.id(name), MazeTemplates.CHERRY_PAGODA.facing());
+        // Turned to look back at the player, which is what an entrance you walk up to does.
+        Direction facing = player.getHorizontalFacing().getOpposite();
+        BlockRotation rotation = MazeTemplates.rotationTo(piece.facing(), facing);
+        BlockPos at = player.getBlockPos();
+        var size = MazeTemplates.size(world, piece, rotation);
+        if (!MazeTemplates.place(world, piece, at, facing)) {
+            src.sendError(Text.literal("No template data/mazecraft/structure/" + name
+                    + ".nbt (singular - the structure block saves to a 'structures' folder,"
+                    + " a data pack reads from 'structure')."));
+            return 0;
+        }
+        src.sendFeedback(() -> Text.literal("[DEBUG] placed " + name + " " + size.getX() + "x"
+                        + size.getY() + "x" + size.getZ() + " centred on " + at.getX() + " "
+                        + at.getY() + " " + at.getZ() + "; built facing " + piece.facing()
+                        + ", turned " + rotation + " to face " + facing)
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        return 1;
+    }
+
+    /**
+     * DEBUG: the whole assembly where the player stands — pagoda, levelled ground, shaft, and the
+     * buried maze under it — built by the same pieces world generation builds.
+     *
+     * <p>Not a mock-up of it: this constructs the real {@code MazePiece} and the real
+     * {@code PagodaPiece} and calls {@code generate} on each, in the order generation calls them,
+     * so the junction between the shaft and the maze's roof is the junction the game will make.
+     * What it skips is only the hunting: finding a cherry grove whose ground passes the rule.</p>
+     *
+     * <p>It does run the rules and says whether they would have accepted the spot, for the same
+     * reason {@code /maze debug place} does — a tool that can be mistaken for the real thing has
+     * to say so itself.</p>
+     */
+    private static int onPagoda(CommandContext<ServerCommandSource> ctx, String sizeId, int lift) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (size == null) {
+            src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        Landmark landmark = CherryPagoda.INSTANCE;
+        BlockPos at = player.getBlockPos();
+        ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
+        NoiseConfig noise = world.getChunkManager().getNoiseConfig();
+
+        MazeStructure.Site measured = landmark.site(gen, world, noise, at.getX(), at.getZ());
+        // `lift` moves the whole building, and everything derived from it, a block at a time.
+        // How a hand-built template meets the ground is a looking question and I have now got
+        // it wrong once; this makes the answer a minute's work instead of a rebuild.
+        //
+        // And the height comes from a survey with NO thresholds, never from `measured`. A Site
+        // that bailed early carries floorY = 0 — the survey stops at the sample that broke the
+        // rule, and the floor is the average of all twenty-five, so there is no floor to report
+        // yet. Reading it anyway put the pagoda at y = 0 on every refused site: underground, in
+        // a cavern, hanging in the air a hundred blocks BELOW the maze it is supposed to lead
+        // down to. The verdict comes from the judged survey; the height never does.
+        MazeStructure.Site ground = MazeStructure.surveyFloor(gen, world, noise, at.getX(),
+                at.getZ(), landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        MazeStructure.Site pad = new MazeStructure.Site(measured.relief(), measured.water(),
+                measured.wet(), measured.drop(), ground.floorY() + lift,
+                measured.rejected(), measured.x(), measured.z(), measured.lowest());
+        var found = landmark.floorY(gen, world, noise, at.getX(), at.getZ(), size, pad.floorY());
+        if (!pad.ok() || found.isEmpty()) {
+            String why = pad.ok()
+                    ? MazeStructure.surveyBurial(gen, world, noise, at.getX(), at.getZ(), size,
+                            Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY())),
+                            landmark.ceilingUnder(MazeStructure.surveyFloor(gen, world, noise,
+                                    at.getX(), at.getZ(), size.span() / 2, 0,
+                                    MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT))
+                                    - MazePiece.ROOF_DY).why()
+                    : pad.rejected() + " on the building's own footprint";
+            src.sendFeedback(() -> Text.literal("[DEBUG] WARNING: generation would REFUSE this spot"
+                            + " (" + why + "). Building it anyway, capped at the stair limit -"
+                            + " what you are about to see is NOT something the game can produce."
+                            + " /maze debug depth gives the full breakdown.")
+                    .formatted(Formatting.RED), false);
+        }
+        // Somewhere to stand it even when the rules said no, so a refused spot can still be
+        // looked at: the shallowest floor the ceiling rule allows, rock test aside.
+        //
+        // The stair cap still applies to the fallback. Without it one refused plateau produced
+        // a descent of 102 blocks and twenty-five full turns of spiral, because the lowest
+        // ground in a 101 by 101 footprint was a hundred blocks below the building. That is not
+        // a maze anybody can look at, and the point of forcing a build is to look at it.
+        MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
+                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        int floorY = found.orElse(Math.max(
+                Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY())),
+                landmark.ceilingUnder(over) - MazePiece.ROOF_DY));
+        Direction facing = player.getHorizontalFacing().getOpposite();
+
+        long seed = world.getRandom().nextLong();
+        MazePiece maze = new MazePiece(CherryPagoda.STYLE, size, seed,
+                at.getX(), floorY, at.getZ(), Random.create(seed).nextInt(4));
+        PagodaPiece pagoda = new PagodaPiece(new BlockPos(at.getX(), floorY, at.getZ()),
+                pad.floorY(), floorY, facing);
+        // The maze first, then the building: within a chunk generation runs them in this order,
+        // and the shaft has to be cut through the roof after the roof exists.
+        maze.generate(world, world.getStructureAccessor(), gen, Random.create(seed),
+                maze.getBoundingBox(), new ChunkPos(at), at);
+        pagoda.generate(world, world.getStructureAccessor(), gen, Random.create(seed),
+                pagoda.getBoundingBox(), new ChunkPos(at), at);
+        lastPlaced = maze;
+
+        int descent = landmark.descent(pad.floorY(), floorY);
+        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda facing " + facing + " on ground "
+                        + pad.floorY() + (lift == 0 ? "" : " (lifted " + lift + ")")
+                        + " (relief " + pad.relief() + "), " + size.id()
+                        + " cherry maze floor " + floorY + ", descent " + descent + " blocks, "
+                        + (descent / 4) + " full turns - seed " + seed)
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        return 1;
+    }
+
+    /**
+     * DEBUG: how deep the maze would go under a landmark standing where the player is, and why.
+     *
+     * <p>The instrument before the thing it measures. The depth rule has one trap in it — the
+     * ceiling is set by the LOWEST ground anywhere over the maze's footprint, not by the ground
+     * under the building — and a hundred and one blocks of footprint is wide enough for a river
+     * to be in it without being anywhere near the player. So this prints both surveys side by
+     * side, the building's and the maze's, and the arithmetic between them. If the rule is
+     * wrong, it is wrong here, before a single block has been placed.</p>
+     */
+    private static int onDepth(CommandContext<ServerCommandSource> ctx, String sizeId) {
+        ServerCommandSource src = ctx.getSource();
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (size == null) {
+            src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        Landmark landmark = CherryPagoda.INSTANCE;
+        BlockPos at = BlockPos.ofFloored(src.getPosition());
+        ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
+        NoiseConfig noise = world.getChunkManager().getNoiseConfig();
+
+        // The building: measured on its own footprint for the numbers, and judged by the same
+        // method worldgen will call for the verdict. Not a second copy of the rule here: a
+        // debug command that re-implements the thing it reports on is how a tool starts lying.
+        MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
+                landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        MazeStructure.Site verdict = landmark.site(gen, world, noise, at.getX(), at.getZ());
+        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda footprint " + (landmark.half() * 2)
+                        + "x" + (landmark.half() * 2) + ": relief " + pad.relief() + " of "
+                        + landmark.maxRelief() + " allowed, water " + pad.water()
+                        + ", ground " + pad.lowest() + " to " + pad.highest()
+                        + " -> " + (verdict.ok() ? "PASSES" : "REFUSED (" + verdict.rejected() + ")"))
+                .formatted(verdict.ok() ? Formatting.GREEN : Formatting.RED), false);
+
+        // The maze: only measured. Nothing about its footprint is judged any more - a bump no
+        // longer refuses anything, which is the whole point of burying it.
+        MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
+                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        src.sendFeedback(() -> Text.literal("[DEBUG] maze footprint " + size.span() + "x"
+                        + size.span() + ": ground " + over.lowest() + " to " + over.highest()
+                        + " (relief " + over.relief() + ", not judged), the ceiling must pass"
+                        + " under " + (over.lowest() - 1 - landmark.clearance()))
+                .formatted(Formatting.GRAY), false);
+
+        int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
+        int byStair = landmark.deepestForStair(pad.floorY());
+        int minFloor = Math.max(landmark.floorLimit(), byStair);
+        src.sendFeedback(() -> Text.literal(minFloor > maxFloor
+                        ? "[DEBUG] no height is both deep enough to clear the ground (" + maxFloor
+                          + " or lower) and shallow enough for the stair (" + minFloor
+                          + " or higher)"
+                        : "[DEBUG] looking for solid rock between floor " + minFloor + " and "
+                          + maxFloor + " (deepest the " + landmark.maxStair()
+                          + "-block stair cap allows here: " + byStair + ")")
+                .formatted(Formatting.GRAY), false);
+        if (minFloor > maxFloor) {
+            src.sendFeedback(() -> Text.literal("[DEBUG] REFUSED: the floor has to sit "
+                            + (pad.floorY() - maxFloor) + " blocks below this building's floor,"
+                            + " more than the " + landmark.maxStair() + " the stair cap allows."
+                            + " The ground falls " + (pad.floorY() - (over.lowest() - 1))
+                            + " blocks somewhere in the maze's footprint.")
+                    .formatted(Formatting.RED), false);
+            return 1;
+        }
+
+        // The breakdown, not just the verdict. "No floor deep enough in rock" was true and
+        // useless: it covered a height range that was empty, a range entirely under water, and
+        // a range of open cavern, which are three different problems with three different
+        // answers - and the one that was actually happening was the second.
+        MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
+                at.getX(), at.getZ(), size, minFloor, maxFloor);
+        src.sendFeedback(() -> Text.literal("[DEBUG] " + report.candidates() + " heights tried: "
+                        + report.wet() + " refused for fluid, " + report.open()
+                        + " for too little rock"
+                        + (report.bestRatio() < 0 ? ""
+                           : ", best rock cover " + Math.round(report.bestRatio() * 100) + "%")
+                        + (report.leastFluid() <= 0 ? ""
+                           : ", driest height still had " + report.leastFluid() + " of "
+                             + report.fluidProbes() + " probes wet"))
+                .formatted(Formatting.GRAY), false);
+        var floorY = report.found();
+        if (floorY.isEmpty()) {
+            src.sendFeedback(() -> Text.literal("[DEBUG] REFUSED: " + report.why())
+                    .formatted(Formatting.RED), false);
+            return 1;
+        }
+        int floor = floorY.getAsInt();
+        int descent = landmark.descent(pad.floorY(), floor);
+        src.sendFeedback(() -> Text.literal("[DEBUG] floor " + floor + ", roof " + (floor + MazePiece.ROOF_DY)
+                        + ", so " + (over.lowest() - 1 - (floor + MazePiece.ROOF_DY))
+                        + " blocks of rock over the ceiling at the thinnest point")
+                .formatted(Formatting.GREEN), false);
+        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda floor at " + pad.floorY() + " -> descent "
+                        + descent + " blocks, " + (descent * 2) + " slab steps, "
+                        + (descent / 4) + " full turns")
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        return 1;
+    }
+
+    /**
+     * DEBUG: places the pagoda at the player's feet and carries its spiral staircase down
+     * {@code depth} levels.
+     *
+     * <p>The one thing this is for is to be looked at from four directions. The shaft is written
+     * in the template's coordinates and put through the same transform as the building, so the
+     * claim is that the pole below ground sits under the pole above it whichever way the pagoda
+     * is turned. That claim is checkable in about a minute and not provable from here, which is
+     * why it gets its own command rather than being tested once the maze is hanging off it.</p>
+     */
+    private static int onShaft(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        if (player == null) {
+            src.sendError(Text.translatable("mazecraft.command.players_only"));
+            return 0;
+        }
+        ServerWorld world = src.getWorld();
+        int depth = IntegerArgumentType.getInteger(ctx, "depth");
+        Direction facing = player.getHorizontalFacing().getOpposite();
+        BlockPos at = player.getBlockPos();
+        MazeTemplates.Placement placement =
+                MazeTemplates.placement(world, MazeTemplates.CHERRY_PAGODA, at, facing);
+        if (placement == null || !MazeTemplates.place(world, placement, world.getRandom(), null)) {
+            src.sendError(Text.literal("No template data/mazecraft/structure/"
+                    + MazeTemplates.CHERRY_PAGODA.id().getPath() + ".nbt"));
+            return 0;
+        }
+        int bottom = PagodaStair.GROUND_Y - depth;
+        int levels = PagodaStair.digDown(world, placement, bottom, 0, null);
+        BlockPos pole = PagodaStair.pole(placement, bottom);
+        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda facing " + facing + "; stair carried down "
+                        + levels + " levels, foot of the pole at " + pole.getX() + " " + pole.getY()
+                        + " " + pole.getZ())
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        return 1;
+    }
+
     private static int onInfo(CommandContext<ServerCommandSource> ctx) {
         ServerCommandSource src = ctx.getSource();
         MazeCraftConfig cfg = MazeCraftConfig.get();
@@ -680,6 +1244,21 @@ public class DebugCommand {
                             + " for an allowance of " + MazeStructure.reliefAllowance(size)
                             + "). What you are about to see is NOT something the game can produce.")
                     .formatted(Formatting.RED), false);
+        }
+
+        // A roofed Overworld style is half-wired by definition: the roof is there because the
+        // maze is going underground, and until the landmark that is to be its way in exists,
+        // world generation still puts it on the surface, where it is a sealed box with trees
+        // growing through it (clearAbove does nothing for an enclosed maze, on purpose - taking
+        // the column up would bore a shaft to the sky). Say so here rather than letting a
+        // screenshot of that be taken as evidence about the roof.
+        if (style.enclosed && !style.isNether() && !style.isKronos()) {
+            src.sendFeedback(() -> Text.literal("[DEBUG] NOTE: " + style.id() + " is a roofed style"
+                            + " meant to be buried under its own landmark. What you place here is"
+                            + " the hall as it will look underground. A " + style.id() + " maze"
+                            + " FOUND IN THE WORLD in this build is still on the surface and is"
+                            + " not finished - do not judge it.")
+                    .formatted(Formatting.YELLOW), false);
         }
 
         // Sit it on the floor generation would have chosen when the site is a real one, so a
@@ -775,6 +1354,46 @@ public class DebugCommand {
      * maze, and the treasure chamber behind the door is not reachable at all until the code
      * exists. Both have to be looked at before either is finished.</p>
      */
+    /**
+     * DEBUG: where the crypt of this maze is, and a lift to the top of its stair.
+     *
+     * <p>The goal of a maze entered through its middle is at the end of the longest walk it has
+     * — 51 to 285 cells for a medium one, measured. That is the point of it and a bad way to
+     * check the room was built right.</p>
+     */
+    private static int onCrypt(CommandContext<ServerCommandSource> ctx) {
+        ServerCommandSource src = ctx.getSource();
+        ServerPlayerEntity player = src.getPlayer();
+        ServerWorld world = src.getWorld();
+        MazeFinder.MazeHit hit = MazeFinder.find(world, BlockPos.ofFloored(src.getPosition()), 64);
+        // Same fallback as the vault: a maze from /maze debug pagoda is not a structure, so the
+        // lookup can never find it.
+        MazePiece maze = hit != null ? hit.piece() : lastPlaced;
+        if (maze == null) {
+            src.sendError(Text.literal("[DEBUG] No maze here, and none placed this session."
+                    + " Try /maze debug pagoda."));
+            return 0;
+        }
+        if (!maze.hasCrypt() || maze.cryptEntrance() == null) {
+            src.sendError(Text.literal("[DEBUG] This maze has no crypt (" + maze.getSize().id()
+                    + " " + maze.getStyle().id() + ") - only a maze entered through its middle"
+                    + " has one."));
+            return 0;
+        }
+        BlockPos stair = maze.cryptEntrance();
+        BlockPos chest = maze.cryptChestPos();
+        src.sendFeedback(() -> Text.literal("[DEBUG] crypt stair at " + stair.toShortString()
+                        + ", chest at " + chest.toShortString() + ", "
+                        + (stair.getY() - chest.getY()) + " blocks down")
+                .formatted(Formatting.LIGHT_PURPLE), false);
+        if (player != null) {
+            player.teleport(world, stair.getX() + 0.5, stair.getY(), stair.getZ() + 0.5,
+                    player.getYaw(), player.getPitch());
+            player.fallDistance = 0;
+        }
+        return 1;
+    }
+
     private static int onVault(CommandContext<ServerCommandSource> ctx, boolean open) {
         ServerCommandSource src = ctx.getSource();
         ServerWorld world = src.getWorld();

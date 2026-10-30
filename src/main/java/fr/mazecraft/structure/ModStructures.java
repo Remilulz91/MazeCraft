@@ -25,6 +25,17 @@ public final class ModStructures {
             Registries.STRUCTURE_PIECE, MazeCraft.id("kronos_gate_piece"),
             (StructurePieceType) KronosGatePiece::new);
 
+    /**
+     * The cherry pagoda: the building, the ground levelled under it, and the shaft down.
+     *
+     * <p>This line and {@code Landmarks.of} are the only two places a new landmark has to be
+     * mentioned. Registration has to happen somewhere central — a piece type that is not in the
+     * registry cannot be written to a save file — so two files it is, rather than one.</p>
+     */
+    public static final StructurePieceType PAGODA_PIECE = Registry.register(
+            Registries.STRUCTURE_PIECE, MazeCraft.id("pagoda_piece"),
+            (StructurePieceType) fr.mazecraft.landmark.PagodaPiece::new);
+
     private ModStructures() { }
 
     /** Forces class loading (and therefore registration). */

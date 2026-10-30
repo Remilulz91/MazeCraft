@@ -70,6 +70,19 @@ public final class MazeProgress {
      * <em>same</em> style has been cleared — progression never carries over between styles.
      */
     public static boolean canEnter(ServerPlayerEntity player, MazeStyle style, MazeSize size) {
+        // A style entered through a landmark has no order to respect.
+        //
+        // The rule exists because a surface maze advertises its size: you see a 61-block hedge
+        // or a 149-block one from outside and know which step you are standing at, so sending
+        // a player away from a large one until they have done the small is a readable gate.
+        // Under a pagoda there is nothing to see. Every building looks the same from the
+        // outside and what is underneath is whichever size that grid put there, so the gate
+        // stops being a progression and becomes a door that slams for no visible reason after
+        // a player has walked down forty blocks of stairs.
+        //
+        // The three sizes still all have to be cleared to finish the style -- the count is
+        // untouched -- they simply no longer have to be cleared in order.
+        if (style.enteredFromPlaza()) return true;
         MazeSize previous = size.previousStep();
         return previous == null || hasCleared(player, style, previous);
     }
@@ -119,9 +132,11 @@ public final class MazeProgress {
         List<MazeStyle> list = new ArrayList<>();
         for (MazeStyle style : MazeStyle.PROGRESSION) {
             boolean match;
-            if (key.equals(World.NETHER)) match = style.enclosed;
+            // isNether(), not enclosed: a roof is how a maze is built, not where it is. The
+            // cherry maze is roofed and belongs to the Overworld.
+            if (key.equals(World.NETHER)) match = style.isNether();
             else if (key.equals(World.END)) match = style.isEnd();
-            else if (key.equals(World.OVERWORLD)) match = !style.enclosed && !style.isEnd();
+            else if (key.equals(World.OVERWORLD)) match = !style.isNether() && !style.isEnd();
             else match = false; // modded dimension: no maze of ours
             if (match) list.add(style);
         }

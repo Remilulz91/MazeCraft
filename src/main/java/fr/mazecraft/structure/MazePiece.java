@@ -27,6 +27,7 @@ import net.minecraft.nbt.NbtCompound;
 import net.minecraft.registry.RegistryKey;
 import net.minecraft.registry.tag.BlockTags;
 import net.minecraft.registry.RegistryKeys;
+import net.minecraft.server.world.ServerWorld;
 import net.minecraft.structure.StructureContext;
 import net.minecraft.structure.StructurePiece;
 import net.minecraft.util.math.BlockBox;
@@ -238,6 +239,88 @@ public class MazePiece extends StructurePiece {
     private static final int VAULT_KEY_X0 = -6;
     /** Height of the keys above the vault floor — eye level for somebody standing on it. */
     private static final int VAULT_KEY_DY = 2;
+
+    // =====================================================================
+    // The crypt: the room under the goal of a maze entered through its middle
+    // =====================================================================
+
+    /**
+     * Half-width of the crypt, and how far below the maze floor it sits.
+     *
+     * <p>Fifteen blocks across outside, thirteen of room, and seven blocks of head room — taller
+     * than the vault's four, because something is going to be fought in here. The ceiling stays
+     * at the vault's five below the maze floor so the stair down is the same length and reads the
+     * same; the floor goes two deeper instead.</p>
+     */
+    private static final int CRYPT_RADIUS = 7;
+    private static final int CRYPT_FLOOR = 12, CRYPT_CEIL = 5;
+
+    /** Stands in the cache for "asked, and this maze has no crypt". */
+    private static final int[] NO_CRYPT = new int[0];
+    private int[] cryptCell;
+
+    /** True for a maze whose progression leads outwards to a dead end with a room under it. */
+    public boolean hasCrypt() {
+        return style.enteredFromPlaza();
+    }
+
+    /**
+     * The dead end the crypt hangs under: the goal of the progression, behind the last gate.
+     *
+     * <p>Cached the same way, and for the same reason, as {@link #vaultCell()}: one field, one
+     * write, {@link #NO_CRYPT} standing in for "there is none". Chunks of one maze generate on
+     * several threads, and a value field plus a "known" flag can be seen half-written.</p>
+     */
+    private int[] cryptCell() {
+        int[] cached = cryptCell;
+        if (cached == null) {
+            int[] found = hasCrypt() ? layout().goal() : null;
+            cached = found == null ? NO_CRYPT : found;
+            cryptCell = cached;
+        }
+        return cached == NO_CRYPT ? null : cached;
+    }
+
+    /** Local X/Z of the middle of the crypt's dead-end cell, or null. */
+    private int[] cryptOrigin() {
+        int[] cell = cryptCell();
+        return cell == null ? null
+                : new int[]{MazeLayout.CELL * cell[0] + 2, MazeLayout.CELL * cell[1] + 2};
+    }
+
+    /** The middle of the crypt floor, where the treasure stands. */
+    public BlockPos cryptChestPos() {
+        int[] o = cryptOrigin();
+        return o == null ? null : new BlockPos(
+                originX() + o[0], floorY - CRYPT_FLOOR + 1, originZ() + o[1]);
+    }
+
+    /** The dead end at the top of the crypt's stair, at feet height. */
+    public BlockPos cryptEntrance() {
+        int[] o = cryptOrigin();
+        return o == null ? null : new BlockPos(originX() + o[0], floorY + 1, originZ() + o[1]);
+    }
+
+    /**
+     * Puts the crypt's chest on its floor. Called when the guardian falls, not when the maze is
+     * built — the chest is meant to arrive, not to have been waiting.
+     *
+     * <p>Idempotent, because the two things that call it are a death and a fallback and either
+     * may run twice: it does nothing if a chest is already there. The repair pass never writes
+     * this block at all, so a chunk reloading afterwards leaves it alone.</p>
+     *
+     * @return true if a chest was actually placed
+     */
+    public boolean placeCryptChest(ServerWorld world) {
+        BlockPos at = cryptChestPos();
+        if (at == null || world.getBlockState(at).isOf(Blocks.CHEST)) return false;
+        world.setBlockState(at, Blocks.CHEST.getDefaultState()
+                .with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
+        if (world.getBlockEntity(at) instanceof ChestBlockEntity chest) {
+            chest.setLootTable(lootTableFor(style, size), seed);
+        }
+        return true;
+    }
 
     /** Stands in the cache for "asked, and this maze has no vault" — see {@link #vaultCell()}. */
     private static final int[] NO_VAULT = new int[0];
@@ -494,7 +577,7 @@ public class MazePiece extends StructurePiece {
     public MazeLayout layout() {
         if (layout == null) {
             layout = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates(),
-                    plazaRadius());
+                    plazaRadius(), style.enteredFromPlaza());
         }
         return layout;
     }
@@ -509,9 +592,22 @@ public class MazePiece extends StructurePiece {
     }
 
     /** World position of the central chest. */
+    /**
+     * Where the treasure is.
+     *
+     * <p>The middle of the maze for the sixteen styles you walk into from outside — you work
+     * your way in, and the plaza is the prize. For a maze entered <em>through</em> its middle
+     * the middle is the front door, so the prize goes to the far end instead: down the stair in
+     * the dead end furthest from the plaza, on the floor of the crypt. Measured over two
+     * thousand layouts, that dead end is 61 to 285 cells of walking in a medium maze.</p>
+     *
+     * <p>One method, so the thirteen places that ask where the chest is follow without knowing
+     * any of this. What they must not use it for is the maze's geometric middle — see
+     * {@link #centerPos}.</p>
+     */
     public BlockPos chestPos() {
-        int c = layout().center();
-        return new BlockPos(originX() + c, floorY + 1, originZ() + c);
+        BlockPos crypt = cryptChestPos();
+        return crypt != null ? crypt : centerPos();
     }
 
     /** World position (feet) just outside the entrance, on the approach path. */
@@ -759,9 +855,18 @@ public class MazePiece extends StructurePiece {
         return path;
     }
 
-    /** Centre of the maze, at feet height (for the thread's direction outside the maze). */
+    /**
+     * The geometric middle of the maze, at feet height.
+     *
+     * <p>Not the chest any more, and the difference matters in two places: the barrier shoves a
+     * player who may not enter <b>away from the middle</b>, and pushing them away from a chest
+     * sitting in a far corner would shove some of them further in. Anything that means
+     * "the plaza" or "the centre" asks this; anything that means "the treasure" asks
+     * {@link #chestPos}.</p>
+     */
     public BlockPos centerPos() {
-        return chestPos();
+        int c = layout().center();
+        return new BlockPos(originX() + c, floorY + 1, originZ() + c);
     }
 
     /** Progress (0 = first zone, 1 = last zone) of the corridor at (x, z). */
@@ -836,6 +941,7 @@ public class MazePiece extends StructurePiece {
                 //    pillars down to the ground or into the lava. Overworld: fill gaps until solid ground.
                 if (style.enclosed) {
                     buildUnderside(world, pos, x, z);
+                    buildShell(world, pos, x, z);
                 }
                 for (int y = floorY - 1; !style.enclosed && y >= floorY - FOUNDATION_DEPTH; y--) {
                     pos.set(x, y, z);
@@ -884,9 +990,20 @@ public class MazePiece extends StructurePiece {
                 //     there is a code to look for. Only the door behind the keys is sealed.
                 if (hasVault()) buildVault(world, pos, x, z, lx, lz, placeChest, repairing);
 
+                // 2e. The crypt at the end of a maze entered through its middle. After the floor
+                //     above, because its stair is cut up through that floor.
+                if (hasCrypt()) buildCrypt(world, pos, x, z, lx, lz, placeChest);
+
                 // 3. Walls, pillars, and clearing above
                 if (style.enclosed) {
-                    buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
+                    // The ring of a landmark maze is rock, not corridor. Done here rather than
+                    // with the rest of the shell because step 2 above has just written a floor
+                    // across it, and the ring has no floor.
+                    if (!inside && style.enteredFromPlaza()) {
+                        fillRockRing(world, pos, x, z, keep);
+                    } else {
+                        buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
+                    }
                     continue;
                 }
                 for (int dy = 1; dy <= CLEAR_HEIGHT; dy++) {
@@ -977,8 +1094,10 @@ public class MazePiece extends StructurePiece {
 
         // The arena of Kronos has no chest at its centre: what is at the centre is the
         // Minotaur, and the hoard is only opened once it is down.
+        // A crypt's chest is not built with the maze: it arrives when the guardian falls, from
+        // placeCryptChest. Kronos's hoard is the same idea and has always worked that way.
         BlockPos chest = chestPos();
-        if (placeChest && !style.isKronos() && chunkBox.contains(chest)) {
+        if (placeChest && !style.isKronos() && !hasCrypt() && chunkBox.contains(chest)) {
             world.setBlockState(chest,
                     Blocks.CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
             BlockEntity be = world.getBlockEntity(chest);
@@ -1125,6 +1244,119 @@ public class MazePiece extends StructurePiece {
         }
     }
 
+    /**
+     * One column of the crypt: the room at the end of a maze entered through its middle.
+     *
+     * <p>A single chamber rather than the vault's two, because nothing here is behind a door —
+     * the lock on this room is the maze above it. You walk the longest path the maze has, you
+     * find the dead end at the end of it, and the floor of that dead end opens.</p>
+     *
+     * <p>Written to the same rules as the vault and the hoard, which are not stylistic: a room
+     * this size cannot be raised from a tick, so it is built with the chunk; and nothing in it
+     * may depend on the {@code Random} handed to the build pass, because generation and the
+     * repair pass are seeded differently and the room would rearrange itself the first time a
+     * chunk was repaired. And the chest's own block is never written on a repair — writing it
+     * scatters the contents on the floor and leaves no chest, which is the bug the hoard shipped
+     * with and the vault then inherited.</p>
+     */
+    private void buildCrypt(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                            int lx, int lz, boolean placeChest) {
+        int[] o = cryptOrigin();
+        if (o == null) return;
+        int dx = lx - o[0], dz = lz - o[1];
+        int d = Math.max(Math.abs(dx), Math.abs(dz));
+        if (d > CRYPT_RADIUS) return;
+
+        int floor = floorY - CRYPT_FLOOR;
+        int ceiling = floorY - CRYPT_CEIL;
+        BlockState shell = style.wallBase;
+        BlockState air = Blocks.AIR.getDefaultState();
+        boolean wall = d == CRYPT_RADIUS;
+
+        BlockPos chest = cryptChestPos();
+        boolean onChest = !wall && x == chest.getX() && z == chest.getZ();
+
+        // 1. Floor, room, ceiling.
+        world.setBlockState(pos.set(x, floor, z),
+                wall ? shell : (d >= CRYPT_RADIUS - 1 ? shell : style.plaza), Block.NOTIFY_LISTENERS);
+        for (int y = floor + 1; y < ceiling; y++) {
+            if (onChest && y == chest.getY() && !placeChest) continue;
+            pos.set(x, y, z);
+            if (wall) {
+                boolean pilaster = (Math.abs(dx) == CRYPT_RADIUS && Math.floorMod(dz, 4) == 0)
+                        || (Math.abs(dz) == CRYPT_RADIUS && Math.floorMod(dx, 4) == 0);
+                world.setBlockState(pos, pilaster ? style.pillar : shell, Block.NOTIFY_LISTENERS);
+            } else {
+                // SKIP_DROPS as well: emptying a room must never spill anything on its floor,
+                // whatever ends up standing in it one day.
+                world.setBlockState(pos, air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            }
+        }
+        // The mouth of the stairwell gets the accent block, or the opening, its lining and the
+        // stair are all the same masonry and read from below as a lump hanging off the ceiling.
+        boolean mouth = Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
+        world.setBlockState(pos.set(x, ceiling, z),
+                mouth || Math.floorMod(dx, 4) == 0 ? style.pillar : shell, Block.NOTIFY_LISTENERS);
+        // A block of rock under the floor and over the ceiling: both of those are made of the
+        // style's own wood here. The shaft is cut after this and takes its own hole back.
+        seal(world, pos, x, floor - 1, z);
+        seal(world, pos, x, ceiling + 1, z);
+
+        if (!wall) {
+            // Four lights hung off the diagonals, clear of the stair and of the middle.
+            if (Math.abs(dx) == 4 && Math.abs(dz) == 4) {
+                world.setBlockState(pos.set(x, ceiling - 1, z),
+                        style.hangingLight != null ? style.hangingLight : style.light,
+                        Block.NOTIFY_LISTENERS);
+            }
+        }
+
+        // 2. The shaft up to the dead end, and its spiral.
+        if (Math.abs(dx) > 2 || Math.abs(dz) > 2) return;
+        if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+            for (int y = ceiling + 1; y < floorY; y++) {
+                world.setBlockState(pos.set(x, y, z), shell, Block.NOTIFY_LISTENERS);
+            }
+            return;
+        }
+        int bottom = floor + 1;
+        int rot = cryptSpiralRotation(bottom);
+        // Top down would pull the lantern hanging under the dead end's ceiling off its support,
+        // the way the pagoda's shaft did; nothing hangs here yet, but the order costs nothing.
+        for (int y = bottom; y <= floorY; y++) {
+            world.setBlockState(pos.set(x, y, z), air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+        }
+        for (int y = bottom; y <= floorY; y++) {
+            for (int half = 0; half < 2; half++) {
+                int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
+                        SHAFT_SPIRAL.length)];
+                if (step[0] != dx || step[1] != dz) continue;
+                world.setBlockState(pos.set(x, y, z), vaultSlab()
+                                .with(SlabBlock.TYPE, half == 0 ? SlabType.BOTTOM : SlabType.TOP),
+                        Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /** Turned so the TOP step of the crypt's stair is the one under the dead end's doorway. */
+    private int cryptSpiralRotation(int bottom) {
+        int[] cell = cryptCell();
+        int exit = cell == null ? -1 : layout().onlyExit(cell[0], cell[1]);
+        int[] towards = switch (exit) {
+            case MazeLayout.NORTH -> new int[]{0, -1};
+            case MazeLayout.SOUTH -> new int[]{0, 1};
+            case MazeLayout.WEST -> new int[]{-1, 0};
+            case MazeLayout.EAST -> new int[]{1, 0};
+            default -> null;
+        };
+        if (towards == null) return 0;
+        int target = 0;
+        for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
+            if (SHAFT_SPIRAL[i][0] == towards[0] && SHAFT_SPIRAL[i][1] == towards[1]) target = i;
+        }
+        return target - ((floorY - bottom) * 2 + 1);
+    }
+
     /** The eight cells round a 3 × 3 shaft: one step per half block makes a walkable spiral. */
     private static final int[][] SHAFT_SPIRAL = {
             {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1}, {0, -1}, {1, -1}
@@ -1198,6 +1430,8 @@ public class MazePiece extends StructurePiece {
         boolean mouth = Math.abs(dx) <= 2 && Math.abs(dz) <= 2;
         world.setBlockState(pos.set(x, ceiling, z),
                 mouth || Math.floorMod(dx, 4) == 0 ? style.pillar : shell, Block.NOTIFY_LISTENERS);
+        seal(world, pos, x, floor - 1, z);
+        seal(world, pos, x, ceiling + 1, z);
 
         // 2. What stands on the floor of the two rooms.
         if (!wall) vaultFurniture(world, pos, x, z, dx, dz, floor, placeChest);
@@ -1483,19 +1717,79 @@ public class MazePiece extends StructurePiece {
      */
     private void buildUnderside(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
         BlockBox box = this.boundingBox;
+        BlockState slab = style.substructure();
         pos.set(x, floorY - 1, z);
-        if (world.getBlockState(pos) != style.ceiling) {
-            world.setBlockState(pos, style.ceiling, Block.NOTIFY_LISTENERS);
+        if (world.getBlockState(pos) != slab) {
+            world.setBlockState(pos, slab, Block.NOTIFY_LISTENERS);
         }
         int side = box.getMaxX() - box.getMinX() + 1;
         if (!supportBand(x - box.getMinX(), side) || !supportBand(z - box.getMinZ(), side)) return;
         int bottom = Math.max(world.getBottomY() + 1, floorY - 1 - SUPPORT_MAX_DEPTH);
+        BlockState post = style.support();
         for (int y = floorY - 2; y >= bottom; y--) {
             pos.set(x, y, z);
             BlockState current = world.getBlockState(pos);
             boolean solid = !current.isAir() && !current.isReplaceable() && current.getFluidState().isEmpty();
             if (solid) break;
-            world.setBlockState(pos, style.pillar, Block.NOTIFY_LISTENERS);
+            world.setBlockState(pos, post, Block.NOTIFY_LISTENERS);
+        }
+    }
+
+    /**
+     * A one-block skin of rock over the roof of a maze buried in the Overworld, and one course of
+     * it down each outer face.
+     *
+     * <p>A sealed box is only sealed against what touches it. The cherry maze's skin is leaves,
+     * logs and planks, and the rule that buries it leaves four blocks of rock over the ceiling at
+     * the thinnest point — but a cave can be inside those four blocks, and lava inside the cave.
+     * Fire needs an air block next to something that burns; this takes the air away. It also
+     * plugs any cave that would otherwise open onto the outer wall and let mobs path in.</p>
+     *
+     * <p>Only where there is actually something to fill, so the vast majority of columns cost one
+     * read and no write. Not in the Nether, where the doorway is <em>meant</em> to open onto a
+     * cave — {@code mostOpenSide} picks the side where the rock is most open on purpose.</p>
+     */
+    private void buildShell(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
+        if (style.isNether()) return;
+        seal(world, pos, x, floorY + ROOF_DY + 1, z);
+    }
+
+    /**
+     * One block of rock over anything of ours that burns, where there is a hole for fire to
+     * live in.
+     *
+     * <p>Fire needs an <em>air</em> block beside something flammable; this takes the air away.
+     * The maze's own roof and floor have been sealed this way since the cherry style got a
+     * wooden ceiling — but the two rooms hung underneath had not, and they are the same problem
+     * one layer down: the crypt's floor and the vault's are {@code style.plaza}, which for the
+     * cherry style is planks, and both ceilings carry {@code style.pillar} beams, which are
+     * logs. Stone bricks on four sides and kindling on the other two is not a sealed room.</p>
+     *
+     * <p>Only where there is actually something to fill, so a room dug into solid rock — which
+     * is nearly all of them — costs one read per column and no writes.</p>
+     */
+    private void seal(StructureWorldAccess world, BlockPos.Mutable pos, int x, int y, int z) {
+        pos.set(x, y, z);
+        BlockState current = world.getBlockState(pos);
+        if (current.isAir() || current.isReplaceable() || !current.getFluidState().isEmpty()) {
+            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS);
+        }
+    }
+
+    /**
+     * The sides of that skin: the one-block ring around a landmark maze, filled solid.
+     *
+     * <p>This is what the flattened ring became once the maze stopped having a doorway. Four
+     * blocks of walled corridor going right round a maze nobody can enter from outside was dead
+     * space; one block of rock is the wall the hedge needs behind it. From inside, the player
+     * sees exactly what they saw before — the maze's own outer wall, at the same place.</p>
+     */
+    private void fillRockRing(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
+                              BlockPos keep) {
+        for (int y = floorY - 1; y <= floorY + ROOF_DY + 1; y++) {
+            pos.set(x, y, z);
+            if (pos.equals(keep)) continue;
+            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS);
         }
     }
 

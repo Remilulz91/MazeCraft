@@ -46,11 +46,43 @@ public final class MazeLayout {
     private int entranceSide;
     private int entranceCell;
 
+    /**
+     * True when the way in is the plaza itself rather than a doorway in the outer wall.
+     *
+     * <p>For a maze buried under a landmark, the staircase comes down in the middle, so the
+     * middle is the <b>entrance</b> and the prize has to be somewhere else. Everything about the
+     * progression hangs off one cell — the root of the breadth-first search that lays out the
+     * zones, the levers, the guardians and the plaques — so inverting the maze is not a second
+     * algorithm, it is the same one rooted at the plaza's door instead of at the outer wall, and
+     * run towards a dead end instead of towards the middle.</p>
+     *
+     * <p>That works because the maze is a <b>spanning tree</b>: there is exactly one path between
+     * any two cells, so "one path from the entrance to the middle" and "one path from the middle
+     * to any dead end" are the same sentence read in either direction. The sixteen surface styles
+     * keep the outer doorway and are not touched by any of this.</p>
+     */
+    private final boolean fromPlaza;
+
+    /** The maze cell just outside the plaza's one door: the root when {@link #fromPlaza}. */
+    private int plazaDoorCellX = -1;
+    private int plazaDoorCellZ = -1;
+
+    /** The dead end the progression leads to when {@link #fromPlaza}, or null. */
+    private int[] goalCell;
+
+    /** Cells the goal dead end keeps from the outer wall, so the room under it fits inside. */
+    private static final int GOAL_CLEARANCE = 3;
+
     private MazeLayout(int cells, int plazaRadius) {
+        this(cells, plazaRadius, false);
+    }
+
+    private MazeLayout(int cells, int plazaRadius, boolean fromPlaza) {
         this.cells = cells;
         this.span = cells * CELL + 1;
         this.wall = new boolean[span * span];
         this.plazaRadius = plazaRadius;
+        this.fromPlaza = fromPlaza;
         int c = cells / 2;
         this.plazaMin = CELL * (c - plazaRadius) + 1;
         this.plazaMax = CELL * (c + plazaRadius) + 3;
@@ -87,7 +119,17 @@ public final class MazeLayout {
      */
     public static MazeLayout generate(int cells, long seed, int entranceSide, int gateCount,
                                       int plazaRadius) {
-        MazeLayout layout = new MazeLayout(cells, plazaRadius);
+        return generate(cells, seed, entranceSide, gateCount, plazaRadius, false);
+    }
+
+    /**
+     * @param fromPlaza true for a maze entered through its own middle, which seals the outer wall
+     *                  and sends the progression outwards to a dead end instead of inwards to the
+     *                  plaza. See {@link #fromPlaza}.
+     */
+    public static MazeLayout generate(int cells, long seed, int entranceSide, int gateCount,
+                                      int plazaRadius, boolean fromPlaza) {
+        MazeLayout layout = new MazeLayout(cells, plazaRadius, fromPlaza);
         layout.build(new Random(seed), entranceSide);
         if (gateCount > 0) {
             layout.computeProgression(gateCount);
@@ -148,13 +190,18 @@ public final class MazeLayout {
         int cell = rng.nextInt(cells);
         this.entranceSide = side;
         this.entranceCell = cell;
-        for (int i = 1; i < CELL; i++) {
-            int along = cell * CELL + i;
-            switch (side) {
-                case 0 -> wall[along * span] = false;                    // north (z = 0)
-                case 1 -> wall[along * span + (span - 1)] = false;       // south (z = max)
-                case 2 -> wall[along] = false;                           // west  (x = 0)
-                default -> wall[(span - 1) * span + along] = false;      // east  (x = max)
+        // Not carved at all when the way in is the plaza: the outer wall stays sealed the whole
+        // way round. A hole in it would open straight into the rock the maze is buried in, and
+        // into whatever cave happens to be branching off it.
+        if (!fromPlaza) {
+            for (int i = 1; i < CELL; i++) {
+                int along = cell * CELL + i;
+                switch (side) {
+                    case 0 -> wall[along * span] = false;                    // north (z = 0)
+                    case 1 -> wall[along * span + (span - 1)] = false;       // south (z = max)
+                    case 2 -> wall[along] = false;                           // west  (x = 0)
+                    default -> wall[(span - 1) * span + along] = false;      // east  (x = max)
+                }
             }
         }
 
@@ -176,6 +223,16 @@ public final class MazeLayout {
                 case 2 -> wall[farWall * span + along] = false;   // entrance west  → door east
                 default -> wall[nearWall * span + along] = false; // entrance east  → door west
             }
+        }
+        // The maze cell on the far side of that door. It is the root of everything when the way
+        // in is the plaza, so it is recorded here rather than searched for later: the door's own
+        // position is drawn from the same rng and would be awkward to reconstruct.
+        int far = c + plazaRadius + 1, near = c - plazaRadius - 1;
+        switch (side) {
+            case 0 -> { plazaDoorCellX = doorCell; plazaDoorCellZ = far; }
+            case 1 -> { plazaDoorCellX = doorCell; plazaDoorCellZ = near; }
+            case 2 -> { plazaDoorCellX = far; plazaDoorCellZ = doorCell; }
+            default -> { plazaDoorCellX = near; plazaDoorCellZ = doorCell; }
         }
     }
 
@@ -218,6 +275,10 @@ public final class MazeLayout {
      * the opening. distance = 0 is the opening itself.
      */
     public int[] entranceOutside(int distance) {
+        // No outer doorway: the way out is the middle, where the staircase is. Everything that
+        // asks this wants somewhere safe to put a player — and "two blocks outside the wall" of
+        // a buried maze is inside solid rock, which would suffocate them.
+        if (fromPlaza) return new int[]{center(), center()};
         int along = entranceCell * CELL + CELL / 2;
         return switch (entranceSide) {
             case NORTH -> new int[]{along, -distance};
@@ -233,6 +294,7 @@ public final class MazeLayout {
      * in step 4 of {@link #build}. The sealed gateway of a locked maze fills exactly these.
      */
     public int[][] entranceGap() {
+        if (fromPlaza) return new int[0][];
         int[][] cells = new int[CELL - 1][];
         for (int i = 1; i < CELL; i++) {
             int along = entranceCell * CELL + i;
@@ -252,6 +314,9 @@ public final class MazeLayout {
     }
 
     public boolean isApproach(int lx, int lz) {
+        // Nothing to approach: the outer wall is sealed all the way round, so the enclosed
+        // perimeter leaves no doorway and the ring gets no path laid across it.
+        if (fromPlaza) return false;
         int along = entranceCell * CELL + CELL / 2;
         return switch (entranceSide) {
             case NORTH -> lz < 0 && Math.abs(lx - along) <= 1;
@@ -370,7 +435,16 @@ public final class MazeLayout {
         };
     }
 
-    private int entranceCellIndex() {
+    /**
+     * The cell the player walks in through, which is the root of the whole progression: the zone
+     * flood, the levers, the guardians, the plaques and every distance are measured from here.
+     *
+     * <p>One method, two meanings, and that is the entire inversion. A surface maze starts at the
+     * doorway in its outer wall; a buried one starts at the cell outside the plaza's door, which
+     * is where the staircase sets the player down.</p>
+     */
+    private int startCellIndex() {
+        if (fromPlaza) return plazaDoorCellX * cells + plazaDoorCellZ;
         return switch (entranceSide) {
             case NORTH -> entranceCell * cells;                    // (entranceCell, 0)
             case SOUTH -> entranceCell * cells + (cells - 1);      // (entranceCell, cells-1)
@@ -386,12 +460,15 @@ public final class MazeLayout {
      */
     private void computeProgression(int gateCount) {
         int n = cells * cells;
-        int start = entranceCellIndex();
+        int start = startCellIndex();
 
-        // 1. BFS from the entrance over maze cells (plaza excluded)
+        // 1. BFS from the way in, over maze cells (plaza excluded)
         int[] parent = new int[n];
+        int[] depth = new int[n];
         Arrays.fill(parent, -2);
+        Arrays.fill(depth, -1);
         parent[start] = -1;
+        depth[start] = 0;
         ArrayDeque<Integer> queue = new ArrayDeque<>();
         queue.add(start);
         int doorCell = -1, doorDir = -1;
@@ -409,14 +486,33 @@ public final class MazeLayout {
                 int ni = nx * cells + nz;
                 if (parent[ni] != -2) continue;
                 parent[ni] = cur;
+                depth[ni] = depth[cur] + 1;
                 queue.add(ni);
             }
         }
-        if (doorCell < 0) return; // cannot happen with a valid layout
 
-        // 2. Solution path entrance → door cell
+        // 2. Where the progression ends, and so what the last gate closes.
+        //
+        //    Outwards: the furthest true dead end from the plaza, and the last gate is the step
+        //    into it — the prize is at the end of the longest walk the maze has.
+        //    Inwards: the plaza's own door, as it always was.
+        int endCell, endDir;
+        if (fromPlaza) {
+            int goal = farthestDeadEnd(depth);
+            if (goal < 0) return;
+            goalCell = new int[]{goal / cells, goal % cells};
+            endCell = parent[goal];
+            if (endCell < 0) return;
+            endDir = dirBetween(endCell, goal);
+        } else {
+            if (doorCell < 0) return; // cannot happen with a valid layout
+            endCell = doorCell;
+            endDir = doorDir;
+        }
+
+        // 3. Solution path, from the way in to the cell the last gate stands in
         List<Integer> path = new ArrayList<>();
-        for (int c = doorCell; c != -1; c = parent[c]) path.add(c);
+        for (int c = endCell; c != -1; c = parent[c]) path.add(c);
         Collections.reverse(path);
         int len = path.size();
 
@@ -437,7 +533,17 @@ public final class MazeLayout {
             gates.add(gateBetween(a / cells, a % cells, dir));
             zoneStarts.add(b);
         }
-        gates.add(gateBetween(doorCell / cells, doorCell % cells, doorDir)); // plaza door
+        // The last gate: the step into the goal dead end, or the plaza door.
+        gates.add(gateBetween(endCell / cells, endCell % cells, endDir));
+        if (fromPlaza) {
+            // And its edge is closed to the zone flood, which the plaza door never needed —
+            // plaza cells are skipped anyway. Without this the goal cell joins the last zone and
+            // can be picked as that zone's furthest dead end, which would put the lever that
+            // opens the last gate on the wrong side of it.
+            int goal = goalCell[0] * cells + goalCell[1];
+            blocked[endCell * 4 + endDir] = true;
+            blocked[goal * 4 + (endDir ^ 1)] = true;
+        }
 
         // 4. Zones = connected components once gate edges are removed
         component = new int[n];
@@ -477,6 +583,50 @@ public final class MazeLayout {
             }
             levers.add(leverIn(best >= 0 ? best : far));
         }
+    }
+
+    /**
+     * The true dead end furthest from the way in: where a maze entered through its middle leads.
+     *
+     * <p>Furthest, not random, and the maze is built to make that mean something — the growing
+     * tree extends the newest cell 85 % of the time, so its corridors are long and winding and
+     * the deepest dead end is genuinely at the end of the longest walk in the maze.</p>
+     *
+     * <p>{@link #GOAL_CLEARANCE} keeps it off the outer wall so the room dug under it stays
+     * inside the maze's own footprint — outside it nothing protects it and the repair pass does
+     * not know it exists. If no dead end satisfies that, the clearance is dropped rather than
+     * leaving the maze with no progression at all; a goal somewhere imperfect beats none.</p>
+     */
+    private int farthestDeadEnd(int[] depth) {
+        int found = farthestDeadEnd(depth, GOAL_CLEARANCE);
+        return found >= 0 ? found : farthestDeadEnd(depth, 0);
+    }
+
+    private int farthestDeadEnd(int[] depth, int clearance) {
+        int best = -1, bestDepth = -1;
+        for (int cx = clearance; cx < cells - clearance; cx++) {
+            for (int cz = clearance; cz < cells - clearance; cz++) {
+                int cell = cx * cells + cz;
+                if (depth[cell] <= 0) continue;          // unreachable, or the way in itself
+                if (isPlazaCell(cx, cz)) continue;
+                if (onlyExit(cx, cz) < 0) continue;      // more than one way out: not a dead end
+                if (depth[cell] > bestDepth) {
+                    best = cell;
+                    bestDepth = depth[cell];
+                }
+            }
+        }
+        return best;
+    }
+
+    /** The dead end the progression leads to, or null for a maze entered from its outer wall. */
+    public int[] goal() {
+        return goalCell == null ? null : new int[]{goalCell[0], goalCell[1]};
+    }
+
+    /** True when the maze has a doorway in its outer wall at all. */
+    public boolean hasOuterEntrance() {
+        return !fromPlaza;
     }
 
     private boolean touchesGate(int cell, boolean[] blocked) {
@@ -527,7 +677,7 @@ public final class MazeLayout {
         List<int[]> result = new ArrayList<>();
         if (component == null) return result;
         int zones = levers.size();
-        int entrance = entranceCellIndex();
+        int entrance = startCellIndex();
         boolean[] leverCell = new boolean[cells * cells];
         for (Lever l : levers) leverCell[(l.x() / CELL) * cells + (l.z() / CELL)] = true;
 
@@ -719,8 +869,8 @@ public final class MazeLayout {
         }
 
         // Distance in cells from the entrance, walking the maze.
-        int[] dist = entranceDistances();
-        int start = entranceCellIndex();
+        int[] dist = startDistances();
+        int start = startCellIndex();
 
         int best = -1, bestDist = -1;
         for (int cx = 0; cx < cells; cx++) {
@@ -733,6 +883,11 @@ public final class MazeLayout {
                 int cell = cx * cells + cz;
                 if (dist[cell] < 0 || cell == start) continue;
                 if (isPlazaCell(cx, cz) || componentOf(cx, cz) < 0) continue;
+                // Never the goal. A colossal maze under a pagoda has BOTH rooms under it: the
+                // crypt the progression leads to, and the code vault that is its own side
+                // quest. Nothing stopped them choosing the same dead end, and two rooms dug
+                // into the same column is one wrecked room.
+                if (goalCell != null && cx == goalCell[0] && cz == goalCell[1]) continue;
                 if (nearestLeverCells(leverCells, cx, cz) < leverClearance) continue;
                 int degree = 0;
                 for (int d = 0; d < 4; d++) if (isOpenBetween(cx, cz, d)) degree++;
@@ -773,8 +928,8 @@ public final class MazeLayout {
             leverCells.add(new int[]{lever.supportX() / CELL, lever.supportZ() / CELL});
             leverCells.add(new int[]{lever.x() / CELL, lever.z() / CELL});
         }
-        int[] dist = entranceDistances();
-        int start = entranceCellIndex();
+        int[] dist = startDistances();
+        int start = startCellIndex();
 
         int[][] found = new int[slots][];
         int[] bestDist = new int[slots];
@@ -789,6 +944,7 @@ public final class MazeLayout {
                 int cell = cx * cells + cz;
                 if (dist[cell] < 0 || cell == start) continue;
                 if (skip != null && cx == skip[0] && cz == skip[1]) continue;
+                if (goalCell != null && cx == goalCell[0] && cz == goalCell[1]) continue;
                 if (isPlazaCell(cx, cz)) continue;
                 int zone = componentOf(cx, cz);
                 if (zone < 0) continue;
@@ -840,11 +996,11 @@ public final class MazeLayout {
         }
     }
 
-    /** Cells walked from the entrance to every cell, or -1 where the cell is unreachable. */
-    private int[] entranceDistances() {
+    /** Cells walked from the way in to every cell, or -1 where the cell is unreachable. */
+    private int[] startDistances() {
         int[] dist = new int[cells * cells];
         java.util.Arrays.fill(dist, -1);
-        int start = entranceCellIndex();
+        int start = startCellIndex();
         ArrayDeque<Integer> queue = new ArrayDeque<>();
         dist[start] = 0;
         queue.add(start);
