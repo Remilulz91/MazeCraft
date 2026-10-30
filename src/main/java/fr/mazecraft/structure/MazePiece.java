@@ -841,7 +841,16 @@ public class MazePiece extends StructurePiece {
                 target = lever.x() * span + lever.z();
             }
         }
-        if (target < 0) target = layout.center() * span + layout.center();
+        if (target < 0) {
+            // Every gate open, so the thread now points at the end of the road. Which end that
+            // is depends on which way the maze runs: inwards to the plaza for the fifteen
+            // surface styles, outwards to the goal dead end — and the crypt under it — for a
+            // maze entered through its own middle. This line was the inversion's last stone
+            // left unturned: it sent the player back to the middle they had walked in from.
+            int[] goal = hasCrypt() ? cryptOrigin() : null;
+            target = goal != null ? goal[0] * span + goal[1]
+                    : layout.center() * span + layout.center();
+        }
 
         int start = sx * span + sz;
         if (layout.isWall(sx, sz)) return List.of();
@@ -1065,7 +1074,11 @@ public class MazePiece extends StructurePiece {
                     // nothing: it is outside the walls.
                     if (!inside && isTreeMatter(current)) continue;
                     if (current != target && !(repairing && current.isOf(Blocks.SNOW) && target.isAir())) {
-                        world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
+                        // SKIP_DROPS: this pass replaces whatever stands in the corridor with
+                        // air, and on a repair what stands there includes the maze's own
+                        // fittings. Without it a lever is broken into an item and laid again by
+                        // step 5, which is why one turns up on the floor under its own wall.
+                        world.setBlockState(pos, target, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
                     }
                 }
 
@@ -1114,7 +1127,11 @@ public class MazePiece extends StructurePiece {
             pos.set(originX() + lever.supportX(), floorY + LEVER_DY, originZ() + lever.supportZ());
             if (chunkBox.contains(pos)) world.setBlockState(pos, style.pillar, Block.NOTIFY_LISTENERS);
             pos.set(originX() + lever.x(), floorY + LEVER_DY, originZ() + lever.z());
-            if (chunkBox.contains(pos)) {
+            // A lever that is already there is left alone on a repair, rather than written
+            // again as a fresh unpulled one: whether it has been thrown is state, and the
+            // default state would quietly flip it back up under the player's hand.
+            if (chunkBox.contains(pos)
+                    && !(repairing && world.getBlockState(pos).isOf(Blocks.LEVER))) {
                 world.setBlockState(pos, Blocks.LEVER.getDefaultState()
                         .with(LeverBlock.FACE, BlockFace.WALL)
                         .with(LeverBlock.FACING, facings[lever.facing()]), Block.NOTIFY_LISTENERS);
@@ -1928,7 +1945,7 @@ public class MazePiece extends StructurePiece {
         for (int y = floorY - 1; y <= floorY + ROOF_DY + 1; y++) {
             pos.set(x, y, z);
             if (pos.equals(keep)) continue;
-            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS);
+            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
         }
     }
 
@@ -1964,7 +1981,8 @@ public class MazePiece extends StructurePiece {
             }
             if (pos.equals(keep)) continue;
             if (world.getBlockState(pos) != target) {
-                world.setBlockState(pos, target, Block.NOTIFY_LISTENERS);
+                // SKIP_DROPS, as in the open-air pass above: a rebuild must never spill.
+                world.setBlockState(pos, target, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
             }
         }
     }
