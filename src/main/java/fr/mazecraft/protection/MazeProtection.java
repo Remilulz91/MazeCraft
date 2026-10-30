@@ -346,11 +346,23 @@ public final class MazeProtection {
         if (!MazeProgress.hasAdvancement(player, step)) {
             MazeProgress.grant(player, step);
             MazeSize next = nextOf(maze.getSize());
-            if (next != null) {
+            // Nothing is being opened under a landmark. Each pagoda hides a size drawn at
+            // random, so there is no small to clear before a medium and MazeProgress.canEnter
+            // lets everyone in; announcing that the next one is "now open to you" names a lock
+            // that was taken out when the pagoda went in.
+            if (next != null && !maze.getStyle().enteredFromPlaza()) {
                 player.sendMessage(Text.translatable("mazecraft.progression.unlocked",
                         Text.translatable("mazecraft.style." + maze.getStyle().id()),
                         Text.translatable("mazecraft.size." + next.id())).formatted(Formatting.AQUA), false);
-            } else if (MazeProgress.isStyleComplete(player, maze.getStyle())) {
+            }
+            // Its own test, not the else of the one above. That else was safe while the sizes
+            // could only be cleared in order -- the style could not be finished except on the
+            // last step, where next is null. Without the lock they can be cleared in any order,
+            // so a player who did large, then small, then medium completes the style on a step
+            // that still has a next, and the else swallowed both the message and the key
+            // fragment. isStyleComplete turns true exactly once, and this block only runs when
+            // a step is newly granted, so it still cannot fire twice.
+            if (MazeProgress.isStyleComplete(player, maze.getStyle())) {
                 player.sendMessage(Text.translatable("mazecraft.progression.style_complete",
                         Text.translatable("mazecraft.style." + maze.getStyle().id())).formatted(Formatting.GOLD), false);
                 giveKeyFragment(world, player, maze);
