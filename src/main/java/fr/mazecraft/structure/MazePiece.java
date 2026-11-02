@@ -336,7 +336,7 @@ public class MazePiece extends StructurePiece {
         world.setBlockState(at, Blocks.CHEST.getDefaultState()
                 .with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
         if (world.getBlockEntity(at) instanceof ChestBlockEntity chest) {
-            chest.setLootTable(lootTableFor(style, size), seed);
+            chest.setLootTable(cryptLootTableFor(style, size), seed);
         }
         return true;
     }
@@ -664,6 +664,21 @@ public class MazePiece extends StructurePiece {
         return list;
     }
 
+    /**
+     * The one block of the doorway that wears the keyhole, or null for a maze with no doorway.
+     *
+     * <p>The middle column, two blocks up. Not the centre of the plane, because there is no
+     * such block: the doorway is three wide and {@link #WALL_HEIGHT} — four — high, and a
+     * three-by-three door would leave a gap along the top that a player can crawl through. Two
+     * up is eye level for someone standing in front of it, which is where a hand goes.</p>
+     */
+    public BlockPos keyholePos() {
+        int[][] cells = layout().entranceGap();
+        if (cells.length == 0) return null;
+        int[] middle = cells[cells.length / 2];
+        return new BlockPos(originX() + middle[0], floorY + 2, originZ() + middle[1]);
+    }
+
     /** Logs and leaves: left in place over the ring so overhanging trees stay whole. */
     private static boolean isTreeMatter(BlockState state) {
         return state.isIn(BlockTags.LOGS) || state.isIn(BlockTags.LEAVES);
@@ -918,6 +933,25 @@ public class MazePiece extends StructurePiece {
     }
 
     /** Loot table of the central chest for this maze size. */
+    /**
+     * The crypt's own table: everything the maze's chest holds, plus a chance at this biome's
+     * key fragment.
+     *
+     * <p>A table of its own per style and size, rather than a pool bolted onto the shared one,
+     * because {@link #lootTableFor} resolves to {@code chests/maze_<size>} for every Overworld
+     * style alike — there is nowhere in it to say "the cherry fragment". These tables are
+     * generated: each is the shared table referenced whole, plus one pool holding the one
+     * fragment at the odds its size earns.</p>
+     *
+     * <p>Only the nine styles that carry a fragment have one, and only those nine have a crypt
+     * to put it in.</p>
+     */
+    public static RegistryKey<LootTable> cryptLootTableFor(MazeStyle style, MazeSize size) {
+        if (!style.hasFragment()) return lootTableFor(style, size);
+        return RegistryKey.of(RegistryKeys.LOOT_TABLE,
+                MazeCraft.id("chests/crypt/" + style.id() + "_" + size.id()));
+    }
+
     public static RegistryKey<LootTable> lootTableFor(MazeStyle style, MazeSize size) {
         return RegistryKey.of(RegistryKeys.LOOT_TABLE, MazeCraft.id("chests/" + style.lootPrefix() + "_" + size.id()));
     }
@@ -1114,9 +1148,11 @@ public class MazePiece extends StructurePiece {
             BlockState gateway = ModBlocks.SEALED_GATEWAY.getDefaultState()
                     .with(SealedGatewayBlock.AXIS, entranceAlongX() ? Direction.Axis.X : Direction.Axis.Z)
                     .with(SealedGatewayBlock.TIER, tier);
+            BlockPos keyhole = tier == SealedGatewayBlock.Tier.KRONOS ? keyholePos() : null;
             for (BlockPos gatewayPos : entranceBlocks()) {
                 if (chunkBox.contains(gatewayPos)) {
-                    world.setBlockState(gatewayPos, gateway, Block.NOTIFY_LISTENERS);
+                    world.setBlockState(gatewayPos, gateway.with(SealedGatewayBlock.KEYHOLE,
+                            gatewayPos.equals(keyhole)), Block.NOTIFY_LISTENERS);
                 }
             }
         }
@@ -1489,29 +1525,40 @@ public class MazePiece extends StructurePiece {
         int rot = cryptSpiralRotation(bottom);
         BlockPos.Mutable pos = new BlockPos.Mutable();
         BlockState air = Blocks.AIR.getDefaultState();
-        boolean changed = false;
+        boolean stairMoved = false;
         for (int y = bottom; y <= floorY; y++) {
             for (int dx = -1; dx <= 1; dx++) {
                 for (int dz = -1; dz <= 1; dz++) {
-                    BlockState want = air;
-                    if (present) {
-                        for (int half = 0; half < 2; half++) {
-                            int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
-                                    SHAFT_SPIRAL.length)];
-                            if (step[0] != dx || step[1] != dz) continue;
-                            want = vaultSlab().with(SlabBlock.TYPE,
-                                    half == 0 ? SlabType.BOTTOM : SlabType.TOP);
-                        }
+                    // The step that belongs in this cell, worked out whether it is going in or
+                    // coming out, because telling the two apart is what the return value is for.
+                    BlockState step = null;
+                    for (int half = 0; half < 2; half++) {
+                        int[] cell = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
+                                SHAFT_SPIRAL.length)];
+                        if (cell[0] != dx || cell[1] != dz) continue;
+                        step = vaultSlab().with(SlabBlock.TYPE,
+                                half == 0 ? SlabType.BOTTOM : SlabType.TOP);
                     }
+                    BlockState want = present && step != null ? step : air;
                     pos.set(originX() + o[0] + dx, y, originZ() + o[1] + dz);
-                    if (world.getBlockState(pos).equals(want)) continue;
+                    BlockState current = world.getBlockState(pos);
+                    if (current.equals(want)) continue;
+                    // Only a STEP going in or coming out counts as the stair moving. Everything
+                    // else in the shaft is still swept away — it has to be, or the player builds
+                    // their way back up — but silently.
+                    //
+                    // Reporting every change made the collapse announce itself over and over: a
+                    // snow golem knocked into the shaft leaves snow layers, and a block placed
+                    // in it is a block, and each one was a difference this pass dutifully
+                    // cleared and called "the stair crumbles behind you". Five ticks later,
+                    // again.
+                    if (step != null && (present || current.equals(step))) stairMoved = true;
                     // SKIP_DROPS: a slab taken out from under a player must not become an item.
                     world.setBlockState(pos, want, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
-                    changed = true;
                 }
             }
         }
-        return changed;
+        return stairMoved;
     }
 
     /**
@@ -1877,6 +1924,24 @@ public class MazePiece extends StructurePiece {
      * 2×2 support pillars going down through air and lava until they reach solid ground.
      */
     private void buildUnderside(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
+        // A maze buried in the Overworld is standing in rock, so it needs no plate and no
+        // posts: one block of fill where there is a hole, exactly as the roof already does.
+        //
+        // What it did before was write the plate unconditionally, for every column of the box
+        // -- 101 by 101 for a medium, 149 by 149 for a large. Invisible in solid ground, and in
+        // a cliff, a cave or a river bed it is a perfectly flat, perfectly square ceiling of
+        // one stone: the big grey rectangle in the rock face. The pillars did the same lower
+        // down, dropping up to eighty blocks of post through open air.
+        //
+        // The plate was written for the Nether, where the maze really does hang over the lava
+        // sea and really does need a floor on legs, fortress-fashion. Keeping it there and
+        // dropping it here is not a compromise, it is what each case actually wants. Burying
+        // the maze deeper would not have helped: the plate shows because it is written whether
+        // it is needed or not, not because there is too little rock above it.
+        if (!style.isNether()) {
+            seal(world, pos, x, floorY - 1, z);
+            return;
+        }
         BlockBox box = this.boundingBox;
         BlockState slab = style.substructure();
         pos.set(x, floorY - 1, z);
