@@ -13,6 +13,7 @@ import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.block.ChestBlock;
+import net.minecraft.block.FallingBlock;
 import net.minecraft.block.LanternBlock;
 import net.minecraft.block.SlabBlock;
 import net.minecraft.block.enums.SlabType;
@@ -1993,29 +1994,132 @@ public class MazePiece extends StructurePiece {
      *
      * <p>Only where there is actually something to fill, so a room dug into solid rock — which
      * is nearly all of them — costs one read per column and no writes.</p>
+     *
+     * <p>"Something to fill" used to mean air, a replaceable block or a fluid. It now means
+     * anything that is not already <b>sound rock</b>: an opaque full cube that does not burn and
+     * does not fall. The three it adds are worth naming. A pointed dripstone or an amethyst
+     * cluster hanging in a cave is none of air, replaceable or fluid, so the old test walked
+     * past it and left a see-through gap in a skin whose whole job is to be solid. Leaves at a
+     * shallow burial were left as kindling against a wall built to keep fire out. And sand or
+     * gravel is a full cube right up until somebody digs under it from the cave next door.</p>
+     *
+     * <p>What it fills with is {@link #skinAt}, not the style's own stone — see there.</p>
      */
     private void seal(StructureWorldAccess world, BlockPos.Mutable pos, int x, int y, int z) {
         pos.set(x, y, z);
-        BlockState current = world.getBlockState(pos);
-        if (current.isAir() || current.isReplaceable() || !current.getFluidState().isEmpty()) {
-            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS);
-        }
+        if (isSoundRock(world, pos, world.getBlockState(pos))) return;
+        world.setBlockState(pos, skinAt(world, pos, y), Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
     }
 
     /**
-     * The sides of that skin: the one-block ring around a landmark maze, filled solid.
+     * Is this block already doing the skin's job, so that the skin can leave it alone?
+     *
+     * <p>Opaque, a full cube, does not burn and does not fall. Live rock that answers yes is the
+     * best camouflage there is and it is free, so the skin keeps it and writes nothing.</p>
+     *
+     * <p>This one predicate is also what makes a rebuild safe, and the reason it is a method
+     * rather than two copies of a condition. {@link #seal} skips a block exactly when this is
+     * true, and {@link #skinAt} refuses to borrow a neighbour unless this is true of it — so
+     * every block the skin writes is one this returns true for, and the next pass over the same
+     * column skips it. The loop closes by construction instead of by trusting a list, which
+     * matters because a rebuild runs this code over a maze that has already been built once.</p>
+     */
+    private static boolean isSoundRock(StructureWorldAccess world, BlockPos pos, BlockState state) {
+        return state.isOpaqueFullCube(world, pos)
+                && !state.isBurnable()
+                && !(state.getBlock() instanceof FallingBlock);
+    }
+
+    /**
+     * Natural blocks the skin is allowed to borrow from the ground it is cut into.
+     *
+     * <p>Explicit and short on purpose, rather than a tag or a predicate. Every entry is a full,
+     * opaque, non-flammable cube that does not fall and carries no block entity, so copying one
+     * can never drop an item, start a fire, leave a gap or spill a container into the world.
+     * Sand, red sand and gravel are the conspicuous absentees: exactly the right colour for a
+     * desert or a sea bed, and exactly the wrong thing to hold a ceiling up with.</p>
+     */
+    private static final java.util.Set<Block> NATURAL_FILL = java.util.Set.of(
+            Blocks.STONE, Blocks.DEEPSLATE, Blocks.TUFF, Blocks.CALCITE, Blocks.DRIPSTONE_BLOCK,
+            Blocks.ANDESITE, Blocks.DIORITE, Blocks.GRANITE,
+            Blocks.DIRT, Blocks.COARSE_DIRT, Blocks.ROOTED_DIRT, Blocks.CLAY, Blocks.PACKED_MUD,
+            Blocks.SANDSTONE, Blocks.RED_SANDSTONE, Blocks.TERRACOTTA,
+            Blocks.WHITE_TERRACOTTA, Blocks.ORANGE_TERRACOTTA, Blocks.MAGENTA_TERRACOTTA,
+            Blocks.LIGHT_BLUE_TERRACOTTA, Blocks.YELLOW_TERRACOTTA, Blocks.LIME_TERRACOTTA,
+            Blocks.PINK_TERRACOTTA, Blocks.GRAY_TERRACOTTA, Blocks.LIGHT_GRAY_TERRACOTTA,
+            Blocks.CYAN_TERRACOTTA, Blocks.PURPLE_TERRACOTTA, Blocks.BLUE_TERRACOTTA,
+            Blocks.BROWN_TERRACOTTA, Blocks.GREEN_TERRACOTTA, Blocks.RED_TERRACOTTA,
+            Blocks.BLACK_TERRACOTTA,
+            Blocks.BASALT, Blocks.SMOOTH_BASALT, Blocks.BLACKSTONE, Blocks.NETHERRACK);
+
+    /**
+     * What one block of the maze's outer skin is made of.
+     *
+     * <p>The skin is the underside, the course over the roof and the ring round the sides. None
+     * of the three is ever seen from inside the maze — the ring stands outside the maze's own
+     * wall, the roof course above its ceiling, the underside below its floor — so what they are
+     * made of is a question about the <em>world</em>, and the world's answer is not the style's
+     * decorative stone.</p>
+     *
+     * <p>It was. The badlands lays {@code RED_SANDSTONE}, and buried in rock that is invisible
+     * and costs nothing. Opened by a cave, a ravine or a sea bed it is a flawless orange wall
+     * seven blocks tall running the length of a hundred and forty-nine, or a flat orange plate
+     * on the ocean floor — the one thing in the picture that no terrain in the game contains.
+     * The maze was never the problem; the maze's own stone was.</p>
+     *
+     * <p>So: borrow the first of the six neighbours that is natural ground, which puts terracotta
+     * in a badlands plateau, deepslate deep down and plain stone in an ordinary cave, and spreads
+     * sideways from the live rock at the edge of the hole into the middle of it. Where nothing
+     * natural touches — the middle of a wide opening, or a sea bed whose floor we have already
+     * replaced — fall back on what the Overworld is actually made of at that height.</p>
+     *
+     * <p>The Nether and the End keep their own stone and this does not touch them. Their styles
+     * already lay netherrack, basalt, soul soil and end stone — the ground those dimensions are
+     * made of — so there is nothing to hide; and a fortress hanging over the lava sea is
+     * <em>supposed</em> to read as built.</p>
+     *
+     * <p>A borrowed neighbour has to pass {@link #isSoundRock} as well as being on the list. The
+     * list says what is tasteful, that says what is safe, and the second is what keeps a rebuild
+     * from writing over its own work for ever.</p>
+     */
+    private BlockState skinAt(StructureWorldAccess world, BlockPos pos, int y) {
+        if (style.isNether() || style.isEnd()) return style.foundation;
+        for (Direction dir : Direction.values()) {
+            BlockPos at = pos.offset(dir);
+            BlockState neighbour = world.getBlockState(at);
+            if (NATURAL_FILL.contains(neighbour.getBlock()) && isSoundRock(world, at, neighbour)) {
+                return neighbour;
+            }
+        }
+        return y < 0 ? Blocks.DEEPSLATE.getDefaultState() : Blocks.STONE.getDefaultState();
+    }
+
+    /**
+     * The sides of that skin: the one-block ring around a landmark maze.
      *
      * <p>This is what the flattened ring became once the maze stopped having a doorway. Four
      * blocks of walled corridor going right round a maze nobody can enter from outside was dead
      * space; one block of rock is the wall the hedge needs behind it. From inside, the player
      * sees exactly what they saw before — the maze's own outer wall, at the same place.</p>
+     *
+     * <p>It wrote {@code style.foundation} over all seven levels of every column, whatever was
+     * already there. That is the same mistake the underside made, and worse: the underside at
+     * least only showed from below, while this is the face a cave runs alongside. It is now
+     * {@link #seal}, which keeps the live rock where there is live rock — the best camouflage
+     * there is, and free — and fills the rest with {@link #skinAt}.</p>
+     *
+     * <p>Sound rock in place of our own stone loses nothing the ring was for. The ring has to be
+     * solid, opaque, non-flammable and not about to fall, and that is precisely what
+     * {@code seal} now tests for before it leaves a block alone. It also makes a repair
+     * idempotent: the old version wrote foundation back over the camouflage every single
+     * time.</p>
      */
     private void fillRockRing(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
                               BlockPos keep) {
         for (int y = floorY - 1; y <= floorY + ROOF_DY + 1; y++) {
             pos.set(x, y, z);
             if (pos.equals(keep)) continue;
-            world.setBlockState(pos, style.foundation, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            seal(world, pos, x, y, z);
         }
     }
 
