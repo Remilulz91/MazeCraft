@@ -13,9 +13,16 @@ public final class Landmarks {
 
     private Landmarks() { }
 
+    /** Looked up from the id a piece was saved under. Null for an unknown or styleless id. */
+    public static Landmark of(String styleId) {
+        MazeStyle style = MazeStyle.fromId(styleId);
+        return style == null ? null : of(style);
+    }
+
     /** The landmark this style is entered through, or null when it has none. */
     public static Landmark of(MazeStyle style) {
         if (style == CherryPagoda.STYLE) return CherryPagoda.INSTANCE;
+        if (style == DesertPyramid.STYLE) return DesertPyramid.INSTANCE;
         return null;
     }
 

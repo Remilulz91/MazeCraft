@@ -10,6 +10,7 @@ import fr.mazecraft.config.MazeCraftConfig;
 import fr.mazecraft.landmark.CherryPagoda;
 import fr.mazecraft.landmark.Landmark;
 import fr.mazecraft.landmark.LandmarkPiece;
+import fr.mazecraft.landmark.Landmarks;
 import fr.mazecraft.landmark.LandmarkStair;
 import fr.mazecraft.protection.MazeState;
 import fr.mazecraft.structure.MazeFinder;
@@ -59,6 +60,36 @@ public class DebugCommand {
         return builder.buildFuture();
     };
 
+    /** The style these three subcommands assume when none is named: the first landmark built. */
+    private static final String LANDMARK_DEFAULT = CherryPagoda.STYLE.id();
+
+    /** Only the styles that actually have a building — the other thirteen would just error. */
+    private static final SuggestionProvider<ServerCommandSource> LANDMARK_SUGGESTIONS =
+            (ctx, builder) -> {
+                for (MazeStyle s : MazeStyle.values()) if (Landmarks.has(s)) builder.suggest(s.id());
+                return builder.buildFuture();
+            };
+
+    /**
+     * The landmark of this style, or null with the reason already sent.
+     *
+     * <p>Names the styles that do have one, because "unknown style" is not the usual mistake
+     * here — asking for a style that exists but has no building is.</p>
+     */
+    private static fr.mazecraft.landmark.Landmark landmarkOf(ServerCommandSource src,
+                                                             String styleId) {
+        fr.mazecraft.landmark.Landmark landmark = Landmarks.of(styleId);
+        if (landmark == null) {
+            StringBuilder have = new StringBuilder();
+            for (MazeStyle s : MazeStyle.values()) {
+                if (Landmarks.has(s)) have.append(have.isEmpty() ? "" : ", ").append(s.id());
+            }
+            src.sendError(Text.literal("[DEBUG] " + styleId + " has no landmark. Styles that do: "
+                    + have));
+        }
+        return landmark;
+    }
+
     private static final SuggestionProvider<ServerCommandSource> STYLE_SUGGESTIONS = (ctx, builder) -> {
         for (MazeStyle s : MazeStyle.values()) builder.suggest(s.id());
         return builder.buildFuture();
@@ -85,21 +116,35 @@ public class DebugCommand {
                         .then(CommandManager.argument("name", StringArgumentType.word())
                                 .executes(DebugCommand::onTemplate)))
                 .then(CommandManager.literal("depth")
-                        .executes(ctx -> onDepth(ctx, MazeSize.MEDIUM.id()))
+                        .executes(ctx -> onDepth(ctx, MazeSize.MEDIUM.id(), LANDMARK_DEFAULT))
                         .then(CommandManager.argument("size", StringArgumentType.word())
                                 .suggests(SIZE_SUGGESTIONS)
                                 .executes(ctx -> onDepth(ctx,
-                                        StringArgumentType.getString(ctx, "size")))))
+                                        StringArgumentType.getString(ctx, "size"), LANDMARK_DEFAULT))
+                                .then(CommandManager.argument("style", StringArgumentType.word())
+                                        .suggests(LANDMARK_SUGGESTIONS)
+                                        .executes(ctx -> onDepth(ctx,
+                                                StringArgumentType.getString(ctx, "size"),
+                                                StringArgumentType.getString(ctx, "style"))))))
+                // size, then style, then lift. The style goes in the middle because a word and
+                // an integer at the same level is a parse Brigadier resolves by trying both, and
+                // "2" is a valid word: the two would have been ambiguous side by side.
                 .then(CommandManager.literal("pagoda")
-                        .executes(ctx -> onPagoda(ctx, MazeSize.MEDIUM.id(), 0))
+                        .executes(ctx -> onPagoda(ctx, MazeSize.MEDIUM.id(), LANDMARK_DEFAULT, 0))
                         .then(CommandManager.argument("size", StringArgumentType.word())
                                 .suggests(SIZE_SUGGESTIONS)
                                 .executes(ctx -> onPagoda(ctx,
-                                        StringArgumentType.getString(ctx, "size"), 0))
-                                .then(CommandManager.argument("lift", IntegerArgumentType.integer(-3, 3))
+                                        StringArgumentType.getString(ctx, "size"), LANDMARK_DEFAULT, 0))
+                                .then(CommandManager.argument("style", StringArgumentType.word())
+                                        .suggests(LANDMARK_SUGGESTIONS)
                                         .executes(ctx -> onPagoda(ctx,
                                                 StringArgumentType.getString(ctx, "size"),
-                                                IntegerArgumentType.getInteger(ctx, "lift"))))))
+                                                StringArgumentType.getString(ctx, "style"), 0))
+                                        .then(CommandManager.argument("lift", IntegerArgumentType.integer(-3, 3))
+                                                .executes(ctx -> onPagoda(ctx,
+                                                        StringArgumentType.getString(ctx, "size"),
+                                                        StringArgumentType.getString(ctx, "style"),
+                                                        IntegerArgumentType.getInteger(ctx, "lift")))))))
                 .then(CommandManager.literal("shaft")
                         .then(CommandManager.argument("depth", IntegerArgumentType.integer(1,
                                         LandmarkStair.MAX_DEPTH))
@@ -132,11 +177,16 @@ public class DebugCommand {
                 .then(CommandManager.literal("crypt")
                         .executes(DebugCommand::onCrypt))
                 .then(CommandManager.literal("landmark")
-                        .executes(ctx -> onLandmarkScan(ctx, MazeSize.MEDIUM.id()))
+                        .executes(ctx -> onLandmarkScan(ctx, MazeSize.MEDIUM.id(), LANDMARK_DEFAULT))
                         .then(CommandManager.argument("size", StringArgumentType.word())
                                 .suggests(SIZE_SUGGESTIONS)
                                 .executes(ctx -> onLandmarkScan(ctx,
-                                        StringArgumentType.getString(ctx, "size")))))
+                                        StringArgumentType.getString(ctx, "size"), LANDMARK_DEFAULT))
+                                .then(CommandManager.argument("style", StringArgumentType.word())
+                                        .suggests(LANDMARK_SUGGESTIONS)
+                                        .executes(ctx -> onLandmarkScan(ctx,
+                                                StringArgumentType.getString(ctx, "size"),
+                                                StringArgumentType.getString(ctx, "style"))))))
                 .then(CommandManager.literal("vault")
                         .executes(ctx -> onVault(ctx, false))
                         .then(CommandManager.literal("open")
@@ -553,7 +603,8 @@ public class DebugCommand {
      * in the right biome, judges every one of them by every rule even after one has already
      * refused it, and prints what each rule cost.</p>
      */
-    private static int onLandmarkScan(CommandContext<ServerCommandSource> ctx, String sizeId) {
+    private static int onLandmarkScan(CommandContext<ServerCommandSource> ctx, String sizeId,
+                                      String styleId) {
         ServerCommandSource src = ctx.getSource();
         ServerPlayerEntity player = src.getPlayer();
         if (player == null) {
@@ -569,19 +620,22 @@ public class DebugCommand {
             src.sendError(Text.literal("[DEBUG] A scan is already running."));
             return 0;
         }
+        fr.mazecraft.landmark.Landmark landmark = landmarkOf(src, styleId);
+        if (landmark == null) return 0;
         ServerWorld world = src.getWorld();
-        String id = "maze_" + CherryPagoda.STYLE.id() + "_" + size.id();
+        String id = "maze_" + landmark.style().id() + "_" + size.id();
         Structure structure = world.getRegistryManager().get(RegistryKeys.STRUCTURE)
                 .get(MazeCraft.id(id));
         if (structure == null) {
             src.sendError(Text.literal("[DEBUG] No structure " + id + " in the registry."));
             return 0;
         }
-        running = new Scan(src, world, structure, size, CherryPagoda.STYLE.margin, id,
+        running = new Scan(src, world, structure, size, landmark.style().margin, id,
                 player.getBlockPos(), false, MazeStructure.reliefAllowance(size), 0,
-                CherryPagoda.INSTANCE);
-        src.sendFeedback(() -> Text.literal("scanning for pagoda sites (" + size.id()
-                        + "): walking outward until " + SCAN_TARGET + " cherry groves are found,"
+                landmark);
+        src.sendFeedback(() -> Text.literal("scanning for " + landmark.style().id()
+                        + " landmark sites (" + size.id() + "): walking outward until "
+                        + SCAN_TARGET + " in-biome candidates are found,"
                         + " a slice per tick. Every rule is measured on every one of them.")
                 .formatted(Formatting.GRAY), false);
         return 1;
@@ -658,13 +712,20 @@ public class DebugCommand {
         ServerCommandSource src = scan.src;
         int sites = scan.examined;
         int matched = scan.inBiome;
+        // The scan reports on whichever landmark it was given, so every line below has to name
+        // it rather than the first one that existed. Run against the desert, this said "in a
+        // cherry grove" and "carry a pagoda" — in a desert, about a mud-brick compound. An
+        // instrument that misreports what it measured is how a figure gets quoted at the wrong
+        // thing, and this is the second time in this file (the spacing line did it before).
+        final String what = scan.landmark.style().id();
         int blocks = scan.ring * SCAN_STEP;
         long ms = scan.nanos / 1_000_000L;
         src.sendFeedback(() -> Text.literal("=== landmark scan " + scan.id + ": " + sites
                         + " positions out to " + blocks + " blocks, " + ms + " ms of work ===")
                 .formatted(Formatting.LIGHT_PURPLE), false);
         src.sendFeedback(() -> Text.literal("biome   " + matched + " of " + sites
-                        + " in a cherry grove (1 in " + (matched == 0 ? sites : sites / matched) + ")")
+                        + " in a " + what + " biome (1 in "
+                        + (matched == 0 ? sites : sites / matched) + ")")
                 .formatted(Formatting.GRAY), false);
         if (matched == 0 || scan.found.isEmpty()) {
             src.sendFeedback(() -> Text.literal("No position here is in the right biome.")
@@ -699,14 +760,14 @@ public class DebugCommand {
         java.util.Collections.sort(descents);
         java.util.Collections.sort(falls);
         final int fReliefFoot = reliefFoot, fWetFoot = wetFoot;
-        src.sendFeedback(() -> Text.literal("pagoda  refused " + fReliefFoot + " for relief (over "
+        src.sendFeedback(() -> Text.literal("ground  refused " + fReliefFoot + " for relief (over "
                         + allowed + "), " + fWetFoot + " for water (over " + maxWater + ")")
                 .formatted(Formatting.GRAY), false);
         final int fStair = stair, fWet = wet, fOpen = open;
         src.sendFeedback(() -> Text.literal("burial  refused " + fStair + " by the stair cap, "
                         + fWet + " too wet, " + fOpen + " too little rock")
                 .formatted(Formatting.GRAY), false);
-        src.sendFeedback(() -> Text.literal("relief  of the pagoda footprint: min " + reliefs.get(0)
+        src.sendFeedback(() -> Text.literal("relief  of the building footprint: min " + reliefs.get(0)
                         + ", 25% " + reliefs.get(reliefs.size() / 4)
                         + ", median " + reliefs.get(reliefs.size() / 2)
                         + ", 75% " + reliefs.get(reliefs.size() * 3 / 4)
@@ -725,7 +786,7 @@ public class DebugCommand {
         final int fPass = pass;
         int perSite = fPass == 0 ? 0 : sites / fPass;
         src.sendFeedback(() -> Text.literal("result  " + fPass + " of " + matched
-                        + " in-biome positions carry a pagoda, so 1 position in "
+                        + " in-biome positions carry a " + what + " landmark, so 1 position in "
                         + (fPass == 0 ? "more than " + sites : String.valueOf(perSite)))
                 .formatted(fPass == 0 ? Formatting.RED : Formatting.GREEN), false);
         if (!descents.isEmpty()) {
@@ -929,7 +990,8 @@ public class DebugCommand {
      * reason {@code /maze debug place} does — a tool that can be mistaken for the real thing has
      * to say so itself.</p>
      */
-    private static int onPagoda(CommandContext<ServerCommandSource> ctx, String sizeId, int lift) {
+    private static int onPagoda(CommandContext<ServerCommandSource> ctx, String sizeId,
+                                String styleId, int lift) {
         ServerCommandSource src = ctx.getSource();
         ServerPlayerEntity player = src.getPlayer();
         if (player == null) {
@@ -941,8 +1003,9 @@ public class DebugCommand {
             src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
             return 0;
         }
+        Landmark landmark = landmarkOf(src, styleId);
+        if (landmark == null) return 0;
         ServerWorld world = src.getWorld();
-        Landmark landmark = CherryPagoda.INSTANCE;
         BlockPos at = player.getBlockPos();
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
@@ -994,7 +1057,7 @@ public class DebugCommand {
         Direction facing = player.getHorizontalFacing().getOpposite();
 
         long seed = world.getRandom().nextLong();
-        MazePiece maze = new MazePiece(CherryPagoda.STYLE, size, seed,
+        MazePiece maze = new MazePiece(landmark.style(), size, seed,
                 at.getX(), floorY, at.getZ(), Random.create(seed).nextInt(4));
         LandmarkPiece pagoda = new LandmarkPiece(landmark,
                 new BlockPos(at.getX(), floorY, at.getZ()), pad.floorY(), floorY, facing);
@@ -1007,7 +1070,8 @@ public class DebugCommand {
         lastPlaced = maze;
 
         int descent = landmark.descent(pad.floorY(), floorY);
-        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda facing " + facing + " on ground "
+        src.sendFeedback(() -> Text.literal("[DEBUG] " + landmark.style().id()
+                        + " landmark facing " + facing + " on ground "
                         + pad.floorY() + (lift == 0 ? "" : " (lifted " + lift + ")")
                         + " (relief " + pad.relief() + "), " + size.id()
                         + " cherry maze floor " + floorY + ", descent " + descent + " blocks, "
@@ -1026,15 +1090,17 @@ public class DebugCommand {
      * side, the building's and the maze's, and the arithmetic between them. If the rule is
      * wrong, it is wrong here, before a single block has been placed.</p>
      */
-    private static int onDepth(CommandContext<ServerCommandSource> ctx, String sizeId) {
+    private static int onDepth(CommandContext<ServerCommandSource> ctx, String sizeId,
+                               String styleId) {
         ServerCommandSource src = ctx.getSource();
         MazeSize size = MazeSize.fromId(sizeId);
         if (size == null) {
             src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
             return 0;
         }
+        Landmark landmark = landmarkOf(src, styleId);
+        if (landmark == null) return 0;
         ServerWorld world = src.getWorld();
-        Landmark landmark = CherryPagoda.INSTANCE;
         BlockPos at = BlockPos.ofFloored(src.getPosition());
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
@@ -1045,7 +1111,8 @@ public class DebugCommand {
         MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
                 landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         MazeStructure.Site verdict = landmark.site(gen, world, noise, at.getX(), at.getZ());
-        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda footprint " + (landmark.half() * 2)
+        src.sendFeedback(() -> Text.literal("[DEBUG] " + landmark.style().id()
+                        + " footprint " + (landmark.half() * 2)
                         + "x" + (landmark.half() * 2) + ": relief " + pad.relief() + " of "
                         + landmark.maxRelief() + " allowed, water " + pad.water()
                         + ", ground " + pad.lowest() + " to " + pad.highest()
@@ -1110,7 +1177,8 @@ public class DebugCommand {
                         + ", so " + (over.lowest() - 1 - (floor + MazePiece.ROOF_DY))
                         + " blocks of rock over the ceiling at the thinnest point")
                 .formatted(Formatting.GREEN), false);
-        src.sendFeedback(() -> Text.literal("[DEBUG] pagoda floor at " + pad.floorY() + " -> descent "
+        src.sendFeedback(() -> Text.literal("[DEBUG] building floor at " + pad.floorY()
+                        + " -> descent "
                         + descent + " blocks, " + (descent * 2) + " slab steps, "
                         + (descent / 4) + " full turns")
                 .formatted(Formatting.LIGHT_PURPLE), false);

@@ -71,6 +71,7 @@ public final class LandmarkStair {
         int levels = 0;
         BlockPos.Mutable at = new BlockPos.Mutable();
         int groundY = descent.groundY();
+        int topStep = descent.topStep();
         // Bottom upwards, which matters for one reason: a block is cleared before the block
         // above it is. Going the other way, the shaft punched through the maze's ceiling first
         // and the lantern hanging from the underside of that very block lost its support and
@@ -108,7 +109,14 @@ public final class LandmarkStair {
                     }
                 }
             }
-            // 3. The pole, and the two steps of this level.
+            // 3. The pole, and the two steps of this level — but not above the top step.
+            //
+            //    Hollowing has to reach the ground floor whatever happens, or the floor stays
+            //    shut and anything resting on it (the desert's carpet) is left floating. Steps
+            //    do not: see Descent#topStep for why a building without a staircase of its own
+            //    wants its highest step one level lower, flush with the floor rather than
+            //    standing half a block over it.
+            if (ty > topStep) continue;
             set(world, at, placement, descent.x(), ty, descent.z(), descent.pole(), limit);
             for (int half = 0; half < SlabSpiral.HALVES; half++) {
                 int[] cell = descent.spiral().cell(ty, half);

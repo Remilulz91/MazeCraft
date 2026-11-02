@@ -20,17 +20,27 @@ import net.minecraft.block.enums.SlabType;
  *
  * @param x        column the shaft is cut down, in template coordinates
  * @param z        the same, on the other axis
- * @param groundY  template level the player stands on walking in: where the descent starts
+ * @param groundY  template level the player stands on walking in: the shaft is hollowed up to
+ *                 here, so the floor opens and whatever rested on it goes with it
+ * @param topStep  highest level that carries a step and the pole, which is NOT always
+ *                 {@code groundY}. Where the building has a staircase of its own continuing
+ *                 upwards, as the pagoda does, the top step belongs at the ground floor and
+ *                 this is {@code groundY}: the descent simply rewrites the builder's own level.
+ *                 Where the shaft is a hole cut in a flat floor, it is {@code groundY - 1}, and
+ *                 the difference is visible: a bottom slab at {@code groundY} stands half a
+ *                 block ABOVE the floor and a top slab a whole one, so the first step floats in
+ *                 the air over the carpet instead of descending from it. A top slab at
+ *                 {@code groundY - 1} is flush with the floor, which is the step you want.
  * @param spiral   how the steps wind round the pole
  */
-public record Descent(int x, int z, int groundY, SlabSpiral spiral,
+public record Descent(int x, int z, int groundY, int topStep, SlabSpiral spiral,
                       BlockState stepBottom, BlockState stepTop,
                       BlockState pole, BlockState lining) {
 
     /** The usual way to state one: a slab block, a pole and a lining. */
-    public static Descent of(int x, int z, int groundY, SlabSpiral spiral,
+    public static Descent of(int x, int z, int groundY, int topStep, SlabSpiral spiral,
                              Block slab, BlockState pole, BlockState lining) {
-        return new Descent(x, z, groundY, spiral,
+        return new Descent(x, z, groundY, topStep, spiral,
                 slab.getDefaultState().with(SlabBlock.TYPE, SlabType.BOTTOM),
                 slab.getDefaultState().with(SlabBlock.TYPE, SlabType.TOP),
                 pole, lining);

@@ -45,6 +45,16 @@ public final class MazeTemplates {
     public static final Piece CHERRY_PAGODA =
             new Piece(MazeCraft.id("japanese_cherry_pagoda"), Direction.SOUTH);
 
+    /**
+     * The mud-brick compound of the deserts.
+     *
+     * <p>SOUTH for the same reason the pagoda is: standing in front of the entrance and looking
+     * at it, the debug screen reads south, which is the situation the pagoda was measured in and
+     * proved correct on all four rotations. Same observation, same value — not a second guess.</p>
+     */
+    public static final Piece DESERT_MUD_BASE =
+            new Piece(MazeCraft.id("desert_mud_base"), Direction.SOUTH);
+
     private MazeTemplates() { }
 
     /**

@@ -66,7 +66,7 @@ public final class CherryPagoda implements Landmark {
      * reproduces the template. Which is why a building with no staircase of its own needs
      * nothing more than a different pair here.</p>
      */
-    private static final Descent DESCENT = Descent.of(12, 12, GROUND_Y,
+    private static final Descent DESCENT = Descent.of(12, 12, GROUND_Y, GROUND_Y,
             new SlabSpiral(-1, 3),
             Blocks.POLISHED_ANDESITE_SLAB,
             Blocks.ANDESITE_WALL.getDefaultState(),

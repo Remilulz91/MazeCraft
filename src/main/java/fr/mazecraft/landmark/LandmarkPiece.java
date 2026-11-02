@@ -1,5 +1,6 @@
 package fr.mazecraft.landmark;
 
+import fr.mazecraft.MazeCraft;
 import fr.mazecraft.structure.MazePiece;
 import fr.mazecraft.structure.MazeStyle;
 import fr.mazecraft.structure.MazeTemplates;
@@ -7,7 +8,11 @@ import fr.mazecraft.structure.ModStructures;
 import net.minecraft.block.Block;
 import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
+import net.minecraft.block.entity.LootableContainerBlockEntity;
+import net.minecraft.loot.LootTable;
 import net.minecraft.nbt.NbtCompound;
+import net.minecraft.registry.RegistryKey;
+import net.minecraft.registry.RegistryKeys;
 import net.minecraft.structure.StructureContext;
 import net.minecraft.structure.StructurePiece;
 import net.minecraft.structure.StructurePieceType;
@@ -153,7 +158,48 @@ public class LandmarkPiece extends StructurePiece {
 
         level(world, chunkBox);
         MazeTemplates.place(world, placement, random, chunkBox);
+        fillContainers(world, placement, chunkBox);
         digDown(world, placement, chunkBox);
+    }
+
+    /** Containers a building can hold, and which this fills. */
+    private static final Block[] CONTAINERS = { Blocks.CHEST, Blocks.BARREL };
+
+    /**
+     * Gives the building's own chests and barrels a loot table.
+     *
+     * <p>These are a household's cupboards, not the labyrinth's prize. The whole mod is built so
+     * that the reward is at the end of the maze, behind a guardian; a chest by the front door
+     * that pays better than that would undo it. So the table is bread, string, clay and the
+     * occasional emerald — supplies and flavour, with one pool that is usually empty and
+     * sometimes a book.</p>
+     *
+     * <p>Found through {@code getInfosForBlock}, which is how the game itself locates jigsaw and
+     * data blocks in a template: it returns the positions already transformed by the same
+     * rotation the template was placed with, so this cannot drift from the building the way a
+     * second copy of the rotation maths would. Scanning the chunk for block entities instead
+     * would read seven thousand positions to find three.</p>
+     *
+     * <p>Only empty containers, so a template that was saved with something already in a chest
+     * keeps it; and only at generation — the repair pass does not come back through here, so a
+     * chest the player has emptied stays empty.</p>
+     */
+    private void fillContainers(StructureWorldAccess world, MazeTemplates.Placement placement,
+                                BlockBox chunkBox) {
+        RegistryKey<LootTable> table = RegistryKey.of(RegistryKeys.LOOT_TABLE,
+                MazeCraft.id("chests/landmark/" + landmark.style().id()));
+        for (Block container : CONTAINERS) {
+            for (var info : placement.template().getInfosForBlock(
+                    placement.origin(), placement.data(), container)) {
+                BlockPos at = info.pos();
+                if (!chunkBox.contains(at)) continue;
+                if (!(world.getBlockEntity(at) instanceof LootableContainerBlockEntity box)) continue;
+                if (!box.isEmpty()) continue;
+                // Seeded from the position, so the same chest rolls the same contents however
+                // many times the chunk is generated, and two chests in one building differ.
+                box.setLootTable(table, at.asLong() * 0x9E3779B97F4A7C15L ^ pole.asLong());
+            }
+        }
     }
 
     /**

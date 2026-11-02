@@ -45,20 +45,32 @@ public enum MazeStyle {
                     Blocks.MOSSY_COBBLESTONE.getDefaultState(), 10)
     ),
     /** Deserts: carved sandstone, iron bars, terracotta plaza. */
+    /**
+     * Desert: a sandstone labyrinth, buried under the mud-brick compound of
+     * {@code DesertPyramid}.
+     *
+     * <p>Sandstone under mud brick on purpose. The cherry maze matches its pagoda because both
+     * are the same builders' work; this one reads as the older thing the compound was put up
+     * over, which is what a buried maze should look like. It also means the fire problem that
+     * cost the cherry style a skin of rock does not exist here — nothing in this palette
+     * burns.</p>
+     */
     DESERT(
             Blocks.CUT_SANDSTONE.getDefaultState(),
             Blocks.CHISELED_SANDSTONE.getDefaultState(),
             Blocks.SANDSTONE.getDefaultState(),
             Blocks.SMOOTH_SANDSTONE.getDefaultState(),
             Blocks.ORANGE_TERRACOTTA.getDefaultState(),
-            lantern(),
             Blocks.SANDSTONE.getDefaultState(),
             Blocks.IRON_BARS.getDefaultState(),
-            5,
             Mix.of(Blocks.SMOOTH_SANDSTONE.getDefaultState(), 55,
                     Blocks.SANDSTONE.getDefaultState(), 25,
                     Blocks.CUT_SANDSTONE.getDefaultState(), 15,
-                    Blocks.CHISELED_SANDSTONE.getDefaultState(), 5)
+                    Blocks.CHISELED_SANDSTONE.getDefaultState(), 5),
+            Realm.LANDMARK,
+            Blocks.SMOOTH_SANDSTONE.getDefaultState(),
+            Blocks.OCHRE_FROGLIGHT.getDefaultState(),
+            Blocks.LANTERN.getDefaultState().with(LanternBlock.HANGING, true)
     ),
     /** Snowy plains / snowy taiga: packed ice walls, spruce posts, snow floor. */
     SNOW(
