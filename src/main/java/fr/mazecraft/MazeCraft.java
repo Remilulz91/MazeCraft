@@ -80,6 +80,7 @@ public class MazeCraft implements ModInitializer {
         ModItems.register();
         ThreadTrails.register();
         ThreadLoot.register();
+        fr.mazecraft.loot.ModLoot.register();
 
         // 2. Register the maze structure type + piece type (before datapacks load)
         ModStructures.register();

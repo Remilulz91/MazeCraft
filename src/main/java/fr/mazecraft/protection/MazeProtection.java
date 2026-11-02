@@ -365,7 +365,6 @@ public final class MazeProtection {
             if (MazeProgress.isStyleComplete(player, maze.getStyle())) {
                 player.sendMessage(Text.translatable("mazecraft.progression.style_complete",
                         Text.translatable("mazecraft.style." + maze.getStyle().id())).formatted(Formatting.GOLD), false);
-                giveKeyFragment(world, player, maze);
             }
             if (MazeProgress.isEverythingComplete(player)) {
                 player.sendMessage(Text.translatable("mazecraft.maze.all_done").formatted(Formatting.LIGHT_PURPLE), false);
@@ -381,29 +380,12 @@ public final class MazeProtection {
         return -1;
     }
 
-    /** One fragment per style fully cleared; dropped at the player's feet if the pack is full. */
-    private static void giveKeyFragment(ServerWorld world, ServerPlayerEntity player, MazePiece maze) {
-        ItemStack fragment = KeyFragmentItem.of(ModItems.KEY_FRAGMENT, maze.getStyle());
-        if (!player.getInventory().insertStack(fragment)) {
-            player.dropItem(fragment, false);
-        }
-        world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
-                SoundCategory.PLAYERS, 1.0f, 1.2f);
-        int owned = MazeProgress.completedStyles(player);
-        player.sendMessage(Text.translatable("mazecraft.fragment.obtained",
-                owned, MazeStyle.PROGRESSION.length).formatted(Formatting.LIGHT_PURPLE), false);
-
-        // The sixteenth fragment is the key. It is granted rather than crafted: a recipe cannot
-        // tell one fragment from another, so a grid would accept sixteen copies of the same one.
-        if (owned >= MazeStyle.PROGRESSION.length) {
-            ItemStack key = KronosKeyItem.forPlayer(ModItems.KRONOS_KEY, player);
-            if (!player.getInventory().insertStack(key)) player.dropItem(key, false);
-            player.sendMessage(Text.translatable("mazecraft.kronos.key_granted")
-                    .formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
-            world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_END_PORTAL_SPAWN,
-                    SoundCategory.PLAYERS, 0.6f, 1.4f);
-        }
-    }
+    // The fragment used to be handed over here, one per style fully cleared, and the key was
+    // GRANTED at the sixteenth because — as the comment that stood here said — a recipe cannot
+    // tell one fragment from another, so a grid would have accepted sixteen copies of the same.
+    // Nine separate items solve that, so the fragment is loot now: it is in the chest the
+    // guardian stands over, at odds that rise with the size of the maze. See
+    // MazePiece#cryptLootTableFor.
 
     private static MazeSize nextOf(MazeSize size) {
         return switch (size.step()) {

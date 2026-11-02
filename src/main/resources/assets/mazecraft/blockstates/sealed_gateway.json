@@ -1,22 +1,40 @@
 {
   "variants": {
-    "axis=x,tier=medium": {
+    "axis=x,tier=medium,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_medium_x"
     },
-    "axis=z,tier=medium": {
+    "axis=x,tier=medium,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_medium_x"
+    },
+    "axis=z,tier=medium,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_medium_z"
     },
-    "axis=x,tier=large": {
+    "axis=z,tier=medium,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_medium_z"
+    },
+    "axis=x,tier=large,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_large_x"
     },
-    "axis=z,tier=large": {
+    "axis=x,tier=large,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_large_x"
+    },
+    "axis=z,tier=large,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_large_z"
     },
-    "axis=x,tier=kronos": {
+    "axis=z,tier=large,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_large_z"
+    },
+    "axis=x,tier=kronos,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_kronos_x"
     },
-    "axis=z,tier=kronos": {
+    "axis=x,tier=kronos,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_kronos_lock_x"
+    },
+    "axis=z,tier=kronos,keyhole=false": {
       "model": "mazecraft:block/sealed_gateway_kronos_z"
+    },
+    "axis=z,tier=kronos,keyhole=true": {
+      "model": "mazecraft:block/sealed_gateway_kronos_lock_z"
     }
   }
 }

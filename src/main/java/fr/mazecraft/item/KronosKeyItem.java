@@ -2,6 +2,10 @@ package fr.mazecraft.item;
 
 import fr.mazecraft.block.SealedGatewayBlock;
 import fr.mazecraft.MazeCraft;
+import fr.mazecraft.protection.MazeState;
+import fr.mazecraft.structure.MazeFinder;
+import net.minecraft.block.Block;
+import net.minecraft.block.Blocks;
 import fr.mazecraft.progression.MazeProgress;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
@@ -65,8 +69,6 @@ public class KronosKeyItem extends Item {
 
     private static final int COOLDOWN = 100;
 
-    private static final String OWNER_KEY = "KronosOwner";
-
     /** Which sweep the next use runs, stored on the stack so the search can be resumed. */
     private static final String SWEEP_KEY = "KronosSweep";
 
@@ -74,37 +76,15 @@ public class KronosKeyItem extends Item {
         super(settings);
     }
 
-    /** A key bound to this player. */
-    public static ItemStack forPlayer(Item item, PlayerEntity owner) {
-        ItemStack stack = new ItemStack(item);
-        NbtCompound nbt = new NbtCompound();
-        nbt.putString(OWNER_KEY, owner.getUuid().toString());
-        nbt.putString("OwnerName", owner.getGameProfile().getName());
-        stack.apply(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT, current -> {
-            NbtCompound merged = current.copyNbt();
-            merged.copyFrom(nbt);
-            return NbtComponent.of(merged);
-        });
-        return stack;
-    }
-
-    private static String ownerName(ItemStack stack) {
-        NbtComponent data = stack.get(DataComponentTypes.CUSTOM_DATA);
-        return data == null ? "" : data.copyNbt().getString("OwnerName");
-    }
-
-    private static boolean isOwner(ItemStack stack, PlayerEntity player) {
-        NbtComponent data = stack.get(DataComponentTypes.CUSTOM_DATA);
-        if (data == null) return false;
-        String owner = data.copyNbt().getString(OWNER_KEY);
-        try {
-            return !owner.isEmpty() && UUID.fromString(owner).equals(player.getUuid());
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
-    }
-
-    /** The advancement that records, per player, that this door has been opened for them. */
+    /**
+     * The advancement for having turned a key in a door of Kronos.
+     *
+     * <p>A trophy now, not a permit. It used to be what let a player through — the door was
+     * open for whoever held the advancement and shut for everyone else, which is the only way
+     * to gate a block per player. The key is crafted from nine fragments rather than handed to
+     * the one who earned it, so there is no "earned it" left to check: turning it opens the
+     * door for the server, and the record of who did it is just a record.</p>
+     */
     public static final String UNSEALED = "unseal_kronos";
 
     /**
@@ -131,34 +111,42 @@ public class KronosKeyItem extends Item {
             return ActionResult.PASS;
         }
 
-        ItemStack stack = context.getStack();
-        if (!isOwner(stack, player)) {
-            player.sendMessage(Text.translatable("mazecraft.kronos.not_yours").formatted(Formatting.RED), true);
-            return ActionResult.FAIL;
-        }
-        if (!MazeProgress.isEverythingComplete(player)) {
-            player.sendMessage(Text.translatable("mazecraft.barrier.kronos",
-                    MazeProgress.completedSteps(player), MazeProgress.TOTAL_STEPS)
-                    .formatted(Formatting.RED), true);
-            return ActionResult.FAIL;
-        }
-        if (MazeProgress.hasAdvancement(player, UNSEALED)) {
+        BlockPos at = context.getBlockPos();
+        MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, at, 2);
+        if (hit == null) return ActionResult.PASS;
+
+        // Per maze, not per player. There is more than one Labyrinth of Kronos in a world, so
+        // this door being open says nothing about the next one — which is what makes a second
+        // key worth crafting.
+        if (!MazeState.get(serverWorld).openKronos(hit.key())) {
             player.sendMessage(Text.translatable("mazecraft.kronos.already_open").formatted(Formatting.GRAY), true);
             return ActionResult.FAIL;
         }
 
-        MazeProgress.grant(player, UNSEALED);
-        stack.decrement(1);
+        // The whole plane, not the block that was clicked: a door with one square missing is
+        // not an open door, it is a hole.
+        for (BlockPos pane : hit.piece().entranceBlocks()) {
+            if (serverWorld.getBlockState(pane).getBlock() instanceof SealedGatewayBlock) {
+                serverWorld.setBlockState(pane, Blocks.AIR.getDefaultState(), Block.NOTIFY_LISTENERS);
+            }
+        }
 
-        BlockPos at = context.getBlockPos();
+        MazeProgress.grant(player, UNSEALED);
+        context.getStack().decrement(1);
+
         serverWorld.spawnParticles(ParticleTypes.SOUL_FIRE_FLAME, at.getX() + 0.5, at.getY() + 1.5,
                 at.getZ() + 0.5, 80, 0.8, 1.4, 0.8, 0.04);
         serverWorld.spawnParticles(ParticleTypes.END_ROD, at.getX() + 0.5, at.getY() + 1.5,
                 at.getZ() + 0.5, 40, 0.6, 1.2, 0.6, 0.08);
         world.playSound(null, at, SoundEvents.BLOCK_END_PORTAL_SPAWN, SoundCategory.BLOCKS, 0.6f, 1.4f);
         world.playSound(null, at, SoundEvents.BLOCK_VAULT_OPEN_SHUTTER, SoundCategory.BLOCKS, 1.4f, 0.5f);
-        player.sendMessage(Text.translatable("mazecraft.kronos.unsealed")
-                .formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
+        // Everyone within earshot, because the door just opened for all of them.
+        for (ServerPlayerEntity nearby : serverWorld.getPlayers()) {
+            if (nearby.getBlockPos().isWithinDistance(at, 64)) {
+                nearby.sendMessage(Text.translatable("mazecraft.kronos.unsealed")
+                        .formatted(Formatting.LIGHT_PURPLE, Formatting.BOLD), false);
+            }
+        }
         return ActionResult.SUCCESS;
     }
 
@@ -169,10 +157,6 @@ public class KronosKeyItem extends Item {
             return TypedActionResult.success(stack, world.isClient());
         }
 
-        if (!isOwner(stack, player)) {
-            player.sendMessage(Text.translatable("mazecraft.kronos.not_yours").formatted(Formatting.RED), true);
-            return TypedActionResult.fail(stack);
-        }
         if (!world.getRegistryKey().equals(World.OVERWORLD)) {
             player.sendMessage(Text.translatable("mazecraft.kronos.wrong_dimension").formatted(Formatting.GRAY), true);
             return TypedActionResult.fail(stack);
@@ -227,10 +211,6 @@ public class KronosKeyItem extends Item {
 
     @Override
     public void appendTooltip(ItemStack stack, TooltipContext context, List<Text> tooltip, TooltipType type) {
-        String owner = ownerName(stack);
-        if (!owner.isEmpty()) {
-            tooltip.add(Text.translatable("mazecraft.kronos.bound", owner).formatted(Formatting.LIGHT_PURPLE));
-        }
         tooltip.add(Text.translatable("mazecraft.kronos.tooltip").formatted(Formatting.DARK_GRAY));
     }
 }

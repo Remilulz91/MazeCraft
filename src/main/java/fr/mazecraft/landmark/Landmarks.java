@@ -23,6 +23,7 @@ public final class Landmarks {
     public static Landmark of(MazeStyle style) {
         if (style == CherryPagoda.STYLE) return CherryPagoda.INSTANCE;
         if (style == DesertPyramid.STYLE) return DesertPyramid.INSTANCE;
+        if (style == BadlandsStarter.STYLE) return BadlandsStarter.INSTANCE;
         return null;
     }
 

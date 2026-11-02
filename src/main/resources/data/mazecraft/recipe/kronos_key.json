@@ -1,0 +1,37 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "mazecraft:key_fragment_cherry"
+    },
+    {
+      "item": "mazecraft:key_fragment_desert"
+    },
+    {
+      "item": "mazecraft:key_fragment_badlands"
+    },
+    {
+      "item": "mazecraft:key_fragment_hedge"
+    },
+    {
+      "item": "mazecraft:key_fragment_jungle"
+    },
+    {
+      "item": "mazecraft:key_fragment_swamp"
+    },
+    {
+      "item": "mazecraft:key_fragment_snow"
+    },
+    {
+      "item": "mazecraft:key_fragment_taiga"
+    },
+    {
+      "item": "mazecraft:key_fragment_dark_forest"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "id": "mazecraft:kronos_key"
+  }
+}

@@ -45,6 +45,25 @@ public interface Landmark {
     /** Where the way down is cut through the building, and what it is made of. */
     Descent descent();
 
+    /**
+     * A block in the template that stands for "whatever the ground is here", or null.
+     *
+     * <p>A template carries one ground: the badlands starter house is built on red sand, and a
+     * badlands is red sand in the flats and banded terracotta on the plateaus. Dropped on a
+     * plateau it would bring its own slab of sand with it, which reads as a house teleported in
+     * rather than built there — and no choice of block in the template fixes that, because any
+     * one of them is wrong half the time.</p>
+     *
+     * <p>So the building names the block it used, and the placement swaps each one for the
+     * surface its own column actually had. On red sand nothing changes; on a plateau it becomes
+     * the terracotta of that exact band, because the value is the block that was there and not
+     * a guess at it. The pagoda and the pyramid name nothing: grass under a pagoda in a cherry
+     * grove, and sand under a compound in a desert, are never wrong.</p>
+     */
+    default net.minecraft.block.Block blend() {
+        return null;
+    }
+
     /** Half-width of the building's own footprint, in blocks. */
     int half();
 

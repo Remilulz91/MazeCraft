@@ -4,6 +4,10 @@ import fr.mazecraft.MazeCraft;
 import net.fabricmc.fabric.api.itemgroup.v1.ItemGroupEvents;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroups;
+import fr.mazecraft.structure.MazeStyle;
+
+import java.util.EnumMap;
+import java.util.Map;
 import net.minecraft.item.SpawnEggItem;
 import fr.mazecraft.entity.ModEntities;
 import net.minecraft.registry.Registries;
@@ -20,9 +24,24 @@ public final class ModItems {
     public static final Item ARIADNE_COMPASS = Registry.register(Registries.ITEM, MazeCraft.id("ariadne_compass"),
             new AriadneCompassItem(new Item.Settings().maxCount(1).rarity(Rarity.UNCOMMON)));
 
-    /** Key fragment: one per style fully cleared; sixteen of them open the way to Kronos. */
-    public static final Item KEY_FRAGMENT = Registry.register(Registries.ITEM, MazeCraft.id("key_fragment"),
-            new KeyFragmentItem(new Item.Settings().maxCount(16).rarity(Rarity.RARE)));
+    /**
+     * The nine key fragments, one per biome in {@link MazeStyle#FRAGMENT_STYLES}.
+     *
+     * <p>Nine items and not one, so the crafting grid can tell them apart — see
+     * {@link KeyFragmentItem}. Registered from the list rather than written out nine times, so
+     * adding a tenth biome to the key is one entry in that array.</p>
+     */
+    public static final Map<MazeStyle, Item> KEY_FRAGMENTS = registerFragments();
+
+    private static Map<MazeStyle, Item> registerFragments() {
+        Map<MazeStyle, Item> fragments = new EnumMap<>(MazeStyle.class);
+        for (MazeStyle style : MazeStyle.FRAGMENT_STYLES) {
+            fragments.put(style, Registry.register(Registries.ITEM,
+                    MazeCraft.id("key_fragment_" + style.id()),
+                    new KeyFragmentItem(new Item.Settings().maxCount(16).rarity(Rarity.RARE), style)));
+        }
+        return java.util.Collections.unmodifiableMap(fragments);
+    }
 
     /** Key of Kronos: granted with the sixteenth fragment, bound to the player who earned it. */
     public static final Item KRONOS_KEY = Registry.register(Registries.ITEM, MazeCraft.id("kronos_key"),
@@ -67,7 +86,7 @@ public final class ModItems {
         ItemGroupEvents.modifyEntriesEvent(ItemGroups.TOOLS).register(entries -> {
             entries.add(ARIADNE_THREAD);
             entries.add(ARIADNE_COMPASS);
-            entries.add(KEY_FRAGMENT);
+            for (MazeStyle style : MazeStyle.FRAGMENT_STYLES) entries.add(KEY_FRAGMENTS.get(style));
             entries.add(KRONOS_KEY);
             entries.add(MINOTAUR_HORN);
             entries.add(ASTERION_HORN);

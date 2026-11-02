@@ -106,22 +106,31 @@ public enum MazeStyle {
                     Blocks.COBBLESTONE.getDefaultState(), 10,
                     Blocks.ANDESITE.getDefaultState(), 5)
     ),
-    /** Badlands: striped terracotta walls (bands by height), red sandstone floor. */
+    /**
+     * Badlands: striped terracotta walls, red sandstone floor, buried under the starter house of
+     * {@code BadlandsStarter}.
+     *
+     * <p>The bands are the point of this style and they survive the move underground — see the
+     * banded enclosed constructor. Strata in a buried maze read better than they ever did in
+     * the open: that is what a badlands cliff face is.</p>
+     */
     BADLANDS(
             Blocks.TERRACOTTA.getDefaultState(),
             Blocks.CHISELED_RED_SANDSTONE.getDefaultState(),
             Blocks.RED_SANDSTONE.getDefaultState(),
             Blocks.SMOOTH_RED_SANDSTONE.getDefaultState(),
             Blocks.CUT_RED_SANDSTONE.getDefaultState(),
-            lantern(),
             Blocks.RED_SANDSTONE.getDefaultState(),
             Blocks.IRON_BARS.getDefaultState(),
-            5,
             // No terracotta / red sand in the ring: dead bushes grow on them
             Mix.of(Blocks.SMOOTH_RED_SANDSTONE.getDefaultState(), 50,
                     Blocks.RED_SANDSTONE.getDefaultState(), 25,
                     Blocks.CUT_RED_SANDSTONE.getDefaultState(), 20,
                     Blocks.CHISELED_RED_SANDSTONE.getDefaultState(), 5),
+            Realm.LANDMARK,
+            Blocks.SMOOTH_RED_SANDSTONE.getDefaultState(),
+            Blocks.OCHRE_FROGLIGHT.getDefaultState(),
+            Blocks.LANTERN.getDefaultState().with(LanternBlock.HANGING, true),
             new BlockState[]{
                     Blocks.RED_TERRACOTTA.getDefaultState(),
                     Blocks.ORANGE_TERRACOTTA.getDefaultState(),
@@ -498,6 +507,29 @@ public enum MazeStyle {
             .filter(style -> style != KRONOS)
             .toArray(MazeStyle[]::new);
 
+    /**
+     * The nine styles that carry a key fragment, and so the nine the Key of Kronos is made of.
+     *
+     * <p>Nine because the crafting grid is three by three and the key fills it. They are items
+     * of their own, not one item wearing nine labels, and that is what makes the recipe work:
+     * an ingredient matches by item id, so nine fragments of the same biome can never be a key,
+     * whatever order they are laid out in. No per-player bookkeeping is needed to enforce
+     * that — and a spare fragment stays worth something, because it completes somebody
+     * else's set.</p>
+     *
+     * <p>Eight of them have a building of their own. {@code JUNGLE} does not yet: its fragment
+     * comes from the vanilla jungle temple in the meantime, so the key is obtainable before the
+     * ninth landmark is built. See {@code ModLoot}.</p>
+     */
+    public static final MazeStyle[] FRAGMENT_STYLES = {
+            CHERRY, DESERT, BADLANDS, HEDGE, JUNGLE, SWAMP, SNOW, TAIGA, DARK_FOREST };
+
+    /** True for a style whose crypt can yield a key fragment. */
+    public boolean hasFragment() {
+        for (MazeStyle style : FRAGMENT_STYLES) if (style == this) return true;
+        return false;
+    }
+
     /** Optional horizontal bands: wall block per height above the floor (1 = lowest). Null = plain {@link #wall}. */
     private final BlockState[] wallBands;
 
@@ -555,6 +587,23 @@ public enum MazeStyle {
     MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor, BlockState plaza,
               BlockState foundation, BlockState gate, Mix ring, Realm realm,
               BlockState ceiling, BlockState ceilingLight, BlockState hangingLight) {
+        this(wall, pillar, wallBase, floor, plaza, foundation, gate, ring, realm,
+                ceiling, ceilingLight, hangingLight, null);
+    }
+
+    /**
+     * The same, for a style whose walls are banded by height.
+     *
+     * <p>Added for the badlands, and the reason is worth writing down: the enclosed constructor
+     * set {@code wallBands} to null, so burying a banded style under a building would have
+     * silently flattened its walls to one colour. The badlands maze IS its strata — red, orange
+     * and white terracotta in courses, with a sandstone coping — and losing them would have
+     * been a regression nobody would trace back to the landmark.</p>
+     */
+    MazeStyle(BlockState wall, BlockState pillar, BlockState wallBase, BlockState floor, BlockState plaza,
+              BlockState foundation, BlockState gate, Mix ring, Realm realm,
+              BlockState ceiling, BlockState ceilingLight, BlockState hangingLight,
+              BlockState[] wallBands) {
         this.wall = wall;
         this.pillar = pillar;
         this.wallBase = wallBase;
@@ -565,7 +614,7 @@ public enum MazeStyle {
         this.gate = gate;
         this.margin = realm == Realm.LANDMARK ? 1 : 4;
         this.ring = ring;
-        this.wallBands = null;
+        this.wallBands = wallBands;
         this.enclosed = true;
         this.realm = realm;
         this.ceiling = ceiling;

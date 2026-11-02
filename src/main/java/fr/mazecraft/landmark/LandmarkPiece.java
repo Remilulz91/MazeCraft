@@ -25,6 +25,9 @@ import net.minecraft.world.StructureWorldAccess;
 import net.minecraft.world.gen.StructureAccessor;
 import net.minecraft.world.gen.chunk.ChunkGenerator;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * The building on the surface, the ground levelled under it, and the shaft from its staircase
  * down to the maze. One class for every landmark, not one per building.
@@ -156,8 +159,12 @@ public class LandmarkPiece extends StructurePiece {
         MazeTemplates.Placement placement = placement(world);
         if (placement == null) return;
 
-        level(world, chunkBox);
+        // The ground the building will stand on is read BEFORE anything is written over it:
+        // see blendGround. On a landmark that blends nothing this map stays empty and costs a
+        // reference.
+        Map<Long, BlockState> ground = level(world, chunkBox);
         MazeTemplates.place(world, placement, random, chunkBox);
+        blendGround(world, placement, ground, chunkBox);
         fillContainers(world, placement, chunkBox);
         digDown(world, placement, chunkBox);
     }
@@ -265,8 +272,10 @@ public class LandmarkPiece extends StructurePiece {
      * way the maze's own foundation pass does. A {@code getHeight} builds a whole NoiseChunk for
      * one column; the blocks are already there by the time a piece generates.</p>
      */
-    private void level(StructureWorldAccess world, BlockBox chunkBox) {
+    private Map<Long, BlockState> level(StructureWorldAccess world, BlockBox chunkBox) {
         int foot = landmark.half();
+        boolean blending = landmark.blend() != null;
+        Map<Long, BlockState> ground = new HashMap<>();
         BlockPos.Mutable pos = new BlockPos.Mutable();
         for (int dx = -foot - RING; dx <= foot + RING; dx++) {
             for (int dz = -foot - RING; dz <= foot + RING; dz++) {
@@ -282,6 +291,11 @@ public class LandmarkPiece extends StructurePiece {
                 int target = out == 0 ? padFloorY
                         : padFloorY + (natural - padFloorY) * out / (RING + 1);
                 BlockState cap = world.getBlockState(pos.set(x, natural, z));
+                // What this column's surface was, kept for blendGround. Taken here because
+                // this is the last moment it exists: the next few lines cut or fill it.
+                if (blending && out == 0 && !cap.isAir()) {
+                    ground.put(BlockPos.asLong(x, 0, z), cap);
+                }
                 BlockState fill = world.getBlockState(pos.set(x, natural - 1, z));
                 if (fill.isAir() || !fill.getFluidState().isEmpty()) {
                     fill = Blocks.DIRT.getDefaultState();
@@ -321,6 +335,39 @@ public class LandmarkPiece extends StructurePiece {
                     }
                 }
             }
+        }
+        return ground;
+    }
+
+    /**
+     * Swaps the building's stand-in ground block for the ground that was actually there.
+     *
+     * <p>A template carries one ground with it. The badlands starter house is built on red
+     * sand, and a badlands is red sand in the flats and banded terracotta on the plateaus — so
+     * dropped on a plateau it would arrive with its own slab of sand under it, which reads as a
+     * house teleported in rather than one built there. No block chosen in the template fixes
+     * that, because whichever is picked is wrong half the time.</p>
+     *
+     * <p>So the building names the block it used ({@link Landmark#blend()}) and every one of
+     * them becomes the surface its own column had, banding and all, because the value is the
+     * block that was read off that column and not a guess at it. Columns the levelling never
+     * saw — outside this chunk — are left as the template laid them; their own chunk's pass
+     * handles them, with its own reading of its own ground.</p>
+     *
+     * <p>Found through {@code getInfosForBlock}, the same call the loot pass uses, so the
+     * positions arrive already rotated and this cannot drift from the building.</p>
+     */
+    private void blendGround(StructureWorldAccess world, MazeTemplates.Placement placement,
+                             Map<Long, BlockState> ground, BlockBox chunkBox) {
+        Block stand = landmark.blend();
+        if (stand == null || ground.isEmpty()) return;
+        for (var info : placement.template().getInfosForBlock(
+                placement.origin(), placement.data(), stand)) {
+            BlockPos at = info.pos();
+            if (!chunkBox.contains(at)) continue;
+            BlockState cap = ground.get(BlockPos.asLong(at.getX(), 0, at.getZ()));
+            if (cap == null || cap.isOf(stand)) continue;
+            world.setBlockState(at, cap, Block.NOTIFY_LISTENERS);
         }
     }
 

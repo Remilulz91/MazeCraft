@@ -91,7 +91,7 @@ public final class MazeBarrier {
         MazeFinder.MazeHit hit = MazeFinder.find(serverWorld, pos, 0);
         if (hit == null) return;
         MazePiece maze = hit.piece();
-        if (mayEnter(player, maze)) return;
+        if (mayEnter(serverWorld, player, maze, hit.key())) return;
 
         // Shove the player back out along the line from the maze centre.
         //
@@ -112,26 +112,18 @@ public final class MazeBarrier {
      * May this player walk into this maze? An ordinary maze asks for the previous step of its own
      * style; the Labyrinth of Kronos asks for all of them.
      */
-    private static boolean mayEnter(ServerPlayerEntity player, MazePiece maze) {
-        // Kronos asks for the door to have been opened with the key, not merely for the 48
-        // steps. The steps are what earns the key; turning it is what opens the door.
+    private static boolean mayEnter(ServerWorld world, ServerPlayerEntity player, MazePiece maze,
+                                    long mazeKey) {
+        // Kronos asks whether THIS door has been opened, which is a fact about the world and no
+        // longer one about the player. The key is crafted from nine fragments now, so holding
+        // the advancement no longer proves anything was earned; whoever turns a key lets
+        // everybody in, the same bargain the levers and the vault's code already make. And the
+        // next Labyrinth in the world is still shut, which is what makes a second key worth
+        // making.
         if (maze.getStyle().isKronos()) {
-            return MazeProgress.hasAdvancement(player, KronosKeyItem.UNSEALED);
+            return fr.mazecraft.protection.MazeState.get(world).isKronosOpen(mazeKey);
         }
         return MazeProgress.canEnter(player, maze.getStyle(), maze.getSize());
-    }
-
-    /** Hands back a Key of Kronos to a player who has earned one and no longer has it. */
-    private static void giveKeyIfMissing(ServerWorld world, ServerPlayerEntity player) {
-        for (int slot = 0; slot < player.getInventory().size(); slot++) {
-            if (player.getInventory().getStack(slot).isOf(ModItems.KRONOS_KEY)) return;
-        }
-        ItemStack key = KronosKeyItem.forPlayer(ModItems.KRONOS_KEY, player);
-        if (!player.getInventory().insertStack(key)) player.dropItem(key, false);
-        player.sendMessage(Text.translatable("mazecraft.kronos.key_returned")
-                .formatted(Formatting.LIGHT_PURPLE), false);
-        world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_AMETHYST_BLOCK_RESONATE,
-                SoundCategory.PLAYERS, 1.0f, 1.0f);
     }
 
     private static void warn(ServerWorld world, ServerPlayerEntity player, MazePiece maze) {
@@ -141,18 +133,11 @@ public final class MazeBarrier {
         lastMessage.put(player.getUuid(), now);
 
         if (maze.getStyle().isKronos()) {
-            if (MazeProgress.isEverythingComplete(player)) {
-                // Earned it, but has not turned the key. If the key itself is gone — lost in
-                // lava, left in a chest a world away — the lock gives them another rather than
-                // shutting them out of the whole endgame over a dropped item.
-                player.sendMessage(Text.translatable("mazecraft.kronos.use_key")
-                        .formatted(Formatting.LIGHT_PURPLE), true);
-                giveKeyIfMissing(world, player);
-            } else {
-                player.sendMessage(Text.translatable("mazecraft.barrier.kronos",
-                        MazeProgress.completedSteps(player), MazeProgress.TOTAL_STEPS)
-                        .formatted(Formatting.RED), true);
-            }
+            // One message, and no free key. The door used to hand a replacement to anybody who
+            // had earned one and lost it, which made sense while the key was granted and bound;
+            // a crafted key is an object like any other and the mod does not reprint it.
+            player.sendMessage(Text.translatable("mazecraft.kronos.use_key")
+                    .formatted(Formatting.LIGHT_PURPLE), true);
             world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_BEACON_DEACTIVATE,
                     SoundCategory.BLOCKS, 0.5f, 0.6f);
             return;
@@ -180,7 +165,7 @@ public final class MazeBarrier {
         if (hit == null) return;
         MazePiece maze = hit.piece();
         if (!maze.isInsideMaze(pos.getX(), pos.getZ())) return;
-        if (mayEnter(player, maze)) return;
+        if (mayEnter(world, player, maze, hit.key())) return;
 
         BlockPos out = maze.entranceOutsidePos();
         player.teleport(world, out.getX() + 0.5, out.getY(), out.getZ() + 0.5,
@@ -193,7 +178,7 @@ public final class MazeBarrier {
 
     private static void retrofitNearby(ServerWorld world, ServerPlayerEntity player) {
         for (MazeFinder.MazeHit hit : MazeFinder.findInChunk(world, player.getChunkPos())) {
-            ensureGateway(world, hit.piece());
+            ensureGateway(world, hit.piece(), hit.key());
         }
     }
 
@@ -206,19 +191,26 @@ public final class MazeBarrier {
      * practice this makes the gateway self-healing: a player in creative can break it, as they
      * can break bedrock, and it closes again on the next sweep.</p>
      */
-    public static void ensureGateway(ServerWorld world, MazePiece maze) {
+    public static void ensureGateway(ServerWorld world, MazePiece maze, long mazeKey) {
         SealedGatewayBlock.Tier tier = SealedGatewayBlock.Tier.of(maze.getStyle(), maze.getSize());
         if (tier == null) return; // small mazes are never sealed
+        // A door of Kronos that has been opened stays open. Without this the self-healing sweep
+        // below would put it back a few ticks after the key was turned, and the key is spent.
+        if (tier == SealedGatewayBlock.Tier.KRONOS
+                && fr.mazecraft.protection.MazeState.get(world).isKronosOpen(mazeKey)) {
+            return;
+        }
 
         BlockState gateway = ModBlocks.SEALED_GATEWAY.getDefaultState()
                 .with(SealedGatewayBlock.AXIS, maze.entranceAlongX() ? Direction.Axis.X : Direction.Axis.Z)
                 .with(SealedGatewayBlock.TIER, tier);
+        BlockPos keyhole = tier == SealedGatewayBlock.Tier.KRONOS ? maze.keyholePos() : null;
         int placed = 0;
         for (BlockPos pos : maze.entranceBlocks()) {
             if (!world.isChunkLoaded(pos.getX() >> 4, pos.getZ() >> 4)) continue;
             // Only fill what is open: never overwrite the walls, or anything a player put there.
             if (!world.getBlockState(pos).isAir()) continue;
-            world.setBlockState(pos, gateway);
+            world.setBlockState(pos, gateway.with(SealedGatewayBlock.KEYHOLE, pos.equals(keyhole)));
             placed++;
         }
         if (placed > 0) {

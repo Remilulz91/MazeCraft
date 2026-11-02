@@ -55,6 +55,10 @@ public final class MazeTemplates {
     public static final Piece DESERT_MUD_BASE =
             new Piece(MazeCraft.id("desert_mud_base"), Direction.SOUTH);
 
+    /** The starter house of the badlands. SOUTH, measured the same way as the other two. */
+    public static final Piece BADLANDS_STARTER_HOUSE =
+            new Piece(MazeCraft.id("badlands_starter_house"), Direction.SOUTH);
+
     private MazeTemplates() { }
 
     /**

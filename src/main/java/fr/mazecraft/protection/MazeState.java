@@ -53,6 +53,27 @@ public class MazeState extends PersistentState {
         return added;
     }
 
+    /**
+     * Doors of Kronos that have been opened with a key.
+     *
+     * <p>Per maze, like the vault's door and unlike a step of the ladder, and for the same
+     * reason: the door is made of blocks and blocks cannot be open for one player and shut for
+     * another. Whoever turns the key opens that Labyrinth for everyone on the server — and
+     * there is more than one Labyrinth in a world, so the next one still wants its own key.</p>
+     */
+    private final LongSet kronosOpen = new LongOpenHashSet();
+
+    public boolean isKronosOpen(long mazeKey) {
+        return kronosOpen.contains(mazeKey);
+    }
+
+    /** @return true if that door was still sealed. */
+    public boolean openKronos(long mazeKey) {
+        boolean added = kronosOpen.add(mazeKey);
+        if (added) markDirty();
+        return added;
+    }
+
     /** DEBUG: seal a vault again (the door itself is not rebuilt). */
     public boolean resealVault(long mazeKey) {
         boolean removed = vaultsOpen.remove(mazeKey);
@@ -129,6 +150,7 @@ public class MazeState extends PersistentState {
         nbt.putLongArray("Repaired", repairedChunks.toLongArray());
         nbt.putLongArray("Champions", championAlive.toLongArray());
         nbt.putLongArray("VaultsOpen", vaultsOpen.toLongArray());
+        nbt.putLongArray("KronosOpen", kronosOpen.toLongArray());
         return nbt;
     }
 
@@ -142,6 +164,9 @@ public class MazeState extends PersistentState {
         }
         for (long key : nbt.getLongArray("VaultsOpen")) {
             state.vaultsOpen.add(key);
+        }
+        for (long key : nbt.getLongArray("KronosOpen")) {
+            state.kronosOpen.add(key);
         }
         for (long chunk : nbt.getLongArray("Repaired")) {
             state.repairedChunks.add(chunk);

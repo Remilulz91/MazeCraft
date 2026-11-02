@@ -8,6 +8,7 @@ import net.minecraft.block.BlockState;
 import net.minecraft.entity.Entity;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.state.StateManager;
+import net.minecraft.state.property.BooleanProperty;
 import net.minecraft.state.property.EnumProperty;
 import net.minecraft.state.property.Properties;
 import net.minecraft.util.StringIdentifiable;
@@ -44,6 +45,18 @@ public class SealedGatewayBlock extends Block {
     /** Which step this gateway guards; drives the colour. */
     public static final EnumProperty<Tier> TIER = EnumProperty.of("tier", Tier.class);
 
+    /**
+     * True on the one block of a door of Kronos that shows the keyhole.
+     *
+     * <p>A plane of identical shimmer gives the player nothing to aim at, and the key is used
+     * on a block. The doorway is three wide and {@code WALL_HEIGHT} — four — high, so there is
+     * no single middle block; a three-by-three door would leave a gap at the top you could
+     * crawl through. The keyhole therefore sits in the middle column at eye level, which is
+     * where a hand goes anyway. Turning the key in any block of the door works all the same:
+     * the keyhole says where, it does not gate it.</p>
+     */
+    public static final BooleanProperty KEYHOLE = BooleanProperty.of("keyhole");
+
     private static final VoxelShape X_SHAPE = Block.createCuboidShape(0.0, 0.0, 6.0, 16.0, 16.0, 10.0);
     private static final VoxelShape Z_SHAPE = Block.createCuboidShape(6.0, 0.0, 0.0, 10.0, 16.0, 16.0);
 
@@ -77,12 +90,13 @@ public class SealedGatewayBlock extends Block {
 
     public SealedGatewayBlock(Settings settings) {
         super(settings);
-        setDefaultState(getDefaultState().with(AXIS, Direction.Axis.X).with(TIER, Tier.MEDIUM));
+        setDefaultState(getDefaultState().with(AXIS, Direction.Axis.X).with(TIER, Tier.MEDIUM)
+                .with(KEYHOLE, false));
     }
 
     @Override
     protected void appendProperties(StateManager.Builder<Block, BlockState> builder) {
-        builder.add(AXIS, TIER);
+        builder.add(AXIS, TIER, KEYHOLE);
     }
 
     @Override
