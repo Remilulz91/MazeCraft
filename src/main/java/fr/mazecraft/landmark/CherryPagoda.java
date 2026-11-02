@@ -76,21 +76,27 @@ public final class CherryPagoda implements Landmark {
      * How far below the terrain's top solid block the template's level 0 goes.
      *
      * <p>Zero, and the first answer was one, from reading the template the wrong way. Counting
-     * what each <em>layer</em> is made of says level 1 is the ground — 264 dirt, 49 grass, 43
-     * dirt path, 36 concrete — and that is the fill under a raised apron, not a ground anybody
-     * walks on. Counting the highest solid block of each <em>column</em> says something else:</p>
+     * what each <em>layer</em> is made of says level 1 is the ground — 264 dirt, 133 stone
+     * bricks, 49 grass, 43 dirt path — and that is the fill under a raised apron, not a ground
+     * anybody walks on. Counting the highest solid block of each <em>column</em> says something
+     * else:</p>
      *
      * <pre>
-     *   y=0   27 columns   grass_block        the corners, where the build meets the world
-     *   y=1  222 columns   garden, paths, kerb
-     *   y=2  282 columns   courtyard and the building's own floor
+     *   y=0   10 columns   grass_block        where the build meets the world untouched
+     *   y=1  209 columns   garden, paths, kerb
+     *   y=2   66 columns   courtyard and the building's own floor
      * </pre>
      *
-     * <p>Those twenty-seven grass corners are the only cells the builder left as plain ground,
-     * and they are the only ones that have to be flush, so level 0 lands on the terrain's top
-     * solid block and the apron rises a block above it the way it was built to. Twenty-seven of
-     * six hundred and fifty is exactly why the aggregate lied: the honest cells are a rounding
-     * error in the layer counts and the whole answer in the column ones.</p>
+     * <p>Those ten grass cells are the only ones the builder left as plain ground, and they are
+     * the only ones that have to be flush, so level 0 lands on the terrain's top solid block and
+     * the apron rises a block above it the way it was built to. Ten of six hundred and fifty is
+     * exactly why the aggregate lied: the honest cells are a rounding error in the layer counts
+     * and the whole answer in the column ones.</p>
+     *
+     * <p>Those figures were wrong here until the template was re-read — 27, 222 and 282, which
+     * match neither copy of the file. The conclusion was right and the game agrees with it, but
+     * a comment that invents its own evidence is worse than no comment, because the next person
+     * to doubt the offset will check the numbers and not the template.</p>
      *
      * <p>Off by one here is a notch all the way round the footprint, so if it still looks wrong
      * {@code /maze debug pagoda <size> <lift>} places it a block up or down without a rebuild.</p>
