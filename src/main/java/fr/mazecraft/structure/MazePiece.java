@@ -786,23 +786,31 @@ public class MazePiece extends StructurePiece {
                 // Redraw the floor BELOW until this floor can end its walk in one of its dead
                 // ends. The seed moves by a large odd step so the mazes drawn are unrelated.
                 MazeLayout selfWalls = buildFloor(cells, seeds[f], f, root, clearance, null);
-                for (int tryNo = 0; tryNo < STAIR_SEED_TRIES && built == null; tryNo++) {
-                    long below = seeds[f + 1] + (long) tryNo * 7919L;
-                    MazeLayout probe = MazeLayout.generateFloor(cells, below, 0, 0, 0, 1);
-                    // Aligned cells first, then any shared dead end. Both treads of the spiral
-                    // sit two apart on the ring, so when the two cells' single doorways are two
-                    // apart as well, the stair points at a door from the top AND the bottom.
-                    // It cannot be had by choosing a phase -- a dead end leaves no phase to
-                    // choose -- only by choosing the cell.
-                    for (boolean alignedOnly : new boolean[]{true, false}) {
+                // Alignment is the OUTER loop, and that ordering is the whole point. Both treads
+                // of the spiral sit two apart on the ring, so when the two cells' single
+                // doorways are two apart as well, the stair points at a door from the top and
+                // from the bottom. A dead end leaves no phase to choose, so this can only come
+                // from choosing the cell -- and therefore, when no cell in the floor below
+                // offers it, from choosing a different floor below.
+                //
+                // Written the other way round, with the seeds outside, the first seed that had
+                // any shared dead end was taken and the search stopped there. The alignment was
+                // only ever tried against one draw of the lower floor, so it failed whenever
+                // that single draw happened not to offer it -- about one large maze in eight,
+                // which is exactly the rate seen in game. Twenty-four draws make that vanish.
+                long base = seeds[f + 1];
+                for (boolean alignedOnly : new boolean[]{true, false}) {
+                    for (int tryNo = 0; tryNo < STAIR_SEED_TRIES && built == null; tryNo++) {
+                        long below = base + (long) tryNo * 7919L;
+                        MazeLayout probe = MazeLayout.generateFloor(cells, below, 0, 0, 0, 1);
                         boolean[] mask = stairMask(cells, selfWalls, probe, alignedOnly);
                         if (mask == null) continue;
                         MazeLayout candidate = buildFloor(cells, seeds[f], f, root, clearance, mask);
                         if (candidate.goal() == null) continue;
                         seeds[f + 1] = below;
                         built = candidate;
-                        break;
                     }
+                    if (built != null) break;
                 }
             }
             if (built == null) built = buildFloor(cells, seeds[f], f, root, clearance, null);
