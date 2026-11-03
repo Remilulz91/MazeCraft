@@ -1687,6 +1687,16 @@ public class MazePiece extends StructurePiece {
         int rot = floorRot;
         for (int y = bottom; y <= top; y++) {
             for (int half = 0; half < 2; half++) {
+                // The last half-step is not laid, and that single omission is what makes both
+                // ends of the stair face a doorway. Twelve treads put the two ends eleven apart
+                // on a ring of eight -- an odd number, so one end always landed in a corner, for
+                // every floor height. Eleven treads put them ten apart, which is even.
+                //
+                // And it costs nothing underfoot: the dropped tread would have been flush with
+                // the floor above, so the floor above simply becomes the last tread. The whole
+                // run stays 0.5 a step, 1.0 -> 1.5 -> ... -> 6.5 -> 7.0, with no block-high
+                // riser anywhere and nothing to jump in either direction.
+                if (y == top && half == 1) continue;
                 int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
                         SHAFT_SPIRAL.length)];
                 if (step[0] != dx || step[1] != dz) continue;
@@ -1716,20 +1726,45 @@ public class MazePiece extends StructurePiece {
         int[] cell = stairCell();
         if (cell == null) return 0;
         int ox = MazeLayout.CELL * cell[0] + 2, oz = MazeLayout.CELL * cell[1] + 2;
-        int[] towards = null;
-        for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
-            if (!layout().isWall(ox + 2 * d[0], oz + 2 * d[1])) {
-                towards = d;
-                break;
+
+        // Which of this cell's four doorways are open, as ring indices. The bottom tread's
+        // index IS the phase -- (y - bottom) * 2 + half is 0 there -- so putting it on one of
+        // these is just a matter of choosing the phase.
+        boolean[] openDoor = new boolean[SHAFT_SPIRAL.length];
+        int firstOpen = -1;
+        for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
+            int[] d = SHAFT_SPIRAL[i];
+            if (Math.abs(d[0]) + Math.abs(d[1]) != 1) continue;          // corners are not doors
+            if (layout().isWall(ox + 2 * d[0], oz + 2 * d[1])) continue;
+            openDoor[i] = true;
+            if (firstOpen < 0) firstOpen = i;
+        }
+        if (firstOpen < 0) return 0;
+
+        // With the last half-step dropped there are 11 treads, so the top one sits at
+        // phase + 10, which is phase + 2 round a ring of eight. When the cell this stair lands
+        // in has more than one way out -- and the floor below's root often does -- there may be
+        // a choice of phase that also points the TOP tread at the doorway the player walks in
+        // through, one floor up. Take it when it exists; it costs nothing and the descent then
+        // reads right from both ends.
+        int exit = parentLayout().onlyExit(stairCell()[0], stairCell()[1]);
+        int[] up = switch (exit) {
+            case MazeLayout.NORTH -> new int[]{0, -1};
+            case MazeLayout.SOUTH -> new int[]{0, 1};
+            case MazeLayout.WEST -> new int[]{-1, 0};
+            case MazeLayout.EAST -> new int[]{1, 0};
+            default -> null;
+        };
+        if (up != null) {
+            for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
+                int topIdx = Math.floorMod(i + 2, SHAFT_SPIRAL.length);
+                if (openDoor[i] && SHAFT_SPIRAL[topIdx][0] == up[0]
+                        && SHAFT_SPIRAL[topIdx][1] == up[1]) {
+                    return i;
+                }
             }
         }
-        if (towards == null) return 0;
-        int target = 0;
-        for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
-            if (SHAFT_SPIRAL[i][0] == towards[0] && SHAFT_SPIRAL[i][1] == towards[1]) target = i;
-        }
-        // The bottom step's index is the phase itself: (y - bottom) * 2 + half is 0 there.
-        return target;
+        return firstOpen;
     }
 
     /** Turned so the TOP step of the crypt's stair is the one under the dead end's doorway. */
