@@ -203,13 +203,22 @@ public class MazeStructure extends Structure {
             int y = floorY.getAsInt();
             int entrance = context.random().nextInt(4);
             Direction facing = Direction.fromHorizontal(context.random().nextInt(4));
-            MazePiece maze = new MazePiece(style, chosen, mazeSeed, centerX, y, centerZ, entrance);
+            int floors = MazePiece.floorsFor(style, chosen);
+            java.util.List<MazePiece> stack = new java.util.ArrayList<>(floors);
+            for (int f = 0; f < floors; f++) {
+                stack.add(new MazePiece(style, chosen, mazeSeed, centerX,
+                        y - MazeSize.FLOOR_PITCH * f, centerZ, entrance, f, floors));
+            }
             // The maze first and the building second, because within one chunk the pieces
             // generate in the order they are added here, and the shaft has to be cut through the
             // maze's roof after that roof has been laid. The other way round, the roof plugs the
             // staircase and the only way in is sealed by the thing it leads to.
             return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector -> {
-                collector.addPiece(maze);
+                // Top floor first and downwards, then the building: within a chunk the pieces
+                // generate in the order they are added, and the shaft has to be cut through the
+                // maze's roof after that roof is laid. The other way round, the roof plugs the
+                // staircase and the only way in is sealed by the thing it leads to.
+                for (MazePiece floor : stack) collector.addPiece(floor);
                 collector.addPiece(new fr.mazecraft.landmark.LandmarkPiece(landmark,
                         new BlockPos(centerX, y, centerZ), pad.floorY(), y, facing));
             }));
@@ -675,7 +684,7 @@ public class MazeStructure extends Structure {
         int offset = context.random().nextInt(2); // vary the parity between mazes
         for (int y = minFloor + offset; y <= maxFloor; y += 2) {
             if (netherFluid(columns, y)) continue;
-            float ratio = burialSolid(columns, y);
+            float ratio = burialSolid(columns, y, 0);
             if (ratio > bestRatio) {
                 bestRatio = ratio;
                 bestY = y;
@@ -776,11 +785,21 @@ public class MazeStructure extends Structure {
      * <p>This is the "is it buried, or is it hanging in a cavern" test, and it is unchanged.</p>
      */
     private static float burialSolid(
-            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y,
+            int below) {
         int solid = 0, total = 0;
         for (var column : columns) {
             for (int dy : BURIAL_PROBES) {
                 if (!column.getState(y + dy).isAir()) solid++;
+                total++;
+            }
+            // A stacked maze owns everything down to its lowest floor, so the same six probes
+            // run again around that one. Reading one end of a twenty-block structure and
+            // calling the whole of it buried is how a bottom floor ends up in a cavern the
+            // survey never looked at.
+            if (below <= 0) continue;
+            for (int dy : BURIAL_PROBES) {
+                if (!column.getState(y - below + dy).isAir()) solid++;
                 total++;
             }
         }
@@ -805,10 +824,11 @@ public class MazeStructure extends Structure {
      * the maze.</p>
      */
     private static int burialFluid(
-            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y,
+            int below) {
         int wet = 0;
         for (var column : columns) {
-            for (int dy = -2; dy <= MazePiece.ROOF_DY + 2; dy++) {
+            for (int dy = -2 - below; dy <= MazePiece.ROOF_DY + 2; dy++) {
                 if (!column.getState(y + dy).getFluidState().isEmpty()) wet++;
             }
         }
@@ -816,8 +836,8 @@ public class MazeStructure extends Structure {
     }
 
     /** How many probes {@link #burialFluid} reads, so a count can be read as a share. */
-    private static int burialFluidProbes(int columns) {
-        return columns * (MazePiece.ROOF_DY + 5);
+    private static int burialFluidProbes(int columns, int below) {
+        return columns * (MazePiece.ROOF_DY + 5 + below);
     }
 
     /**
@@ -836,10 +856,11 @@ public class MazeStructure extends Structure {
      * this can only refuse more, never accept something the old rule turned down.</p>
      */
     private static int burialWetColumns(
-            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y,
+            int below) {
         int wet = 0;
         for (var column : columns) {
-            for (int dy = -2; dy <= MazePiece.ROOF_DY + 2; dy++) {
+            for (int dy = -2 - below; dy <= MazePiece.ROOF_DY + 2; dy++) {
                 if (!column.getState(y + dy).getFluidState().isEmpty()) {
                     wet++;
                     break;
@@ -912,8 +933,23 @@ public class MazeStructure extends Structure {
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
             MazeSize size, int minFloor, int maxFloor) {
+        return findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ, size,
+                minFloor, maxFloor, 0);
+    }
+
+    /**
+     * @param below how far the structure reaches under the floor being tested, so that a maze
+     *              folded into several floors is judged on the whole stack and not on its top
+     *              level alone. 0 for a flat maze, which is what every caller that does not
+     *              pass it has.
+     */
+    public static OptionalInt findShallowestBuriedFloorY(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeSize size, int minFloor, int maxFloor, int below) {
         if (maxFloor < minFloor) return OptionalInt.empty();
-        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor).found();
+        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor, below)
+                .found();
     }
 
     /**
@@ -950,6 +986,13 @@ public class MazeStructure extends Structure {
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
             MazeSize size, int minFloor, int maxFloor) {
+        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor, 0);
+    }
+
+    public static BurialReport surveyBurial(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeSize size, int minFloor, int maxFloor, int below) {
         if (maxFloor < minFloor) {
             return new BurialReport(OptionalInt.empty(), 0, 0, 0, -1f, -1, 0, -1, 0);
         }
@@ -957,12 +1000,12 @@ public class MazeStructure extends Structure {
         int candidates = 0, wet = 0, open = 0;
         int leastFluid = Integer.MAX_VALUE, leastWet = Integer.MAX_VALUE;
         float bestRatio = -1f;
-        int probes = burialFluidProbes(columns.size());
+        int probes = burialFluidProbes(columns.size(), below);
         int wetCap = Math.round(columns.size() * MAX_WET_COLUMN_SHARE);
         for (int y = maxFloor; y >= minFloor; y--) {
             candidates++;
-            int fluid = burialFluid(columns, y);
-            int wetColumns = burialWetColumns(columns, y);
+            int fluid = burialFluid(columns, y, below);
+            int wetColumns = burialWetColumns(columns, y, below);
             leastFluid = Math.min(leastFluid, fluid);
             leastWet = Math.min(leastWet, wetColumns);
             // Two rules, not one: how deeply the site is wet, and how widely. An aquifer fails
@@ -972,7 +1015,7 @@ public class MazeStructure extends Structure {
                 wet++;
                 continue;
             }
-            float ratio = burialSolid(columns, y);
+            float ratio = burialSolid(columns, y, below);
             bestRatio = Math.max(bestRatio, ratio);
             if (ratio >= MIN_SOLID_RATIO) {
                 return new BurialReport(OptionalInt.of(y), candidates, wet, open, ratio,

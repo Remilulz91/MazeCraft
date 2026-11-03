@@ -100,19 +100,96 @@ public class MazePiece extends StructurePiece {
     private final int floorY;
     private final int entranceSide;
 
+    /**
+     * Which level of the stack this piece is, counting <b>down</b> from 0 at the top, and how
+     * many there are.
+     *
+     * <p>A maze is no longer one flat slab but several smaller floors stacked under each other,
+     * and the way that is built is not by teaching this class to hold several floors — fifty-two
+     * of its methods are written around having exactly one — but by placing <b>one piece per
+     * floor</b>. A Minecraft structure already holds several pieces; that is how the building
+     * and the maze under it live side by side. So each piece stays what it already is and is
+     * already correct, a single floor, and the stack is made of three of them.</p>
+     *
+     * <p>What a piece does have to know is where it sits, because the levels where two floors
+     * meet belong to both. With a pitch of {@link MazeSize#FLOOR_PITCH}, a floor's slab sits
+     * exactly where the floor below's roof skin would go. So only the top piece lays a roof
+     * skin and only the bottom one lays an underside; in between, the upper floor's own slab is
+     * the lower floor's ceiling cover, which it already was.</p>
+     *
+     * <p>0 of 1 is a flat maze, which is every maze that exists today, and every rule below
+     * reads as it did before at those values.</p>
+     */
+    private final int floorIndex;
+    private final int floorCount;
+
     // Rebuilt lazily from the seed; not saved to NBT
     private MazeLayout layout;
+
+    /**
+     * How many floors a maze of this style and size is folded into.
+     *
+     * <p>Only a maze buried under a building. A surface maze is open to the sky and has no
+     * burial problem to solve, and the Nether's hang over the lava sea and are walked into
+     * through a doorway — stacking either would change what they are to fix something they do
+     * not suffer from. {@code enteredFromPlaza} is exactly the set that does.</p>
+     */
+    public static int floorsFor(MazeStyle style, MazeSize size) {
+        return FLOORS_ENABLED && style.enteredFromPlaza() ? size.floors() : 1;
+    }
+
+    /**
+     * Off until the <b>footprint</b> follows the floors, and this flag is the honest way to say
+     * so rather than leaving a half-built feature live.
+     *
+     * <p>Everything a stack needs is in place: a piece knows where it sits, saves it, lays skin
+     * only at the ends, roots its layout under the floor above, and the burial survey probes the
+     * whole drop. What is not done is that {@code size.cells()} still answers with the old
+     * single-slab footprint, so flipping this on today would stack three mazes <b>149 blocks
+     * wide</b> on top of each other — three times the structure, none of the gain, and strictly
+     * worse than what it replaces. The footprint has to become {@link MazeSize#cellsPerFloor}
+     * at some twenty-six places first, among them the surveys that decide where a maze may go.</p>
+     *
+     * <p>The flag goes away in the same change that moves them.</p>
+     */
+    private static final boolean FLOORS_ENABLED = false;
+
+    /** Blocks from the top floor's slab down to the bottom one's. */
+    public static int stackDrop(MazeStyle style, MazeSize size) {
+        return MazeSize.FLOOR_PITCH * (floorsFor(style, size) - 1);
+    }
+
+    /** The topmost floor: the one the building's staircase arrives in, and the only one with a plaza. */
+    public boolean isTopFloor() {
+        return floorIndex == 0;
+    }
+
+    /** The deepest floor: the one that carries the crypt, the guardian and the treasure. */
+    public boolean isBottomFloor() {
+        return floorIndex == floorCount - 1;
+    }
+
+    public int floorIndex() {
+        return floorIndex;
+    }
 
     /**
      * @param entranceSide {@link MazeLayout#NORTH}.. {@link MazeLayout#EAST}, or -1 for random
      */
     public MazePiece(MazeStyle style, MazeSize size, long seed, int centerX, int floorY, int centerZ, int entranceSide) {
+        this(style, size, seed, centerX, floorY, centerZ, entranceSide, 0, 1);
+    }
+
+    public MazePiece(MazeStyle style, MazeSize size, long seed, int centerX, int floorY, int centerZ,
+                     int entranceSide, int floorIndex, int floorCount) {
         super(ModStructures.MAZE_PIECE, 0, boxFor(style, size, centerX, floorY, centerZ));
         this.style = style;
         this.size = size;
         this.seed = seed;
         this.floorY = floorY;
         this.entranceSide = entranceSide;
+        this.floorIndex = floorIndex;
+        this.floorCount = floorCount;
         this.setOrientation(null); // absolute coordinates, no rotation
     }
 
@@ -126,6 +203,10 @@ public class MazePiece extends StructurePiece {
         this.seed = nbt.getLong("Seed");
         this.floorY = nbt.getInt("FloorY");
         this.entranceSide = nbt.contains("Entrance") ? nbt.getInt("Entrance") : -1;
+        // Absent on every piece written before mazes had floors, and the defaults are exactly
+        // what such a piece is: the only floor of a stack of one.
+        this.floorIndex = nbt.contains("Floor") ? nbt.getInt("Floor") : 0;
+        this.floorCount = nbt.contains("Floors") ? nbt.getInt("Floors") : 1;
     }
 
     private static BlockBox boxFor(MazeStyle style, MazeSize size, int centerX, int floorY, int centerZ) {
@@ -151,6 +232,8 @@ public class MazePiece extends StructurePiece {
         nbt.putLong("Seed", seed);
         nbt.putInt("FloorY", floorY);
         nbt.putInt("Entrance", entranceSide);
+        nbt.putInt("Floor", floorIndex);
+        nbt.putInt("Floors", floorCount);
     }
 
     /**
@@ -596,11 +679,47 @@ public class MazePiece extends StructurePiece {
 
     public MazeLayout layout() {
         if (layout == null) {
-            layout = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates(),
-                    plazaRadius(), style.enteredFromPlaza());
+            layout = layoutFor(floorIndex);
         }
         return layout;
     }
+
+    /**
+     * The layout of floor {@code index}, worked out from the maze's seed alone.
+     *
+     * <p>A lower floor is rooted where its staircase arrives, which is the goal of the floor
+     * above, so each one depends on the one before it. Rather than hand that down from piece to
+     * piece — which would mean the three pieces of a stack had to be built in order, and that
+     * chunk generation would have to guarantee it — every piece simply recomputes the floors
+     * above its own. It is deterministic from the seed, it is a handful of array walks, and it
+     * happens once per piece because {@link #layout} is cached. Independence is worth more here
+     * than the few microseconds it costs.</p>
+     */
+    private MazeLayout layoutFor(int index) {
+        MazeLayout top = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates(),
+                plazaRadius(), style.enteredFromPlaza());
+        if (index == 0) return top;
+        MazeLayout current = top;
+        for (int f = 1; f <= index; f++) {
+            int[] root = current.goal();
+            if (root == null) return current;   // no progression: nothing to descend from
+            boolean last = f == floorCount - 1;
+            current = MazeLayout.generateFloor(size.cells(), seed * 31 + f, size.gates(),
+                    root[0], root[1], last ? CRYPT_GOAL_CLEARANCE : STAIR_GOAL_CLEARANCE);
+        }
+        return current;
+    }
+
+    /**
+     * Room the goal dead end keeps from the outer wall, in cells.
+     *
+     * <p>Three on the bottom floor, because the crypt is dug under its goal and a crypt that
+     * overhangs the footprint is not clipped neatly — it is simply missing on that side. One
+     * anywhere else, where the goal is a 3 × 3 stairwell and three cells of margin would throw
+     * away most of the candidate dead ends on a grid this small for nothing.</p>
+     */
+    private static final int CRYPT_GOAL_CLEARANCE = 3;
+    private static final int STAIR_GOAL_CLEARANCE = 1;
 
     /** World X of local maze coordinate 0 (the maze proper, not the margin). */
     private int originX() {
@@ -1023,8 +1142,12 @@ public class MazePiece extends StructurePiece {
                 // 1. Foundation. Enclosed (Nether): a clean underside slab + fortress-like support
                 //    pillars down to the ground or into the lava. Overworld: fill gaps until solid ground.
                 if (style.enclosed) {
-                    buildUnderside(world, pos, x, z);
-                    buildShell(world, pos, x, z);
+                    // Only the ends of the stack. A floor's slab sits exactly where the floor
+                    // below's roof skin would go, so in between the two would write the same
+                    // level with different blocks; the upper floor's own slab already covers
+                    // the lower floor's ceiling.
+                    if (isBottomFloor()) buildUnderside(world, pos, x, z);
+                    if (isTopFloor()) buildShell(world, pos, x, z);
                 }
                 for (int y = floorY - 1; !style.enclosed && y >= floorY - FOUNDATION_DEPTH; y--) {
                     pos.set(x, y, z);

@@ -151,9 +151,15 @@ public interface Landmark {
                                int centerX, int centerZ, MazeSize size, int padFloorY,
                                MazeStructure.Site over) {
         int maxFloor = ceilingUnder(over) - fr.mazecraft.structure.MazePiece.ROOF_DY;
-        int minFloor = Math.max(floorLimit(), deepestForStair(padFloorY));
+        // Everything here is about the TOP floor, which is the one this returns. The stair cap
+        // measures from the building down to it, so that bound is unchanged. floorLimit is
+        // about the deepest block the structure owns, and with a stack that is the bottom
+        // floor -- so the limit has to be raised by the whole drop, or a three-floor maze digs
+        // two pitches further than the limit was ever meant to allow.
+        int drop = fr.mazecraft.structure.MazePiece.stackDrop(style(), size);
+        int minFloor = Math.max(floorLimit() + drop, deepestForStair(padFloorY));
         return MazeStructure.findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ, size,
-                minFloor, maxFloor);
+                minFloor, maxFloor, drop);
     }
 
     /**
