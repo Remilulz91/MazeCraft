@@ -694,6 +694,59 @@ public class MazeStructure extends Structure {
             {-3, -1, 1, 3, MazePiece.ROOF_DY + 1, MazePiece.ROOF_DY + 3};
 
     /**
+     * The same solid share, on a grid of any fineness. <b>For the scan only — generation never
+     * calls this.</b>
+     *
+     * <p>It exists because the first instrumented scan threw up a contradiction. The badlands
+     * run reported a median rock cover of <b>99%</b> and refused not one site for sitting in
+     * cavern — while there were photographs of those same mazes cut open by caves. Both cannot
+     * be true unless the measurement is blind to what the photographs show, and it is: 25
+     * columns is one sounding every <b>27</b> blocks on a medium and every <b>39</b> on a large,
+     * and a cavern thirty across fits between two of them without touching either. A cover of
+     * 99% read that way is exactly what a maze crossing an unseen cavern would also report.</p>
+     *
+     * <p>So before anything in generation moves, this measures the same sites again on a finer
+     * grid and the scan prints the two side by side. If they agree, the caverns are somewhere
+     * else and the rule I suspected is innocent; if the fine one is far lower, the gap is the
+     * size of the error the production test has been making all along.</p>
+     *
+     * <p><b>At {@code radius = 2} this is the production test block for block</b> — the same 25
+     * positions, the same {@link #BURIAL_PROBES}, the same arithmetic — which is what makes the
+     * two columns of the report comparable rather than merely adjacent.</p>
+     *
+     * <p>It is still a grid, and it is worth saying what it in turn cannot see: at
+     * {@code radius = 4} the spacing is 13 blocks on a medium and 19 on a large, so a cavern a
+     * dozen across can still hide between soundings. A finer grid raises the floor on what gets
+     * detected. It never proves a site is clean.</p>
+     *
+     * <p>One honest caveat on "block for block". Integer division means a finer grid reaches
+     * very slightly less far — {@code ±76} rather than {@code ±78} on a large — because the
+     * step is rounded down before being multiplied back out. Two blocks at the rim of a 149
+     * footprint, which is noise next to the thing being measured, but it is a difference and it
+     * belongs in writing rather than in a surprise later.</p>
+     *
+     * @param radius half the grid's width in cells, so the grid is {@code (2r+1)} squared
+     */
+    public static float gridBurialSolid(
+            ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeSize size, int y, int radius) {
+        int half = size.span() / 2 + 4;
+        int solid = 0, total = 0;
+        for (int i = -radius; i <= radius; i++) {
+            for (int j = -radius; j <= radius; j++) {
+                var column = gen.getColumnSample(centerX + i * half / radius,
+                        centerZ + j * half / radius, world, noise);
+                for (int dy : BURIAL_PROBES) {
+                    if (!column.getState(y + dy).isAir()) solid++;
+                    total++;
+                }
+            }
+        }
+        return (float) solid / total;
+    }
+
+    /**
      * How much of what surrounds a floor laid at {@code y} is rock rather than cave.
      *
      * <p>This is the "is it buried, or is it hanging in a cavern" test, and it is unchanged.</p>

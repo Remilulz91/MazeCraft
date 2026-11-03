@@ -662,6 +662,15 @@ public class DebugCommand {
     private static final int WHY_OK = 0, WHY_STAIR = 1, WHY_WET = 2, WHY_OPEN = 3;
 
     /**
+     * The grid the scan re-measures an accepted site on: 4 gives 9x9 = 81 columns, a sounding
+     * every 13 blocks on a medium against the production test's 27, and every 19 against 39 on
+     * a large. Three and a quarter times the columns, which is why it is a scan and not the
+     * rule: it runs on accepted sites only, a couple of dozen per scan, in a command that is
+     * already sliced across ticks.
+     */
+    private static final int FINE_GRID_RADIUS = 4;
+
+    /**
      * One site, judged by the landmark's rules rather than the surface ones, and recorded
      * <b>whatever</b> it did.
      *
@@ -683,6 +692,7 @@ public class DebugCommand {
         int why;
         int descent = -1;
         int cover = -1;
+        int fine = -1;
         if (minFloor > maxFloor) {
             why = WHY_STAIR;
         } else {
@@ -696,6 +706,11 @@ public class DebugCommand {
                 // picking a number and finding out afterwards -- the same way the relief
                 // allowance was settled.
                 cover = Math.round(report.bestRatio() * 100);
+                // And the same height measured again on a 9x9, one sounding every ~19 blocks
+                // instead of every ~37. Scan only: generation is untouched until this says
+                // whether the coarse grid has been overstating, and by how much.
+                fine = Math.round(MazeStructure.gridBurialSolid(gen, world, noise, x, z,
+                        scan.size, report.found().getAsInt(), FINE_GRID_RADIUS) * 100);
             } else {
                 why = report.wet() == report.candidates() ? WHY_WET : WHY_OPEN;
             }
@@ -703,7 +718,7 @@ public class DebugCommand {
         // How far the ground falls somewhere in the maze's footprint: the number the stair cap
         // is really about, and the one missing from the first run of this scan.
         int fall = pad.floorY() - (over.lowest() - 1);
-        scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall, cover});
+        scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall, cover, fine});
     }
 
     /**
@@ -746,6 +761,8 @@ public class DebugCommand {
         java.util.List<Integer> descents = new java.util.ArrayList<>();
         java.util.List<Integer> falls = new java.util.ArrayList<>();
         java.util.List<Integer> covers = new java.util.ArrayList<>();
+        java.util.List<Integer> fines = new java.util.ArrayList<>();
+        java.util.List<Integer> drops = new java.util.ArrayList<>();
         for (int[] row : scan.found) {
             reliefs.add(row[0]);
             falls.add(row[4]);
@@ -762,6 +779,10 @@ public class DebugCommand {
                 pass++;
                 descents.add(row[3]);
                 if (row[5] >= 0) covers.add(row[5]);
+                if (row[5] >= 0 && row[6] >= 0) {
+                    fines.add(row[6]);
+                    drops.add(row[5] - row[6]);
+                }
             }
         }
         java.util.Collections.sort(reliefs);
@@ -843,6 +864,42 @@ public class DebugCommand {
                 bar.append("  ").append(b).append("%: ").append(n);
             }
             src.sendFeedback(() -> Text.literal(bar.toString()).formatted(Formatting.AQUA), false);
+        }
+
+        // The whole point of this run: is the production figure above true, or is it just what
+        // 25 soundings 37 blocks apart happen to see? Same sites, same heights, same probes,
+        // on a 9x9. If the two medians agree the caverns in the screenshots are not where I
+        // said they were; if the fine one is far lower, that gap IS the error.
+        if (!fines.isEmpty()) {
+            java.util.Collections.sort(fines);
+            java.util.Collections.sort(drops);
+            int grid = FINE_GRID_RADIUS * 2 + 1;
+            src.sendFeedback(() -> Text.literal("fine    same heights on a " + grid + "x" + grid
+                            + " (" + (grid * grid) + " columns): min " + fines.get(0)
+                            + "%, 25% " + fines.get(fines.size() / 4)
+                            + "%, median " + fines.get(fines.size() / 2)
+                            + "%, 75% " + fines.get(fines.size() * 3 / 4)
+                            + "%, max " + fines.get(fines.size() - 1) + "%")
+                    .formatted(Formatting.GRAY), false);
+            int worse5 = 0, worse10 = 0, worse20 = 0;
+            for (int d : drops) {
+                if (d >= 5) worse5++;
+                if (d >= 10) worse10++;
+                if (d >= 20) worse20++;
+            }
+            final int f5 = worse5, f10 = worse10, f20 = worse20, n = drops.size();
+            src.sendFeedback(() -> Text.literal("fine    the coarse grid overstated by: median "
+                            + drops.get(drops.size() / 2) + " points, worst "
+                            + drops.get(drops.size() - 1) + "; " + f5 + " of " + n
+                            + " sites by 5+, " + f10 + " by 10+, " + f20 + " by 20+")
+                    .formatted(Formatting.AQUA), false);
+            StringBuilder fbar = new StringBuilder("fine    sites left if the bar were, measured fine:");
+            for (int b : new int[]{60, 70, 75, 80, 85, 90, 95}) {
+                int k = 0;
+                for (int c : fines) if (c >= b) k++;
+                fbar.append("  ").append(b).append("%: ").append(k);
+            }
+            src.sendFeedback(() -> Text.literal(fbar.toString()).formatted(Formatting.AQUA), false);
         }
 
         StringBuilder table = new StringBuilder("relief  if the allowance were:");
