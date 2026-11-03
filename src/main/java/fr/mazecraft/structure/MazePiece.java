@@ -360,6 +360,9 @@ public class MazePiece extends StructurePiece {
 
     /** True for a maze whose progression leads outwards to a dead end with a room under it. */
     public boolean hasCrypt() {
+        // One crypt per maze, at the bottom of the stack. Every floor has a goal -- that is
+        // what its walk ends at -- but only the last one's goal is the end of the maze.
+        if (!isBottomFloor()) return false;
         return style.enteredFromPlaza();
     }
 
@@ -686,6 +689,42 @@ public class MazePiece extends StructurePiece {
         }
         return layout;
     }
+
+    /**
+     * The cell of this floor where the staircase from the floor above comes down, or null on
+     * the top floor, which is entered by the building's own shaft instead.
+     *
+     * <p>It is the <b>goal</b> of the floor above: the dead end its walk ends at. Which is the
+     * same cell this floor's progression is rooted at, so the player arrives where this floor
+     * begins.</p>
+     */
+    private int[] stairCell() {
+        if (isTopFloor()) return null;
+        if (stairCell == null) {
+            int[] found = parentLayout().goal();
+            stairCell = found == null ? NO_CRYPT : found;
+        }
+        return stairCell == NO_CRYPT ? null : stairCell;
+    }
+
+    private int[] stairCell;
+
+    /**
+     * The floor above's layout, kept rather than recomputed.
+     *
+     * <p>{@link #layoutFor} walks the stack from the top every time it is called, so asking it
+     * for the parent once per column of a stairwell would regenerate two whole mazes nine times
+     * over for every chunk the stair touches. It is the same answer each time; hold it.</p>
+     */
+    private MazeLayout parentLayout;
+
+    private MazeLayout parentLayout() {
+        if (parentLayout == null) parentLayout = layoutFor(floorIndex - 1);
+        return parentLayout;
+    }
+
+    /** The spiral's phase, which is one number per piece and never changes. */
+    private int floorRot = Integer.MIN_VALUE;
 
     /**
      * The layout of floor {@code index}, worked out from the maze's seed alone.
@@ -1213,6 +1252,11 @@ public class MazePiece extends StructurePiece {
                     } else {
                         buildEnclosedColumn(world, pos, x, z, lx, lz, inside, isWall, isPillar, air, keep);
                     }
+                    // After the walls, never with the crypt: the crypt is dug below the floor
+                    // and nothing up here touches it, but this stair stands exactly where step 3
+                    // lays corridor and wall, so running it earlier would see its own work
+                    // written over.
+                    buildFloorStair(world, pos, x, z, lx, lz);
                     continue;
                 }
                 for (int dy = 1; dy <= CLEAR_HEIGHT; dy++) {
@@ -1568,6 +1612,81 @@ public class MazePiece extends StructurePiece {
                         Block.NOTIFY_LISTENERS);
             }
         }
+    }
+
+    /**
+     * The staircase from the floor above, cut by the floor <b>below</b> it.
+     *
+     * <p>Which way round matters, and getting it wrong is a bug this project has already had
+     * once: the pieces of a structure generate in the order they were added, so if the upper
+     * floor cut its own way down, the lower floor would build afterwards and plug it — the same
+     * way the building's shaft was once sealed by the roof it led to. The lower floor writing
+     * last is what keeps the hole open, on generation and on every repair alike.</p>
+     *
+     * <p>Six blocks of descent, which is {@link MazeSize#FLOOR_PITCH}: from the slab of the
+     * floor above down to this floor's own walking surface, through that slab, through this
+     * floor's ceiling, and into its corridor. Twelve half-steps on the same ring the crypt's
+     * stair and the landmarks' staircases wind round.</p>
+     */
+    private void buildFloorStair(StructureWorldAccess world, BlockPos.Mutable pos,
+                                 int x, int z, int lx, int lz) {
+        int[] cell = stairCell();
+        if (cell == null) return;
+        int ox = MazeLayout.CELL * cell[0] + 2, oz = MazeLayout.CELL * cell[1] + 2;
+        int dx = lx - ox, dz = lz - oz;
+        if (Math.abs(dx) > 2 || Math.abs(dz) > 2) return;
+
+        int bottom = floorY + 1;                        // this floor's walking surface
+        int top = floorY + MazeSize.FLOOR_PITCH;        // the slab of the floor above
+
+        // The lining, one ring out: the well passes through this floor's own corridors, so
+        // without it the stair would open sideways into whatever passage it happens to cross
+        // and the maze would have a shortcut nobody designed.
+        if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
+            for (int y = bottom; y <= top; y++) {
+                world.setBlockState(pos.set(x, y, z), style.wallBase,
+                        Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            }
+            return;
+        }
+        // Bottom upwards, so a block is cleared before the one above it: clearing a cell can
+        // dislodge whatever hangs beneath it, and the order is the fix rather than a list of
+        // blocks to watch for.
+        for (int y = bottom; y <= top; y++) {
+            world.setBlockState(pos.set(x, y, z), Blocks.AIR.getDefaultState(),
+                    Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+        }
+        if (floorRot == Integer.MIN_VALUE) floorRot = floorSpiralRotation(bottom, top);
+        int rot = floorRot;
+        for (int y = bottom; y <= top; y++) {
+            for (int half = 0; half < 2; half++) {
+                int[] step = SHAFT_SPIRAL[Math.floorMod((y - bottom) * 2 + half + rot,
+                        SHAFT_SPIRAL.length)];
+                if (step[0] != dx || step[1] != dz) continue;
+                world.setBlockState(pos.set(x, y, z), vaultSlab()
+                                .with(SlabBlock.TYPE, half == 0 ? SlabType.BOTTOM : SlabType.TOP),
+                        Block.NOTIFY_LISTENERS);
+            }
+        }
+    }
+
+    /** Turned so the TOP step faces the way the player walks in, on the floor above. */
+    private int floorSpiralRotation(int bottom, int top) {
+        int[] cell = stairCell();
+        int exit = cell == null ? -1 : parentLayout().onlyExit(cell[0], cell[1]);
+        int[] towards = switch (exit) {
+            case MazeLayout.NORTH -> new int[]{0, -1};
+            case MazeLayout.SOUTH -> new int[]{0, 1};
+            case MazeLayout.WEST -> new int[]{-1, 0};
+            case MazeLayout.EAST -> new int[]{1, 0};
+            default -> null;
+        };
+        if (towards == null) return 0;
+        int target = 0;
+        for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
+            if (SHAFT_SPIRAL[i][0] == towards[0] && SHAFT_SPIRAL[i][1] == towards[1]) target = i;
+        }
+        return target - ((top - bottom) * 2 + 1);
     }
 
     /** Turned so the TOP step of the crypt's stair is the one under the dead end's doorway. */
