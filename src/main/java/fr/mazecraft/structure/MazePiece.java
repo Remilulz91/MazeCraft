@@ -1607,7 +1607,17 @@ public class MazePiece extends StructurePiece {
         // Top down would pull the lantern hanging under the dead end's ceiling off its support,
         // the way the pagoda's shaft did; nothing hangs here yet, but the order costs nothing.
         for (int y = bottom; y <= floorY; y++) {
-            world.setBlockState(pos.set(x, y, z), air, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
+            // A newel post, as the inter-floor stairs and the buildings' staircases have: the
+            // middle of a 3 x 3 spiral is otherwise a clear drop the whole way down, and the
+            // quickest way to the bottom is to step into it.
+            //
+            // Only ABOVE the crypt's ceiling. The shaft comes down in the middle of the room,
+            // and a pillar standing in the middle of a nineteen-block arena would change the
+            // fight -- the guardian charges in straight lines and is stunned by what it hits.
+            // The hole worth closing is the shaft; the room is not a hole.
+            boolean post = dx == 0 && dz == 0 && y > ceiling;
+            world.setBlockState(pos.set(x, y, z), post ? style.pillar : air,
+                    Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
         }
         for (int y = bottom; y <= floorY; y++) {
             for (int half = 0; half < 2; half++) {
