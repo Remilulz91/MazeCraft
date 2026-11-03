@@ -115,6 +115,17 @@ public class DebugCommand {
                 .then(CommandManager.literal("template")
                         .then(CommandManager.argument("name", StringArgumentType.word())
                                 .executes(DebugCommand::onTemplate)))
+                .then(CommandManager.literal("carve")
+                        .executes(ctx -> onCarve(ctx, MazeSize.MEDIUM.id(), LANDMARK_DEFAULT))
+                        .then(CommandManager.argument("size", StringArgumentType.word())
+                                .suggests(SIZE_SUGGESTIONS)
+                                .executes(ctx -> onCarve(ctx,
+                                        StringArgumentType.getString(ctx, "size"), LANDMARK_DEFAULT))
+                                .then(CommandManager.argument("style", StringArgumentType.word())
+                                        .suggests(LANDMARK_SUGGESTIONS)
+                                        .executes(ctx -> onCarve(ctx,
+                                                StringArgumentType.getString(ctx, "size"),
+                                                StringArgumentType.getString(ctx, "style"))))))
                 .then(CommandManager.literal("depth")
                         .executes(ctx -> onDepth(ctx, MazeSize.MEDIUM.id(), LANDMARK_DEFAULT))
                         .then(CommandManager.argument("size", StringArgumentType.word())
@@ -1182,6 +1193,145 @@ public class DebugCommand {
      * side, the building's and the maze's, and the arithmetic between them. If the rule is
      * wrong, it is wrong here, before a single block has been placed.</p>
      */
+    /** Columns across the footprint that {@link #onCarve} reads, per side. */
+    private static final int CARVE_GRID = 13;
+
+    /**
+     * How much of a maze-sized box the carvers take out <b>after</b> the site has been chosen.
+     *
+     * <p>This exists because of a contradiction two scans could not resolve. The site test
+     * reported a median rock cover of 99% and refused nothing for cavern; a finer 9x9 grid
+     * agreed with it to within three points; and there were still photographs of mazes cut open
+     * by caves. The grids agreed because they read the same terrain, and that terrain is not the
+     * one the maze is built in.</p>
+     *
+     * <p>{@code gen.getColumnSample} takes neither a chunk nor a region, so it can only return
+     * the terrain the noise describes. And {@code ChunkStatus} runs STRUCTURE_STARTS — where the
+     * site is chosen — four steps before CARVERS, which is where caves and ravines are cut, and
+     * five before FEATURES, where the maze is finally built. <b>The site is picked two stages
+     * before the holes exist.</b> The rock really is 99% solid when we look; it simply is not
+     * solid any more by the time we build.</p>
+     *
+     * <p>So this command reads both worlds at once and subtracts them: the noise column against
+     * the live world, over the footprint, through the band the shell occupies. What it prints is
+     * the volume the placement rule is structurally blind to.</p>
+     *
+     * <p>Two things to know before trusting a number it prints. <b>Run it where no maze has been
+     * built</b> — a built maze has already sealed its own skin, so the world would read solid and
+     * the figure would come back near zero for the wrong reason. And it only reads chunks that
+     * are already loaded, counting the rest as skipped rather than generating a hundred chunks
+     * from a chat command; stand in the middle of the footprint and the count comes out whole.</p>
+     */
+    private static int onCarve(CommandContext<ServerCommandSource> ctx, String sizeId,
+                               String styleId) {
+        ServerCommandSource src = ctx.getSource();
+        MazeSize size = MazeSize.fromId(sizeId);
+        if (size == null) {
+            src.sendError(Text.literal("[DEBUG] Unknown size: " + sizeId));
+            return 0;
+        }
+        Landmark landmark = landmarkOf(src, styleId);
+        if (landmark == null) return 0;
+        ServerWorld world = src.getWorld();
+        BlockPos at = BlockPos.ofFloored(src.getPosition());
+        ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
+        NoiseConfig noise = world.getChunkManager().getNoiseConfig();
+
+        // The floor is chosen by the real rule, not by the player's feet: the question is what
+        // the carvers do to the box worldgen WOULD have put here, so the box has to be the one
+        // worldgen would have put here.
+        MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
+                landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
+                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
+        int minFloor = Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY()));
+        if (minFloor > maxFloor) {
+            src.sendError(Text.literal("[DEBUG] no floor fits here, so there is no box to measure."
+                    + " Move somewhere a landmark could stand and run it again."));
+            return 0;
+        }
+        MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
+                at.getX(), at.getZ(), size, minFloor, maxFloor);
+        if (report.found().isEmpty()) {
+            src.sendError(Text.literal("[DEBUG] the site test refuses this spot (" + report.why()
+                    + "), so there is no box to measure. Move and run it again."));
+            return 0;
+        }
+        int floor = report.found().getAsInt();
+
+        int step = Math.max(1, size.span() / (CARVE_GRID - 1));
+        // Centre the grid on the player rather than hanging it off the west edge. Stepping from
+        // -span/2 would have run -50 to +46 on a medium: the right number of soundings, two
+        // blocks off true, and every figure below quietly measuring a box the maze is not in.
+        int from = step * (CARVE_GRID - 1) / 2;
+        int top = floor + MazePiece.ROOF_DY + 1;
+        int heights = top - (floor - 1) + 1;
+        int probes = 0, skipped = 0, carved = 0, bittenColumns = 0, worstColumn = 0;
+        int columns = 0;
+        BlockPos.Mutable pos = new BlockPos.Mutable();
+        for (int i = 0; i < CARVE_GRID; i++) {
+            for (int j = 0; j < CARVE_GRID; j++) {
+                int x = at.getX() - from + i * step;
+                int z = at.getZ() - from + j * step;
+                columns++;
+                if (!world.isChunkLoaded(x >> 4, z >> 4)) {
+                    skipped += heights;
+                    continue;
+                }
+                var column = gen.getColumnSample(x, z, world, noise);
+                int bites = 0;
+                for (int y = floor - 1; y <= top; y++) {
+                    probes++;
+                    if (column.getState(y).isAir()) continue;   // the noise says hole already
+                    pos.set(x, y, z);
+                    net.minecraft.block.BlockState real = world.getBlockState(pos);
+                    if (real.isAir() || real.isReplaceable() || !real.getFluidState().isEmpty()) {
+                        bites++;
+                    }
+                }
+                carved += bites;
+                if (bites > 0) bittenColumns++;
+                worstColumn = Math.max(worstColumn, bites);
+            }
+        }
+
+        final int fProbes = probes, fSkipped = skipped, fCarved = carved;
+        final int fBitten = bittenColumns, fWorst = worstColumn, fCols = columns, fH = heights;
+        final int fFloor = floor;
+        src.sendFeedback(() -> Text.literal("[DEBUG] carve: " + CARVE_GRID + "x" + CARVE_GRID
+                        + " columns every " + step + " blocks over the " + size.span() + "x"
+                        + size.span() + " footprint, floor " + fFloor + ", shell band "
+                        + (fFloor - 1) + ".." + (fFloor + MazePiece.ROOF_DY + 1)
+                        + " (" + fH + " heights)")
+                .formatted(Formatting.GRAY), false);
+        if (skipped > 0) {
+            src.sendFeedback(() -> Text.literal("[DEBUG] " + fSkipped
+                            + " probes skipped: those chunks are not loaded. Stand in the middle"
+                            + " of the footprint for a whole count.")
+                    .formatted(Formatting.GOLD), false);
+        }
+        if (probes == 0) {
+            src.sendError(Text.literal("[DEBUG] nothing was readable here."));
+            return 0;
+        }
+        src.sendFeedback(() -> Text.literal("[DEBUG] " + fCarved + " of " + fProbes
+                        + " probes are rock in the noise and open in the world: "
+                        + (fCarved * 100 / fProbes) + "% of the shell is cut by carvers the"
+                        + " site test cannot see")
+                .formatted(fCarved * 100 / fProbes >= 5 ? Formatting.RED : Formatting.GREEN), false);
+        src.sendFeedback(() -> Text.literal("[DEBUG] " + fBitten + " of " + fCols
+                        + " columns are bitten at least once (" + (fBitten * 100 / fCols)
+                        + "% of the footprint), worst column open at " + fWorst + " of " + fH
+                        + " heights" + (fWorst == fH ? " -- a hole clean through the shell" : ""))
+                .formatted(Formatting.GRAY), false);
+        src.sendFeedback(() -> Text.literal("[DEBUG] reminder: run this where no maze has been"
+                        + " built. A built maze has already filled its own skin, which would read"
+                        + " as 0% for the wrong reason.")
+                .formatted(Formatting.DARK_GRAY), false);
+        return 1;
+    }
+
     private static int onDepth(CommandContext<ServerCommandSource> ctx, String sizeId,
                                String styleId) {
         ServerCommandSource src = ctx.getSource();
