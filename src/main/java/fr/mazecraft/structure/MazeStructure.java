@@ -182,10 +182,13 @@ public class MazeStructure extends Structure {
             // costs the player nothing — which is why this one downgrade is allowed and a
             // large quietly becoming a medium is not.
             //
-            // Expect it to be rare to the point of myth for now. A colossal footprint is 221
-            // blocks across, and the ceiling has to clear the lowest ground anywhere in it;
-            // over that much terrain there is almost always a dip. The ceiling rule is the
-            // thing to change if colossal pagodas should really exist.
+            // This used to say "rare to the point of myth", on the grounds that a colossal
+            // footprint was 221 blocks across and the ceiling has to clear the lowest ground
+            // anywhere in it -- over that much terrain there is almost always a dip. Folding a
+            // maze into floors took the footprint to 125, so the ceiling rule it used to fail
+            // now passes routinely: a colossal pagoda is simply one large in COLOSSAL_CHANCE,
+            // and a player finding a code room under a "large" pagoda is seeing that upgrade,
+            // not a bug. Worth retuning the odds now that they mean something.
             MazeSize actual = size;
             if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
                     && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)

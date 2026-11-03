@@ -49,6 +49,7 @@ public final class MazeFinder {
     }
 
     private static MazeHit find(ServerWorld world, BlockPos pos, int extraAbove, boolean anyY) {
+        MazeHit loose = null;
         StructureAccessor accessor = world.getStructureAccessor();
         Map<Structure, LongSet> references = accessor.getStructureReferences(pos);
         for (Map.Entry<Structure, LongSet> entry : references.entrySet()) {
@@ -64,22 +65,70 @@ public final class MazeFinder {
                 if (start == null || !start.hasChildren()) continue;
 
                 for (StructurePiece piece : start.getChildren()) {
-                    if (piece instanceof MazePiece maze && contains(maze.getBoundingBox(), pos, extraAbove, anyY)) {
-                        return new MazeHit(start, maze);
+                    if (!(piece instanceof MazePiece maze)) continue;
+                    // The floor this position is actually in wins outright. Only if no floor
+                    // holds it does the tolerance above the walls get a say, and then the
+                    // highest floor takes it -- someone over a stack is over its roof.
+                    if (contains(maze, pos, 0, anyY)) return new MazeHit(start, maze);
+                    if (extraAbove > 0 && contains(maze, pos, extraAbove, anyY)
+                            && (loose == null || maze.getFloorY() > loose.piece().getFloorY())) {
+                        loose = new MazeHit(start, maze);
                     }
                 }
             }
         }
-        return null;
+        return loose;
     }
 
     /** The box covers the maze above its floor; floor + foundation below it count too. */
     private static final int BELOW = MazePiece.FOUNDATION_DEPTH + 1;
 
-    private static boolean contains(BlockBox box, BlockPos pos, int extraAbove, boolean anyY) {
+    /**
+     * How far below its box a floor still owns, which is not the same for every floor.
+     *
+     * <p>The bottom one owns its whole foundation — thirty-two blocks of it, and the vault and
+     * the crypt that hang under it. A floor with another floor underneath owns one block below
+     * its box, which is the slab it stands on, and nothing more. Giving every floor the
+     * foundation's reach made the top piece of a stack answer for the two floors below it, since
+     * they sit six and twelve blocks down and the pieces are asked in order from the top: a lever
+     * on the second floor was looked up in the first floor's layout and found nowhere, so it did
+     * nothing at all.</p>
+     */
+    private static int below(MazePiece maze) {
+        return maze.isBottomFloor() ? BELOW : 1;
+    }
+
+    private static boolean contains(MazePiece maze, BlockPos pos, int extraAbove, boolean anyY) {
+        BlockBox box = maze.getBoundingBox();
         return pos.getX() >= box.getMinX() && pos.getX() <= box.getMaxX()
                 && pos.getZ() >= box.getMinZ() && pos.getZ() <= box.getMaxZ()
-                && (anyY || (pos.getY() >= box.getMinY() - BELOW && pos.getY() <= box.getMaxY() + extraAbove));
+                && (anyY || (pos.getY() >= box.getMinY() - below(maze)
+                        && pos.getY() <= box.getMaxY() + extraAbove));
+    }
+
+    /**
+     * Every floor of this maze, deepest last.
+     *
+     * <p>A maze is one structure and its floors are its pieces, so anything that belongs to the
+     * maze rather than to the floor the player happens to stand on — the vault, the crypt, the
+     * digits of a code spread down the stack — has to be asked of all of them.</p>
+     */
+    public static List<MazePiece> floorsOf(MazeHit hit) {
+        List<MazePiece> floors = new ArrayList<>();
+        for (StructurePiece piece : hit.start().getChildren()) {
+            if (piece instanceof MazePiece maze) floors.add(maze);
+        }
+        floors.sort((a, b) -> Integer.compare(b.getFloorY(), a.getFloorY()));
+        return floors;
+    }
+
+    /** The deepest floor of this maze: where the crypt and the vault are. */
+    public static MazeHit bottomFloor(MazeHit hit) {
+        MazePiece deepest = hit.piece();
+        for (MazePiece floor : floorsOf(hit)) {
+            if (floor.getFloorY() < deepest.getFloorY()) deepest = floor;
+        }
+        return deepest == hit.piece() ? hit : new MazeHit(hit.start(), deepest);
     }
 
     /** Every natural maze whose box overlaps this (loaded) chunk. */

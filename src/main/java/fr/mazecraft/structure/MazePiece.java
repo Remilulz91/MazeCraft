@@ -437,9 +437,28 @@ public class MazePiece extends StructurePiece {
     /** Cached: {cx, cz} of the vault's dead end, {@link #NO_VAULT}, or null if not asked yet. */
     private int[] vaultCell;
 
-    /** True for a maze that has a vault at all: the colossal ones, Kronos excepted. */
-    public boolean hasVault() {
+    /**
+     * True for a maze that has a vault at all: the colossal ones, Kronos excepted.
+     *
+     * <p>Of the <b>maze</b>. {@link #hasVault} answers for the floor that holds it, which is the
+     * bottom one; this is what the things belonging to the maze as a whole ask — the code, and
+     * the plaques that carry its digits, which are scattered over every floor.</p>
+     */
+    public boolean mazeHasVault() {
         return size == MazeSize.COLOSSAL && !style.isKronos();
+    }
+
+    /**
+     * True for the floor the vault is dug under: the bottom of the stack.
+     *
+     * <p>One vault per maze, like one crypt and one treasure chest. Without the floor test every
+     * piece of a colossal stack dug its own — and a vault hangs ten blocks below its floor, which
+     * on any but the deepest floor is the middle of the maze below it. That is what a code room
+     * "that went wrong, with another one further off that came out right" was: two rooms, the
+     * upper one cut through the corridors of the floor beneath it.</p>
+     */
+    public boolean hasVault() {
+        return mazeHasVault() && isBottomFloor();
     }
 
     /**
@@ -514,30 +533,57 @@ public class MazePiece extends StructurePiece {
         return code;
     }
 
-    /** Cached dead ends carrying the plaques, one per zone; see {@link #codePlaqueCells()}. */
+    /**
+     * How many of the code's digits are written on floor {@code index} of a stack of
+     * {@code floors}.
+     *
+     * <p>He asked for the code to be shared out between the floors rather than all of it hanging
+     * on the first one, and that is the right shape for it: a code gathered as you go down is a
+     * reason to go down, where four plaques on the top floor let a player read the whole code
+     * before ever finding the stair. Dealt from the top so the digits are met in order —
+     * 2, 1, 1 over three floors, 2, 2 over two.</p>
+     */
+    public static int plaquesOnFloor(int floors, int index) {
+        if (floors <= 1) return CodeKeyBlock.SLOTS;
+        return (CodeKeyBlock.SLOTS + floors - 1 - index) / floors;
+    }
+
+    /** The slot of this floor's first plaque: the digits written on the floors above it. */
+    public int plaqueBase() {
+        int n = 0;
+        for (int f = 0; f < floorIndex; f++) n += plaquesOnFloor(floorCount, f);
+        return n;
+    }
+
+    /** Cached dead ends carrying this floor's plaques; see {@link #codePlaqueCells()}. */
     private int[][] plaqueCells;
 
     /**
-     * The dead ends carrying the code's four digits, indexed by slot. An entry may be null
-     * when a zone had no dead end to spare.
+     * The dead ends carrying this floor's share of the code's digits, indexed from
+     * {@link #plaqueBase()}. An entry may be null when a zone had no dead end to spare.
      */
     private int[][] codePlaqueCells() {
         int[][] cached = plaqueCells;
         if (cached == null) {
-            cached = hasVault()
-                    ? layout().codePlaqueCells(1, CodeKeyBlock.SLOTS, vaultCell())
-                    : new int[CodeKeyBlock.SLOTS][];
-            if (cached == null) cached = new int[CodeKeyBlock.SLOTS][];
+            int mine = plaquesOnFloor(floorCount, floorIndex);
+            // mazeHasVault, not hasVault: every floor of the stack writes some of the digits,
+            // and only the deepest one holds the door they open.
+            cached = mazeHasVault() ? layout().codePlaqueCells(1, mine, vaultCell()) : new int[mine][];
+            if (cached == null) cached = new int[mine][];
             plaqueCells = cached;
         }
         return cached;
     }
 
-    /** World position of the digit plaque for {@code slot} (0-based), or null. */
+    /**
+     * World position of the digit plaque for {@code slot} (0-based, of the whole code), or null
+     * — including when that digit is written on another floor of the stack.
+     */
     public BlockPos codePlaquePos(int slot) {
         int[][] cells = codePlaqueCells();
-        if (slot < 0 || slot >= cells.length || cells[slot] == null) return null;
-        int[] wall = plaqueWall(cells[slot]);
+        int local = slot - plaqueBase();
+        if (local < 0 || local >= cells.length || cells[local] == null) return null;
+        int[] wall = plaqueWall(cells[local]);
         return wall == null ? null
                 : new BlockPos(originX() + wall[0], floorY + PLAQUE_DY, originZ() + wall[1]);
     }
@@ -583,11 +629,13 @@ public class MazePiece extends StructurePiece {
      * wall loop would otherwise write straight over them.
      */
     private void buildPlaques(StructureWorldAccess world, BlockBox chunkBox) {
-        if (!hasVault()) return;
+        if (!mazeHasVault()) return;
         int[] code = vaultCode();
         int[][] cells = codePlaqueCells();
-        for (int slot = 0; slot < cells.length; slot++) {
-            int[] cell = cells[slot];
+        int base = plaqueBase();
+        for (int local = 0; local < cells.length; local++) {
+            int slot = base + local;
+            int[] cell = cells[local];
             if (cell == null) continue;
             int[] wall = plaqueWall(cell);
             if (wall == null) continue;
@@ -864,13 +912,36 @@ public class MazePiece extends StructurePiece {
     /** One floor: the top one keeps its plaza and its entrance, the rest are rooted at a stair. */
     private MazeLayout buildFloor(int cells, long floorSeed, int index, int[] root,
                                   int clearance, boolean[] goalAllowed) {
+        int gates = gatesOnFloor(size, floorCount, index);
         if (index == 0) {
-            return MazeLayout.generate(cells, floorSeed, entranceSide, size.gates(),
+            return MazeLayout.generate(cells, floorSeed, entranceSide, gates,
                     plazaRadius(), style.enteredFromPlaza(), goalAllowed);
         }
         if (root == null) root = new int[]{cells / 2, cells / 2};
-        return MazeLayout.generateFloor(cells, floorSeed, size.gates(),
+        return MazeLayout.generateFloor(cells, floorSeed, gates,
                 root[0], root[1], clearance, goalAllowed);
+    }
+
+    /**
+     * How many of a maze's gates stand on floor {@code index} of a stack of {@code floors}.
+     *
+     * <p>The gates belong to the <b>maze</b>, not to each of its floors. Every floor asking for
+     * {@code size.gates()} gave a large maze twelve doors and twelve levers instead of four, and
+     * it put them where there was no room: a floor of a stack is 21 cells across where a flat
+     * large maze was 37, so the walk a floor's gates are spread along is less than half as long.
+     * Measured over 400 stacks: a large maze had two doors one cell apart 16% of the time, with
+     * the lever of the first wedged in between — there being nowhere else in a zone one cell
+     * deep to put it.</p>
+     *
+     * <p>The share is handed out from the top down, so a remainder lands on the floor the player
+     * walks first: 2, 1, 1 for a large maze, 2, 1 for a medium, 2, 2, 1 for a colossal. Every
+     * floor keeps at least one, which is the gate that closes its own way down — so each floor
+     * of the stack is still a lock to be opened, and the maze still has exactly the number of
+     * levers its size says it has.</p>
+     */
+    public static int gatesOnFloor(MazeSize size, int floors, int index) {
+        if (floors <= 1) return size.gates();
+        return (size.gates() + floors - 1 - index) / floors;
     }
 
     /**
@@ -972,10 +1043,15 @@ public class MazePiece extends StructurePiece {
         return layout().entranceAlongX();
     }
 
-    /** World positions of all blocks of gate {@code index} (3 wide × WALL_HEIGHT high). */
+    /**
+     * World positions of all blocks of gate {@code index} (3 wide × WALL_HEIGHT high), or an
+     * empty list when that gate is on another floor. The number is of the maze — see
+     * {@link #gateCount()}.
+     */
     public List<BlockPos> gateBlocks(int index) {
         List<BlockPos> list = new ArrayList<>();
-        MazeLayout.Gate gate = layout().gates().get(index);
+        if (!hasGate(index)) return list;
+        MazeLayout.Gate gate = layout().gates().get(index - gateBase());
         for (int x = gate.x0(); x <= gate.x1(); x++) {
             for (int z = gate.z0(); z <= gate.z1(); z++) {
                 for (int dy = 1; dy <= WALL_HEIGHT; dy++) {
@@ -1054,20 +1130,66 @@ public class MazePiece extends StructurePiece {
         return Blocks.CHISELED_DEEPSLATE.getDefaultState();
     }
 
+    /**
+     * How many gates this maze has, every floor of the stack counted.
+     *
+     * <p><b>Gate numbers are of the maze, not of the floor.</b> {@link
+     * fr.mazecraft.protection.MazeState} remembers which gates are open as a bitmask against the
+     * maze's key — the structure's start chunk, which is the same for every floor — so two floors
+     * numbering their gates from zero would have shared those bits: one lever on the top floor
+     * would have reported the stair of the floor below as open too, and "every gate open", the
+     * one condition the treasure hangs on, would have been true a third of the way in.</p>
+     *
+     * <p>So a floor's gates are numbered after the gates of every floor above it: floor 0 holds
+     * 0 … n-1, the floor below it starts where that left off. {@link #gateBase} is the offset,
+     * and {@link #gateBlocks}, {@link #leverPos} and {@link #leverIndexAt} all speak in maze
+     * numbers. Every piece recomputes the whole stack's layouts anyway (see {@link
+     * #floorLayouts}), so each one can count what is above it without asking anybody.</p>
+     */
     public int gateCount() {
+        MazeLayout[] floors = floorLayouts();
+        int n = 0;
+        for (MazeLayout floor : floors) n += floor.gates().size();
+        return n;
+    }
+
+    /** Gates on this floor alone — the ones {@link #build} lays. */
+    public int floorGateCount() {
         return layout().gates().size();
     }
 
-    /** World position of lever {@code index}. */
-    public BlockPos leverPos(int index) {
-        MazeLayout.Lever lever = layout().levers().get(index);
+    private int gateBase = -1;
+
+    /** Maze number of this floor's gate 0: the gates of every floor above it. */
+    public int gateBase() {
+        int cached = gateBase;
+        if (cached < 0) {
+            MazeLayout[] floors = floorLayouts();
+            cached = 0;
+            for (int f = 0; f < floorIndex; f++) cached += floors[f].gates().size();
+            gateBase = cached;
+        }
+        return cached;
+    }
+
+    /** Is gate {@code gate} (a maze number) one of this floor's? */
+    public boolean hasGate(int gate) {
+        int local = gate - gateBase();
+        return local >= 0 && local < floorGateCount();
+    }
+
+    /** World position of the lever of gate {@code gate} (a maze number), or null. */
+    public BlockPos leverPos(int gate) {
+        if (!hasGate(gate)) return null;
+        MazeLayout.Lever lever = layout().levers().get(gate - gateBase());
         return new BlockPos(originX() + lever.x(), floorY + LEVER_DY, originZ() + lever.z());
     }
 
-    /** Index of the lever at this position, or -1. */
+    /** Maze number of the gate whose lever is at this position, or -1. */
     public int leverIndexAt(BlockPos pos) {
+        int base = gateBase();
         for (int i = 0; i < layout().levers().size(); i++) {
-            if (leverPos(i).equals(pos)) return i;
+            if (leverPos(base + i).equals(pos)) return base + i;
         }
         return -1;
     }
@@ -1129,8 +1251,9 @@ public class MazePiece extends StructurePiece {
 
         boolean[] blocked = new boolean[span * span];
         int target = -1;
+        int base = gateBase();
         for (int g = 0; g < layout.gates().size(); g++) {
-            if (gateOpen.test(g)) continue;
+            if (gateOpen.test(base + g)) continue;   // the predicate speaks in maze numbers
             MazeLayout.Gate gate = layout.gates().get(g);
             for (int x = gate.x0(); x <= gate.x1(); x++)
                 for (int z = gate.z0(); z <= gate.z1(); z++) blocked[x * span + z] = true;
@@ -1416,9 +1539,11 @@ public class MazePiece extends StructurePiece {
         }
 
         // 4. Gates (closed) — bars connected along the opening so nobody squeezes through
+        int gateBase = gateBase();
         for (int gateIndex = 0; gateIndex < layout.gates().size(); gateIndex++) {
             MazeLayout.Gate gate = layout.gates().get(gateIndex);
-            if (gateOpen.test(gateIndex)) continue; // opened for good: leave the passage clear
+            // Maze numbers, not floor numbers: see gateCount().
+            if (gateOpen.test(gateBase + gateIndex)) continue; // opened for good: leave it clear
             BlockState bars = style.gate;
             if (bars.contains(HorizontalConnectingBlock.NORTH)) {
                 bars = gate.alongX()

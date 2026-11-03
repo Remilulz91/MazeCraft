@@ -1669,15 +1669,24 @@ public class DebugCommand {
             return 0;
         }
         MazeState state = MazeState.get(world);
-        MazePiece maze = hit.piece();
-        for (int i = 0; i < maze.gateCount(); i++) {
-            final int k = i;
-            boolean open = state.isGateOpen(hit.key(), k);
-            BlockPos gate = maze.gateBlocks(k).get(0);
-            src.sendFeedback(() -> Text.literal("[DEBUG] Gate " + k + (k == maze.gateCount() - 1 ? " (plaza)" : "")
-                    + ": " + (open ? "OPEN" : "closed") + " at " + gate.toShortString()
-                    + " - lever at " + maze.leverPos(k).toShortString())
-                    .formatted(open ? Formatting.GREEN : Formatting.LIGHT_PURPLE), false);
+        // Gate numbers run over the whole stack, and each floor only knows its own share of
+        // them, so every floor is asked in turn rather than just the one being stood on.
+        java.util.List<MazePiece> floors = MazeFinder.floorsOf(hit);
+        int total = floors.get(0).gateCount();
+        for (int f = 0; f < floors.size(); f++) {
+            MazePiece floor = floors.get(f);
+            final int level = f;
+            for (int i = 0; i < floor.floorGateCount(); i++) {
+                final int k = floor.gateBase() + i;
+                boolean open = state.isGateOpen(hit.key(), k);
+                BlockPos gate = floor.gateBlocks(k).get(0);
+                BlockPos lever = floor.leverPos(k);
+                src.sendFeedback(() -> Text.literal("[DEBUG] Gate " + k
+                        + (k == total - 1 ? " (last)" : "") + " on floor " + level
+                        + ": " + (open ? "OPEN" : "closed") + " at " + gate.toShortString()
+                        + " - lever at " + lever.toShortString())
+                        .formatted(open ? Formatting.GREEN : Formatting.LIGHT_PURPLE), false);
+            }
         }
         return 1;
     }
@@ -1702,6 +1711,9 @@ public class DebugCommand {
         ServerPlayerEntity player = src.getPlayer();
         ServerWorld world = src.getWorld();
         MazeFinder.MazeHit hit = MazeFinder.find(world, BlockPos.ofFloored(src.getPosition()), 64);
+        // The crypt belongs to the maze and is dug under its deepest floor, so it is asked of
+        // that floor however high up in the stack the command was run.
+        if (hit != null) hit = MazeFinder.bottomFloor(hit);
         // Same fallback as the vault: a maze from /maze debug pagoda is not a structure, so the
         // lookup can never find it.
         MazePiece maze = hit != null ? hit.piece() : lastPlaced;
@@ -1733,7 +1745,9 @@ public class DebugCommand {
     private static int onVault(CommandContext<ServerCommandSource> ctx, boolean open) {
         ServerCommandSource src = ctx.getSource();
         ServerWorld world = src.getWorld();
-        MazeFinder.MazeHit hit = MazeFinder.find(world, BlockPos.ofFloored(src.getPosition()), 64);
+        MazeFinder.MazeHit found = MazeFinder.find(world, BlockPos.ofFloored(src.getPosition()), 64);
+        // The vault hangs under the deepest floor, so that is the piece that has one.
+        MazeFinder.MazeHit hit = found != null ? MazeFinder.bottomFloor(found) : null;
         // Fall back on the last maze from /maze debug place: it is not a structure, so the
         // lookup above can never find it, and placing a colossal maze on demand is how the
         // vault gets looked at without hunting one in the world first.
@@ -1762,12 +1776,23 @@ public class DebugCommand {
         StringBuilder code = new StringBuilder();
         for (int digit : maze.vaultCode()) code.append(digit);
         src.sendFeedback(() -> Text.literal("[DEBUG] Code " + code).formatted(Formatting.GOLD), false);
+        // A digit a floor at a time: the plaques are shared out down the stack, so each floor
+        // is asked and only answers for its own share.
+        java.util.List<MazePiece> floors = hit != null
+                ? MazeFinder.floorsOf(hit) : java.util.List.of(maze);
         for (int slot = 0; slot < fr.mazecraft.block.CodeKeyBlock.SLOTS; slot++) {
-            BlockPos plaque = maze.codePlaquePos(slot);
-            final int n = slot + 1;
+            BlockPos plaque = null;
+            int level = -1;
+            for (int f = 0; f < floors.size() && plaque == null; f++) {
+                plaque = floors.get(f).codePlaquePos(slot);
+                if (plaque != null) level = f;
+            }
+            final BlockPos at = plaque;
+            final int n = slot + 1, on = level;
             src.sendFeedback(() -> Text.literal("[DEBUG]   digit " + n + " on a plaque at "
-                    + (plaque == null ? "nowhere — this maze lost one" : plaque.toShortString()))
-                    .formatted(plaque == null ? Formatting.RED : Formatting.GRAY), false);
+                    + (at == null ? "nowhere — this maze lost one"
+                            : at.toShortString() + " (floor " + on + ")"))
+                    .formatted(at == null ? Formatting.RED : Formatting.GRAY), false);
         }
 
         if (open) {

@@ -575,6 +575,9 @@ public final class MazeLayout {
         };
     }
 
+    /** Cells of corridor two gates must keep between them; see {@link #computeProgression}. */
+    private static final int MIN_GATE_SPACING = 3;
+
     /**
      * Cuts the unique entrance → center path with {@code gateCount} gates (the last one is the
      * plaza door), which splits the maze into zones. Each zone gets the lever of the gate that
@@ -643,10 +646,20 @@ public final class MazeLayout {
         boolean[] blocked = new boolean[n * 4];
         List<Integer> zoneStarts = new ArrayList<>();
         zoneStarts.add(start);
-        int lastIndex = -1;
+        int lastIndex = -MIN_GATE_SPACING;
         for (int k = 1; k < gateCount; k++) {
             int i = (int) ((long) k * (len - 1) / gateCount); // edge path[i] → path[i+1]
-            if (i <= lastIndex || i >= len - 1) continue;      // path too short for this many gates
+            // Three cells of corridor between one gate and the next, and between the last of
+            // these and the gate that closes the goal -- which stands at len - 1 and is laid
+            // below whatever happens here. A gate that cannot keep its distance is dropped
+            // instead of placed: the maze loses a door it had no room for.
+            //
+            // Without this the spacing was only "not the same edge", and a short walk put two
+            // doors in neighbouring cells with the lever of the first one wedged between them
+            // -- because the lever of a zone goes to the dead end furthest from the way in, and
+            // a zone one cell deep has nowhere else to put it. Measured over 400 stacks: a
+            // large maze had two doors within a cell of each other 16% of the time.
+            if (i - lastIndex < MIN_GATE_SPACING || i > len - 1 - MIN_GATE_SPACING) continue;
             lastIndex = i;
             int a = path.get(i), b = path.get(i + 1);
             int dir = dirBetween(a, b);
