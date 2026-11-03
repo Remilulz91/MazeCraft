@@ -1634,21 +1634,26 @@ public class MazePiece extends StructurePiece {
         if (cell == null) return;
         int ox = MazeLayout.CELL * cell[0] + 2, oz = MazeLayout.CELL * cell[1] + 2;
         int dx = lx - ox, dz = lz - oz;
-        if (Math.abs(dx) > 2 || Math.abs(dz) > 2) return;
+        // One, not two. Two is the wall line between cells, and whatever is written there --
+        // masonry or air -- is wrong: masonry bricks up the cell's doorways, air punches holes
+        // through walls the maze meant to keep. The well is the cell and nothing more.
+        if (Math.abs(dx) > 1 || Math.abs(dz) > 1) return;
 
         int bottom = floorY + 1;                        // this floor's walking surface
         int top = floorY + MazeSize.FLOOR_PITCH;        // the slab of the floor above
 
-        // The lining, one ring out: the well passes through this floor's own corridors, so
-        // without it the stair would open sideways into whatever passage it happens to cross
-        // and the maze would have a shortcut nobody designed.
-        if (Math.abs(dx) == 2 || Math.abs(dz) == 2) {
-            for (int y = bottom; y <= top; y++) {
-                world.setBlockState(pos.set(x, y, z), style.wallBase,
-                        Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
-            }
-            return;
-        }
+        // No lining, and the first version's was a mistake worth recording. It wrote
+        // style.wallBase over every column at |dx| == 2 or |dz| == 2, on the reasoning that the
+        // well crosses this floor's corridors and would otherwise open sideways into them.
+        //
+        // It does not cross anything. A cell's corridor runs from CELL*c + 1 to CELL*c + 3, so
+        // the 3 x 3 well IS the cell, exactly -- and |d| == 2 is the wall line, where the cell's
+        // four DOORWAYS are cut. The lining therefore bricked up every way out of the cell the
+        // player had just climbed down into. Measured afterwards on 300 generated stacks: 300
+        // arrival cells with no exit at all, 605 doorways walled. And since wallBase is stone
+        // brick, it also stamped a grey 5 x 5 box through corridors made of cherry leaves.
+        //
+        // The cell is already walled, by the maze. Nothing here needs a wall of its own.
         // Bottom upwards, so a block is cleared before the one above it: clearing a cell can
         // dislodge whatever hangs beneath it, and the order is the fix rather than a list of
         // blocks to watch for.
