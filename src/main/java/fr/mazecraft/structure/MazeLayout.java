@@ -97,6 +97,35 @@ public final class MazeLayout {
     private int goalClearance = GOAL_CLEARANCE;
 
     /**
+     * Cells the goal may be chosen from, indexed {@code cx * cells + cz}, or null for any.
+     *
+     * <p>A stair between two floors lands in one cell, and that cell has to make sense on both.
+     * It is the goal of the floor above — the dead end its walk ends at — and it was free to be
+     * anything on the floor below, which meant arriving down six blocks of spiral into the
+     * middle of a three-way junction. Passing the floor below's dead ends in here makes the
+     * choice satisfy both.</p>
+     *
+     * <p>It works because a floor's <b>walls do not depend on its root</b>: the root only enters
+     * at {@code computeProgression}. So the floor below can be generated walls-first, asked
+     * where its dead ends are, and only then rooted.</p>
+     */
+    private boolean[] goalAllowed;
+
+    /**
+     * Cells with exactly one way out. Needs only the walls, so it can be asked of a floor that
+     * has not been rooted yet.
+     */
+    public boolean[] deadEndMask() {
+        boolean[] mask = new boolean[cells * cells];
+        for (int cx = 0; cx < cells; cx++) {
+            for (int cz = 0; cz < cells; cz++) {
+                mask[cx * cells + cz] = onlyExit(cx, cz) >= 0;
+            }
+        }
+        return mask;
+    }
+
+    /**
      * Cells the goal dead end keeps from the outer wall, so the room under it fits inside.
      *
      * <p>Three is not a round number, it is the crypt's. The room is {@code CRYPT_RADIUS + 1}
@@ -172,7 +201,20 @@ public final class MazeLayout {
      */
     public static MazeLayout generate(int cells, long seed, int entranceSide, int gateCount,
                                       int plazaRadius, boolean fromPlaza) {
+        return generate(cells, seed, entranceSide, gateCount, plazaRadius, fromPlaza, null);
+    }
+
+    /**
+     * @param goalAllowed cells the goal may be chosen from, or null for any. When it is given
+     *                    and no dead end in it qualifies, the layout comes back with <b>no
+     *                    goal</b> rather than silently picking elsewhere, so the caller can try
+     *                    another seed for the floor below instead of getting a stair that lands
+     *                    in a corridor.
+     */
+    public static MazeLayout generate(int cells, long seed, int entranceSide, int gateCount,
+                                      int plazaRadius, boolean fromPlaza, boolean[] goalAllowed) {
         MazeLayout layout = new MazeLayout(cells, plazaRadius, fromPlaza);
+        layout.goalAllowed = goalAllowed;
         layout.build(new Random(seed), entranceSide);
         if (gateCount > 0) {
             layout.computeProgression(gateCount);
@@ -195,8 +237,16 @@ public final class MazeLayout {
      */
     public static MazeLayout generateFloor(int cells, long seed, int gateCount,
                                            int rootX, int rootZ, int goalClearance) {
+        return generateFloor(cells, seed, gateCount, rootX, rootZ, goalClearance, null);
+    }
+
+    /** The same, restricting where this floor's own walk may end. See {@link #goalAllowed}. */
+    public static MazeLayout generateFloor(int cells, long seed, int gateCount,
+                                           int rootX, int rootZ, int goalClearance,
+                                           boolean[] goalAllowed) {
         MazeLayout layout = new MazeLayout(cells, NO_PLAZA, true);
         layout.goalClearance = goalClearance;
+        layout.goalAllowed = goalAllowed;
         layout.build(new Random(seed), -1);
         layout.rootCellX = rootX;
         layout.rootCellZ = rootZ;
@@ -679,7 +729,11 @@ public final class MazeLayout {
             int found = farthestDeadEnd(depth, clearance);
             if (found >= 0) return found;
         }
-        return farthestDeadEnd(depth, 0);
+        int last = farthestDeadEnd(depth, 0);
+        // With a restriction in force, "none of these will do" is an answer the caller needs to
+        // hear: it will try another seed for the floor below rather than accept a stair landing
+        // in the middle of a corridor. Without one, the old behaviour stands.
+        return last;
     }
 
     private int farthestDeadEnd(int[] depth, int clearance) {
@@ -690,6 +744,7 @@ public final class MazeLayout {
                 if (depth[cell] <= 0) continue;          // unreachable, or the way in itself
                 if (isPlazaCell(cx, cz)) continue;
                 if (cx == rootCellX && cz == rootCellZ) continue;   // never the stair we came down
+                if (goalAllowed != null && !goalAllowed[cell]) continue;
                 if (onlyExit(cx, cz) < 0) continue;      // more than one way out: not a dead end
                 if (depth[cell] > bestDepth) {
                     best = cell;
