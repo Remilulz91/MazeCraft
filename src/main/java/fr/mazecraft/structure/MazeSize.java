@@ -37,6 +37,75 @@ public enum MazeSize {
         return cells * MazeLayout.CELL + 1;
     }
 
+    // === Floors ===
+    //
+    // A maze was one flat slab, and that shape is what made it visible. 149 blocks square is an
+    // enormous object: wherever a cave, a ravine or a sea bed cuts through it, what shows is a
+    // perfectly flat plane the size of a village, and no amount of work on its skin makes that
+    // look like rock. Three fixes went into the skin -- camouflage, burial under the sea bed,
+    // and dropping the terrain adaptation -- and the thing was still visible, because the
+    // problem was never the material.
+    //
+    // The answer is to stop presenting so much flat surface. Fold the same maze into a stack of
+    // smaller floors and the dominant face -- the roof and the underside -- shrinks with the
+    // square of the side, while only the walls grow. For a large maze, at constant corridor
+    // area:
+    //
+    //   floors  side  height   exposed surface
+    //     1      149     8        49 170          (today)
+    //     2      105    14        27 930   -43%
+    //     3       85    20        21 250   -57%
+    //     4       75    26        19 050   -61%
+    //     5       67    32        17 554   -64%
+    //
+    // The returns collapse after three while the height -- and so the cost in sites -- keeps
+    // climbing, which is why the split stops there rather than going deeper.
+
+    /**
+     * Levels this size is folded into.
+     *
+     * <p>SMALL stays flat on purpose. At 61 blocks it was never part of the problem, and the
+     * first maze a player ever walks into is a better introduction for being one room deep.</p>
+     */
+    public int floors() {
+        return switch (this) { case SMALL -> 1; case MEDIUM -> 2; case LARGE, COLOSSAL -> 3; };
+    }
+
+    /**
+     * Cells per side on <b>one</b> floor, so that the whole stack holds about as much maze as
+     * the old single slab did.
+     *
+     * <p>Each is {@code cells / sqrt(floors)} rounded to an odd number, odd because a maze needs
+     * a true centre cell. The totals land a little under the old ones rather than over — 578
+     * cells against 625 for a medium, 1323 against 1369 for a large, 2883 against 3025 for a
+     * colossal — between 3 and 8 per cent less maze. Rounding the other way overshot by more
+     * (a medium at 19 cells a floor would be 15 per cent bigger than it is today), and of the
+     * two errors the small one is the honest choice.</p>
+     */
+    public int cellsPerFloor() {
+        return switch (this) { case SMALL -> 15; case MEDIUM -> 17; case LARGE -> 21; case COLOSSAL -> 31; };
+    }
+
+    /**
+     * Blocks from one floor's slab to the next: its floor, four of corridor, its ceiling.
+     *
+     * <p>{@link MazeLayout#CELL} says how wide a corridor is; this is the vertical equivalent,
+     * and it is {@code MazePiece.ROOF_DY + 1} by construction — the ceiling sits at ROOF_DY and
+     * the floor below the next one starts immediately after.</p>
+     */
+    public static final int FLOOR_PITCH = MazePiece.ROOF_DY + 1;
+
+    /**
+     * Total height of the stack including its skin: the underside a block below the lowest
+     * floor, and the course above the topmost ceiling.
+     *
+     * <p>8 for a flat maze, which is what the old single-slab box measured, so the formula is
+     * checked against the shape it replaces.</p>
+     */
+    public int stackHeight() {
+        return FLOOR_PITCH * floors() + 2;
+    }
+
     public String id() {
         return name().toLowerCase(Locale.ROOT);
     }
