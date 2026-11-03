@@ -71,6 +71,32 @@ public final class MazeLayout {
     private int[] goalCell;
 
     /**
+     * No central room at all: every cell of the grid belongs to the maze.
+     *
+     * <p>For the floors under the first one. A plaza is where the staircase from the building
+     * sets the player down, and only the top floor has one — the floors below are entered at
+     * the foot of the stair from the floor above, which lands wherever that floor's walk ended,
+     * not in the middle. A room in the middle of those would be a room nothing opens onto.</p>
+     */
+    public static final int NO_PLAZA = -1;
+
+    /**
+     * The cell the progression is rooted at, when it is neither the outer doorway nor the
+     * plaza's door: {@code -1} when unused.
+     *
+     * <p>This is the whole of what a lower floor needs. The inversion that {@link #fromPlaza}
+     * describes already proved the point — the zones, levers, guardians and distances all hang
+     * off one cell, so moving the maze's starting point is not a second algorithm but the same
+     * one rooted somewhere else. A lower floor roots it at the cell directly under the floor
+     * above's goal, which is where its staircase arrives.</p>
+     */
+    private int rootCellX = -1;
+    private int rootCellZ = -1;
+
+    /** How far the goal dead end must stay from the outer wall, in cells. */
+    private int goalClearance = GOAL_CLEARANCE;
+
+    /**
      * Cells the goal dead end keeps from the outer wall, so the room under it fits inside.
      *
      * <p>Three is not a round number, it is the crypt's. The room is {@code CRYPT_RADIUS + 1}
@@ -93,11 +119,19 @@ public final class MazeLayout {
         this.plazaRadius = plazaRadius;
         this.fromPlaza = fromPlaza;
         int c = cells / 2;
-        this.plazaMin = CELL * (c - plazaRadius) + 1;
-        this.plazaMax = CELL * (c + plazaRadius) + 3;
+        // A floor with no plaza still has to give these two a value, and the value has to be one
+        // that cannot match a real coordinate: plazaMin > plazaMax means the carving loop in
+        // build() runs zero times, which is the whole of "no central room".
+        this.plazaMin = plazaRadius < 0 ? 1 : CELL * (c - plazaRadius) + 1;
+        this.plazaMax = plazaRadius < 0 ? 0 : CELL * (c + plazaRadius) + 3;
+    }
+
+    private boolean hasPlaza() {
+        return plazaRadius >= 0;
     }
 
     private boolean isPlazaCell(int cx, int cz) {
+        if (!hasPlaza()) return false;
         int c = cells / 2;
         return Math.abs(cx - c) <= plazaRadius && Math.abs(cz - c) <= plazaRadius;
     }
@@ -140,6 +174,32 @@ public final class MazeLayout {
                                       int plazaRadius, boolean fromPlaza) {
         MazeLayout layout = new MazeLayout(cells, plazaRadius, fromPlaza);
         layout.build(new Random(seed), entranceSide);
+        if (gateCount > 0) {
+            layout.computeProgression(gateCount);
+        }
+        return layout;
+    }
+
+    /**
+     * One floor under another: no central room, and the progression rooted where its staircase
+     * arrives rather than at a door.
+     *
+     * <p>{@code goalClearance} is the room the goal dead end must keep from the outer wall. The
+     * bottom floor keeps {@link #GOAL_CLEARANCE}, because the crypt is dug under its goal and a
+     * crypt that overhangs the footprint is simply not built on that side. A floor whose goal is
+     * only a staircase needs far less, and asking for three there would throw away most of the
+     * candidate dead ends on a grid this small for nothing.</p>
+     *
+     * <p>The outer wall is sealed the whole way round, as for any buried maze: the only ways in
+     * or out of a floor are its two staircases.</p>
+     */
+    public static MazeLayout generateFloor(int cells, long seed, int gateCount,
+                                           int rootX, int rootZ, int goalClearance) {
+        MazeLayout layout = new MazeLayout(cells, NO_PLAZA, true);
+        layout.goalClearance = goalClearance;
+        layout.build(new Random(seed), -1);
+        layout.rootCellX = rootX;
+        layout.rootCellZ = rootZ;
         if (gateCount > 0) {
             layout.computeProgression(gateCount);
         }
@@ -214,7 +274,9 @@ public final class MazeLayout {
             }
         }
 
-        // 5. Single plaza door, on the plaza side facing away from the entrance
+        // 5. Single plaza door, on the plaza side facing away from the entrance.
+        //    Nothing to open when there is no room: a lower floor is entered by its staircase.
+        if (!hasPlaza()) return;
         int c = cells / 2;
         // Scaled by the plaza's half-width, which is 2 for the arena of Kronos. With these
         // written as 1 and 2 the door of a 5 × 5 room was cut in a wall line that no longer
@@ -453,6 +515,7 @@ public final class MazeLayout {
      * is where the staircase sets the player down.</p>
      */
     private int startCellIndex() {
+        if (rootCellX >= 0) return rootCellX * cells + rootCellZ;
         if (fromPlaza) return plazaDoorCellX * cells + plazaDoorCellZ;
         return switch (entranceSide) {
             case NORTH -> entranceCell * cells;                    // (entranceCell, 0)
@@ -612,7 +675,7 @@ public final class MazeLayout {
         // blocks from the outer wall and most of the room outside the maze's box, unbuilt. The
         // clearance is a room's half-width, so losing one cell of it costs four blocks of
         // overhang; losing all three costs the room.
-        for (int clearance = GOAL_CLEARANCE; clearance > 0; clearance--) {
+        for (int clearance = goalClearance; clearance > 0; clearance--) {
             int found = farthestDeadEnd(depth, clearance);
             if (found >= 0) return found;
         }
@@ -626,6 +689,7 @@ public final class MazeLayout {
                 int cell = cx * cells + cz;
                 if (depth[cell] <= 0) continue;          // unreachable, or the way in itself
                 if (isPlazaCell(cx, cz)) continue;
+                if (cx == rootCellX && cz == rootCellZ) continue;   // never the stair we came down
                 if (onlyExit(cx, cz) < 0) continue;      // more than one way out: not a dead end
                 if (depth[cell] > bestDepth) {
                     best = cell;
