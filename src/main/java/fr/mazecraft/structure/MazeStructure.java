@@ -369,8 +369,16 @@ public class MazeStructure extends Structure {
      *                 its footprint, not under the ground at its middle. Exact only on a survey
      *                 that ran to the end — see the note above about early returns.
      */
+    /**
+     * @param lowest       the lowest {@code WORLD_SURFACE_WG} over the footprint — the top of
+     *                     the <b>water</b> where there is water, which is what you want for
+     *                     standing a building on and emphatically not for deciding how deep to
+     *                     bury something
+     * @param lowestGround the lowest {@code OCEAN_FLOOR_WG} — the sea bed. See
+     *                     {@code Landmark#ceilingUnder}, which is why this exists.
+     */
     public record Site(int relief, int water, int wet, int drop, int floorY, String rejected,
-                       int x, int z, int lowest) {
+                       int x, int z, int lowest, int lowestGround) {
         public boolean ok() {
             return rejected == null;
         }
@@ -432,6 +440,7 @@ public class MazeStructure extends Structure {
                                    int centerX, int centerZ, int half, int ringMargin,
                                    int maxRelief, int maxWater) {
         int min = Integer.MAX_VALUE, max = Integer.MIN_VALUE, sum = 0, n = 0, deepest = 0, wet = 0;
+        int minGround = Integer.MAX_VALUE;
         for (int[] offset : SAMPLE_ORDER) {
             {
                 int x = centerX + offset[0] * half / 2;
@@ -445,7 +454,7 @@ public class MazeStructure extends Structure {
                 // are rejected, and a rejected site now costs a handful of them instead of
                 // fifty, which is what makes a compass search survivable on a server.
                 if (max - min > maxRelief) {
-                    return new Site(max - min, deepest, wet, 0, 0, "relief", x, z, min);
+                    return new Site(max - min, deepest, wet, 0, 0, "relief", x, z, min, groundOr(minGround, min));
                 }
                 // The water test needs a second NoiseChunk, so it waits until the relief test
                 // has had its say: a site rejected for relief — which is most of them — now
@@ -456,10 +465,11 @@ public class MazeStructure extends Structure {
                 // heightmaps: trees and plants are not placed yet, so the gap IS the water
                 // depth, in blocks.
                 int ground = gen.getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG, world, noise);
+                minGround = Math.min(minGround, ground);
                 deepest = Math.max(deepest, surface - ground);
                 if (surface > ground) wet++;
                 if (surface - ground > maxWater) {
-                    return new Site(max - min, deepest, wet, 0, 0, "water", x, z, min);
+                    return new Site(max - min, deepest, wet, 0, 0, "water", x, z, min, groundOr(minGround, min));
                 }
                 sum += surface;
                 n++;
@@ -496,20 +506,34 @@ public class MazeStructure extends Structure {
                 min = Math.min(min, surface);
                 max = Math.max(max, surface);
                 if (max - min > maxRelief) {
-                    return new Site(max - min, deepest, wet, drop, 0, "relief (ring)", x, z, min);
+                    return new Site(max - min, deepest, wet, drop, 0, "relief (ring)", x, z, min, groundOr(minGround, min));
                 }
                 int ground = gen.getHeight(x, z, Heightmap.Type.OCEAN_FLOOR_WG, world, noise);
+                minGround = Math.min(minGround, ground);
                 deepest = Math.max(deepest, surface - ground);
                 if (surface > ground) wet++;
                 // ground is the first free y, so the solid top is one below it.
                 drop = Math.max(drop, floorY - (ground - 1));
                 if (surface - ground > maxWater) {
-                    return new Site(max - min, deepest, wet, drop, 0, "water (ring)", x, z, min);
+                    return new Site(max - min, deepest, wet, drop, 0, "water (ring)", x, z, min, groundOr(minGround, min));
                 }
             }
         }
 
-        return new Site(max - min, deepest, wet, drop, floorY, null, 0, 0, min);
+        return new Site(max - min, deepest, wet, drop, floorY, null, 0, 0, min, groundOr(minGround, min));
+    }
+
+    /**
+     * The lowest sea bed seen, or the surface minimum when the survey bailed before reading a
+     * single one.
+     *
+     * <p>The relief test can return on the very first sample, before any {@code OCEAN_FLOOR_WG}
+     * query has run, which would leave the minimum at {@code Integer.MAX_VALUE}. Such a site is
+     * refused anyway and nothing reads its depth — but a sentinel that large, handed to
+     * arithmetic, is exactly the shape of the bug that once put a pagoda at y = 0.</p>
+     */
+    private static int groundOr(int minGround, int fallback) {
+        return minGround == Integer.MAX_VALUE ? fallback : minGround;
     }
 
     /**

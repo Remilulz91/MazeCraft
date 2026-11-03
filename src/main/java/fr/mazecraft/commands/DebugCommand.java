@@ -728,7 +728,7 @@ public class DebugCommand {
         }
         // How far the ground falls somewhere in the maze's footprint: the number the stair cap
         // is really about, and the one missing from the first run of this scan.
-        int fall = pad.floorY() - (over.lowest() - 1);
+        int fall = pad.floorY() - (over.lowestGround() - 1);
         scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall, cover, fine});
     }
 
@@ -1128,7 +1128,8 @@ public class DebugCommand {
                 at.getZ(), landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         MazeStructure.Site pad = new MazeStructure.Site(measured.relief(), measured.water(),
                 measured.wet(), measured.drop(), ground.floorY() + lift,
-                measured.rejected(), measured.x(), measured.z(), measured.lowest());
+                measured.rejected(), measured.x(), measured.z(), measured.lowest(),
+                measured.lowestGround());
         var found = landmark.floorY(gen, world, noise, at.getX(), at.getZ(), size, pad.floorY());
         if (!pad.ok() || found.isEmpty()) {
             String why = pad.ok()
@@ -1366,9 +1367,13 @@ public class DebugCommand {
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
                 size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         src.sendFeedback(() -> Text.literal("[DEBUG] maze footprint " + size.span() + "x"
-                        + size.span() + ": ground " + over.lowest() + " to " + over.highest()
-                        + " (relief " + over.relief() + ", not judged), the ceiling must pass"
-                        + " under " + (over.lowest() - 1 - landmark.clearance()))
+                        + size.span() + ": surface " + over.lowest() + " to " + over.highest()
+                        + " (relief " + over.relief() + ", not judged), lowest sea bed "
+                        + over.lowestGround()
+                        + (over.lowestGround() == over.lowest() ? " (dry)"
+                           : " -- " + (over.lowest() - over.lowestGround()) + " under the water")
+                        + ", the ceiling must pass under "
+                        + (over.lowestGround() - 1 - landmark.clearance()))
                 .formatted(Formatting.GRAY), false);
 
         int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
@@ -1386,7 +1391,7 @@ public class DebugCommand {
             src.sendFeedback(() -> Text.literal("[DEBUG] REFUSED: the floor has to sit "
                             + (pad.floorY() - maxFloor) + " blocks below this building's floor,"
                             + " more than the " + landmark.maxStair() + " the stair cap allows."
-                            + " The ground falls " + (pad.floorY() - (over.lowest() - 1))
+                            + " The ground falls " + (pad.floorY() - (over.lowestGround() - 1))
                             + " blocks somewhere in the maze's footprint.")
                     .formatted(Formatting.RED), false);
             return 1;
@@ -1419,7 +1424,7 @@ public class DebugCommand {
         int floor = floorY.getAsInt();
         int descent = landmark.descent(pad.floorY(), floor);
         src.sendFeedback(() -> Text.literal("[DEBUG] floor " + floor + ", roof " + (floor + MazePiece.ROOF_DY)
-                        + ", so " + (over.lowest() - 1 - (floor + MazePiece.ROOF_DY))
+                        + ", so " + (over.lowestGround() - 1 - (floor + MazePiece.ROOF_DY))
                         + " blocks of rock over the ceiling at the thinnest point")
                 .formatted(Formatting.GREEN), false);
         src.sendFeedback(() -> Text.literal("[DEBUG] building floor at " + pad.floorY()

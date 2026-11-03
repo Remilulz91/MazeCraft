@@ -161,9 +161,26 @@ public interface Landmark {
      * the lowest ground over the footprint.
      *
      * <p>{@code getHeight} returns the first free block, so the solid top is one below it.</p>
+     *
+     * <p>It reads {@code lowestGround} — the sea bed — and it used to read {@code lowest}, which
+     * is {@code WORLD_SURFACE_WG} and therefore the top of the <b>water</b> wherever there is
+     * water. The javadoc above has always said "ground"; the code did not, and over a lake, a
+     * river or a sea anywhere in a footprint a hundred and one blocks wide the two are not the
+     * same number at all.</p>
+     *
+     * <p>What that did is visible in a {@code /maze debug depth} run taken on an ocean shore:
+     * <b>"maze footprint 149x149: ground 63 to 120"</b>. Sixty-three is not a sea bed, it is
+     * sea level — the heightmap was reporting the surface of the water as the ground. The
+     * ceiling was then placed four blocks under <em>that</em>, so on a sea bed at 50 the roof
+     * came out around 58: <b>eight blocks above the floor of the ocean</b>, a flat rectangular
+     * plateau standing proud of the sand. Which is the photograph.</p>
+     *
+     * <p>So the underwater case was never the carvers. It is this line, and the cost of fixing
+     * it is that a maze near water now has to sit deeper, which the stair cap will refuse at
+     * some sites — the right refusal, since those are the sites where it was surfacing.</p>
      */
     default int ceilingUnder(MazeStructure.Site over) {
-        return over.lowest() - 1 - clearance();
+        return over.lowestGround() - 1 - clearance();
     }
 
     /**
