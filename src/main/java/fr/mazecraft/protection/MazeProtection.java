@@ -98,6 +98,10 @@ public final class MazeProtection {
                 return false;
             }
             if (!MazeCraftConfig.get().protectUntilSolved) return true;
+            // A breadcrumb the player left is theirs to pick up again, and it has to be, or the
+            // trail becomes litter they can never clear. Safe because nothing in the mod places
+            // any of these -- see isMarker.
+            if (isMarker(state)) return true;
             if (lockedMazeAt(serverWorld, pos, 0) == null) return true;
             player.sendMessage(Text.translatable("mazecraft.protection.cant_break").formatted(Formatting.RED), true);
             return false;
@@ -176,10 +180,45 @@ public final class MazeProtection {
         MazeCraft.LOGGER.info("[MazeCraft] Maze protection registered");
     }
 
+    /**
+     * Blocks a player may leave inside a maze they have not conquered: the trail of breadcrumbs.
+     *
+     * <p>The protection refused <b>everything</b>, which read as strict and was really just a
+     * hole in the design. A maze is a place you are meant to get lost in, and the oldest answer
+     * to getting lost is to leave a mark behind you — Theseus had his thread before he had his
+     * sword. Taking that away does not make the maze harder to solve, it makes it tedious to
+     * re-walk, which is not the same thing.</p>
+     *
+     * <p>Every entry here is chosen because it <b>cannot be used to cheat</b>. You do not cross
+     * a wall on a carpet, you do not climb a banner, and a torch holds nothing up. Ladders,
+     * scaffolding, and any solid block stay refused, because those let you leave the corridors
+     * — and leaving the corridors is the one thing the maze is for.</p>
+     *
+     * <p>And every entry is something <b>the mod itself never places</b>, which is what makes
+     * the matching rule for breaking safe: the styles light themselves with lanterns, glowstone,
+     * shroomlight and froglight, and nothing in the mod lays a torch, a banner, a sign, a carpet
+     * or a candle anywhere. So a torch standing in a maze was put there by a player, and letting
+     * them take it back cannot strip anything of ours.</p>
+     */
+    private static boolean isMarker(net.minecraft.block.BlockState state) {
+        // One list, in MazePiece. Three rules depend on it agreeing with itself -- a marker may
+        // be placed, may be broken again, and must not be cleared by a repair -- and two copies
+        // of a list is how a block becomes placeable but unbreakable, or breakable but swept
+        // away behind the player.
+        return fr.mazecraft.structure.MazePiece.isMarker(state);
+    }
+
+    /** The same question asked of an item's block, before the state exists. */
+    private static boolean isMarker(net.minecraft.block.Block block) {
+        return block != null && isMarker(block.getDefaultState());
+    }
+
     /** Called by {@code BlockItemMixin} before a block is placed. */
-    public static boolean canPlace(ServerWorld world, PlayerEntity player, BlockPos pos) {
+    public static boolean canPlace(ServerWorld world, PlayerEntity player, BlockPos pos,
+                                   net.minecraft.block.Block placing) {
         if (player == null || isExempt(player)) return true;
         if (!MazeCraftConfig.get().protectUntilSolved) return true;
+        if (isMarker(placing)) return true;
         if (lockedMazeAt(world, pos, 0) == null) return true;
         player.sendMessage(Text.translatable("mazecraft.protection.cant_place").formatted(Formatting.RED), true);
         // The client already removed the block from the stack (prediction). The server never

@@ -1108,7 +1108,9 @@ public class MazePiece extends StructurePiece {
                     // overhanging branches whole instead of leaving half a tree, and costs
                     // nothing: it is outside the walls.
                     if (!inside && isTreeMatter(current)) continue;
-                    if (current != target && !(repairing && current.isOf(Blocks.SNOW) && target.isAir())) {
+                    if (current != target
+                            && !(repairing && current.isOf(Blocks.SNOW) && target.isAir())
+                            && !(repairing && isMarker(current) && target.isAir())) {
                         // SKIP_DROPS: this pass replaces whatever stands in the corridor with
                         // air, and on a repair what stands there includes the maze's own
                         // fittings. Without it a lever is broken into an item and laid again by
@@ -2005,6 +2007,33 @@ public class MazePiece extends StructurePiece {
      *
      * <p>What it fills with is {@link #skinAt}, not the style's own stone — see there.</p>
      */
+    /**
+     * A mark a player left to find their way back: the trail of breadcrumbs.
+     *
+     * <p>The protection used to refuse every block inside an unconquered maze, which read as
+     * strict and was really a hole in the design. A maze is a place you are meant to get lost
+     * in, and the oldest answer to getting lost is to leave a mark behind you. Refusing that
+     * does not make the maze harder to solve, it makes it tedious to re-walk.</p>
+     *
+     * <p>Two properties make this list the right one, and both are load-bearing. None of these
+     * <b>can be used to cheat</b>: you do not cross a wall on a carpet, you do not climb a
+     * banner, a torch holds nothing up. Ladders, scaffolding and solid blocks stay refused,
+     * because those let you leave the corridors, which is the one thing a maze is for. And none
+     * of them is <b>ever placed by the mod</b> — the styles light themselves with lanterns,
+     * glowstone, shroomlight and froglight, and nothing anywhere lays a torch, banner, sign,
+     * carpet or candle. So a torch standing in a maze was put there by a player, which is what
+     * makes it safe both to let them break it again and, here, to refuse to clear it.</p>
+     */
+    public static boolean isMarker(BlockState state) {
+        return state.isOf(Blocks.TORCH) || state.isOf(Blocks.WALL_TORCH)
+                || state.isOf(Blocks.SOUL_TORCH) || state.isOf(Blocks.SOUL_WALL_TORCH)
+                || state.isOf(Blocks.REDSTONE_TORCH) || state.isOf(Blocks.REDSTONE_WALL_TORCH)
+                || state.isIn(BlockTags.BANNERS)
+                || state.isIn(BlockTags.ALL_SIGNS)
+                || state.isIn(BlockTags.WOOL_CARPETS)
+                || state.isIn(BlockTags.CANDLES);
+    }
+
     private void seal(StructureWorldAccess world, BlockPos.Mutable pos, int x, int y, int z) {
         pos.set(x, y, z);
         if (isSoundRock(world, pos, world.getBlockState(pos))) return;
@@ -2154,7 +2183,14 @@ public class MazePiece extends StructurePiece {
                 target = air;
             }
             if (pos.equals(keep)) continue;
-            if (world.getBlockState(pos) != target) {
+            BlockState standing = world.getBlockState(pos);
+            // A breadcrumb a player left in the corridor is not spillage to be cleared. The
+            // repair is one-time per chunk, but it runs a couple of chunks a tick off a queue,
+            // so a player walking into fresh maze can easily place a torch seconds before that
+            // chunk's turn comes up. Without this, their trail would vanish behind them --
+            // which is precisely the thing the trail exists to prevent.
+            if (isMarker(standing) && target.isAir()) continue;
+            if (standing != target) {
                 // SKIP_DROPS, as in the open-air pass above: a rebuild must never spill.
                 world.setBlockState(pos, target, Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
             }
