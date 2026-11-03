@@ -1362,7 +1362,14 @@ public class MazePiece extends StructurePiece {
         // A crypt's chest is not built with the maze: it arrives when the guardian falls, from
         // placeCryptChest. Kronos's hoard is the same idea and has always worked that way.
         BlockPos chest = chestPos();
-        if (placeChest && !style.isKronos() && !hasCrypt() && chunkBox.contains(chest)) {
+        // isBottomFloor, and without it every floor of a stack got one. The rule reads "a maze
+        // with no crypt keeps its treasure in the middle", and it was true while a maze was one
+        // floor. Once hasCrypt answered only for the deepest floor, the floors above it became
+        // mazes with no crypt as far as this line could tell -- so each laid a full treasure
+        // chest, diamonds and enchanted gear, in the middle of a corridor. The treasure belongs
+        // to the maze, and the maze ends at the bottom.
+        if (placeChest && !style.isKronos() && isBottomFloor() && !hasCrypt()
+                && chunkBox.contains(chest)) {
             world.setBlockState(chest,
                     Blocks.CHEST.getDefaultState().with(ChestBlock.FACING, Direction.NORTH), Block.NOTIFY_LISTENERS);
             BlockEntity be = world.getBlockEntity(chest);
@@ -1658,7 +1665,12 @@ public class MazePiece extends StructurePiece {
         // dislodge whatever hangs beneath it, and the order is the fix rather than a list of
         // blocks to watch for.
         for (int y = bottom; y <= top; y++) {
-            world.setBlockState(pos.set(x, y, z), Blocks.AIR.getDefaultState(),
+            // A newel post down the middle, as the buildings' own staircases have. Without it
+            // the well is an open shaft with a rim of steps, which invites dropping straight
+            // down rather than walking it and reads as slabs stuck to a wall instead of a
+            // stair. The eight cells around it stay open, so it cannot block the corridor.
+            world.setBlockState(pos.set(x, y, z),
+                    dx == 0 && dz == 0 ? style.pillar : Blocks.AIR.getDefaultState(),
                     Block.NOTIFY_LISTENERS | Block.SKIP_DROPS);
         }
         if (floorRot == Integer.MIN_VALUE) floorRot = floorSpiralRotation(bottom, top);
@@ -1675,23 +1687,39 @@ public class MazePiece extends StructurePiece {
         }
     }
 
-    /** Turned so the TOP step faces the way the player walks in, on the floor above. */
+    /**
+     * Turned so the <b>bottom</b> step faces a way out of the cell it lands in.
+     *
+     * <p>Only one end can be chosen, and which is not a matter of taste. Twelve half-steps put
+     * the two ends eleven apart on a ring of eight, so they differ by three -- an odd number,
+     * which flips the parity. A cell's four doorways are the four <em>orthogonal</em> cells of
+     * that ring; the other four are its corners. Anchoring one end on a doorway therefore puts
+     * the other on a corner, always, and no phase spares both.</p>
+     *
+     * <p>It used to anchor the top. Measured afterwards over 400 stacks, the bottom step then
+     * faced a way out <b>0 times out of 400</b> -- not bad luck but arithmetic: the player came
+     * down six blocks and was set down in a corner, facing a wall. Anchoring the bottom costs
+     * only that the top step sits in a corner of a dead end the player is already standing in,
+     * with the whole mouth of the well open in front of them.</p>
+     */
     private int floorSpiralRotation(int bottom, int top) {
         int[] cell = stairCell();
-        int exit = cell == null ? -1 : parentLayout().onlyExit(cell[0], cell[1]);
-        int[] towards = switch (exit) {
-            case MazeLayout.NORTH -> new int[]{0, -1};
-            case MazeLayout.SOUTH -> new int[]{0, 1};
-            case MazeLayout.WEST -> new int[]{-1, 0};
-            case MazeLayout.EAST -> new int[]{1, 0};
-            default -> null;
-        };
+        if (cell == null) return 0;
+        int ox = MazeLayout.CELL * cell[0] + 2, oz = MazeLayout.CELL * cell[1] + 2;
+        int[] towards = null;
+        for (int[] d : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+            if (!layout().isWall(ox + 2 * d[0], oz + 2 * d[1])) {
+                towards = d;
+                break;
+            }
+        }
         if (towards == null) return 0;
         int target = 0;
         for (int i = 0; i < SHAFT_SPIRAL.length; i++) {
             if (SHAFT_SPIRAL[i][0] == towards[0] && SHAFT_SPIRAL[i][1] == towards[1]) target = i;
         }
-        return target - ((top - bottom) * 2 + 1);
+        // The bottom step's index is the phase itself: (y - bottom) * 2 + half is 0 there.
+        return target;
     }
 
     /** Turned so the TOP step of the crypt's stair is the one under the dead end's doorway. */
