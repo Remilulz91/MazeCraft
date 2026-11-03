@@ -5,5 +5,5 @@
   "biomes": "#mazecraft:has_structure/maze_cherry",
   "step": "surface_structures",
   "spawn_overrides": {},
-  "terrain_adaptation": "beard_thin"
+  "terrain_adaptation": "none"
 }
