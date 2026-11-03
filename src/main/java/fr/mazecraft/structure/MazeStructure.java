@@ -744,6 +744,52 @@ public class MazeStructure extends Structure {
     }
 
     /**
+     * How many of the sampled columns have a fluid <em>anywhere</em> in the band.
+     *
+     * <p>The companion to {@link #burialFluid}, and it exists because that one answers the wrong
+     * question about a sea. It counts probes: ten per column, of which a sheet of water lying on
+     * the sea bed above the roof wets one or two, the other eight being rock below. So a sea
+     * covering <b>half</b> the footprint registers about twelve columns times one and a half
+     * probes — <b>19 of 250, or 7.6%</b> — and sails under a limit of 10%. The test measured how
+     * <em>deeply</em> the site was wet and called a wide shallow sheet dry.</p>
+     *
+     * <p>This one measures how <em>widely</em>. The two are kept side by side rather than one
+     * replacing the other: the probe share is bracketed by seven surveyed sites and refuses the
+     * aquifer that soaks a whole volume, which a column count would read as merely broad. Adding
+     * this can only refuse more, never accept something the old rule turned down.</p>
+     */
+    private static int burialWetColumns(
+            java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
+        int wet = 0;
+        for (var column : columns) {
+            for (int dy = -2; dy <= MazePiece.ROOF_DY + 2; dy++) {
+                if (!column.getState(y + dy).getFluidState().isEmpty()) {
+                    wet++;
+                    break;
+                }
+            }
+        }
+        return wet;
+    }
+
+    /**
+     * How many of the sampled columns may touch a fluid before the site is refused.
+     *
+     * <p>A fifth — of twenty-five columns, six is already too many. Unlike {@link #MAX_WET_SHARE}
+     * this is <b>not</b> bracketed by measurement, because the surveys behind that one recorded
+     * probes and cannot be re-read as columns, and I would rather say so than dress a guess up
+     * as a finding. What it is bracketed by is the two cases we already know. The puddle in one
+     * corner that the probe rule was relaxed to allow is one or two columns, 4 to 8%, and still
+     * passes. A sea over half the footprint is twelve or thirteen, 50%, and now does not. Any
+     * threshold between those separates them; a fifth leaves roughly a factor of three of margin
+     * on the low side and two and a half on the high.</p>
+     *
+     * <p>What it costs in sites is unmeasured. {@code /maze debug landmark} prints the refusal
+     * breakdown, so the first scan after this lands says whether a fifth is too strict.</p>
+     */
+    private static final float MAX_WET_COLUMN_SHARE = 0.20f;
+
+    /**
      * How much of the rock around a buried maze may be fluid before the site is refused.
      *
      * <p>A tenth, and the number is bracketed by measurement rather than chosen. Seven sites
@@ -803,14 +849,17 @@ public class MazeStructure extends Structure {
      * @param bestRatio  the best solid share seen among the heights no fluid refused, or -1
      */
     public record BurialReport(OptionalInt found, int candidates, int wet, int open,
-                               float bestRatio, int leastFluid, int fluidProbes) {
+                               float bestRatio, int leastFluid, int fluidProbes,
+                               int leastWetColumns, int columnCount) {
         public String why() {
             if (found.isPresent()) return "ok";
             if (candidates == 0) return "no height in range";
             if (wet == candidates) {
                 return "every height was too wet, the driest with " + leastFluid
                         + " of " + fluidProbes + " probes in fluid (the limit is "
-                        + Math.round(fluidProbes * MAX_WET_SHARE) + ")";
+                        + Math.round(fluidProbes * MAX_WET_SHARE) + ") and " + leastWetColumns
+                        + " of " + columnCount + " columns touching it (the limit is "
+                        + Math.round(columnCount * MAX_WET_COLUMN_SHARE) + ")";
             }
             return "best rock cover " + Math.round(bestRatio * 100) + "% of the "
                     + MIN_SOLID_RATIO_PERCENT + "% needed";
@@ -825,16 +874,24 @@ public class MazeStructure extends Structure {
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
             MazeSize size, int minFloor, int maxFloor) {
         if (maxFloor < minFloor) {
-            return new BurialReport(OptionalInt.empty(), 0, 0, 0, -1f, -1, 0);
+            return new BurialReport(OptionalInt.empty(), 0, 0, 0, -1f, -1, 0, -1, 0);
         }
         var columns = burialColumns(gen, world, noise, centerX, centerZ, size);
-        int candidates = 0, wet = 0, open = 0, leastFluid = Integer.MAX_VALUE;
+        int candidates = 0, wet = 0, open = 0;
+        int leastFluid = Integer.MAX_VALUE, leastWet = Integer.MAX_VALUE;
         float bestRatio = -1f;
+        int probes = burialFluidProbes(columns.size());
+        int wetCap = Math.round(columns.size() * MAX_WET_COLUMN_SHARE);
         for (int y = maxFloor; y >= minFloor; y--) {
             candidates++;
             int fluid = burialFluid(columns, y);
+            int wetColumns = burialWetColumns(columns, y);
             leastFluid = Math.min(leastFluid, fluid);
-            if (fluid > burialFluidProbes(columns.size()) * MAX_WET_SHARE) {
+            leastWet = Math.min(leastWet, wetColumns);
+            // Two rules, not one: how deeply the site is wet, and how widely. An aquifer fails
+            // the first, a sea on the roof fails the second, and before the second existed the
+            // sea passed. See burialWetColumns.
+            if (fluid > probes * MAX_WET_SHARE || wetColumns > wetCap) {
                 wet++;
                 continue;
             }
@@ -842,13 +899,13 @@ public class MazeStructure extends Structure {
             bestRatio = Math.max(bestRatio, ratio);
             if (ratio >= MIN_SOLID_RATIO) {
                 return new BurialReport(OptionalInt.of(y), candidates, wet, open, ratio,
-                        0, burialFluidProbes(columns.size()));
+                        0, probes, 0, columns.size());
             }
             open++;
         }
         return new BurialReport(OptionalInt.empty(), candidates, wet, open, bestRatio,
-                leastFluid == Integer.MAX_VALUE ? -1 : leastFluid,
-                burialFluidProbes(columns.size()));
+                leastFluid == Integer.MAX_VALUE ? -1 : leastFluid, probes,
+                leastWet == Integer.MAX_VALUE ? -1 : leastWet, columns.size());
     }
 
     /**

@@ -682,6 +682,7 @@ public class DebugCommand {
 
         int why;
         int descent = -1;
+        int cover = -1;
         if (minFloor > maxFloor) {
             why = WHY_STAIR;
         } else {
@@ -690,6 +691,11 @@ public class DebugCommand {
             if (report.found().isPresent()) {
                 why = WHY_OK;
                 descent = landmark.descent(pad.floorY(), report.found().getAsInt());
+                // The rock cover of the height that was actually taken. Collected so the scan
+                // can answer "what would a stricter bar cost?" from one run, instead of my
+                // picking a number and finding out afterwards -- the same way the relief
+                // allowance was settled.
+                cover = Math.round(report.bestRatio() * 100);
             } else {
                 why = report.wet() == report.candidates() ? WHY_WET : WHY_OPEN;
             }
@@ -697,7 +703,7 @@ public class DebugCommand {
         // How far the ground falls somewhere in the maze's footprint: the number the stair cap
         // is really about, and the one missing from the first run of this scan.
         int fall = pad.floorY() - (over.lowest() - 1);
-        scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall});
+        scan.found.add(new int[]{pad.relief(), pad.water(), why, descent, fall, cover});
     }
 
     /**
@@ -739,6 +745,7 @@ public class DebugCommand {
         java.util.List<Integer> reliefs = new java.util.ArrayList<>();
         java.util.List<Integer> descents = new java.util.ArrayList<>();
         java.util.List<Integer> falls = new java.util.ArrayList<>();
+        java.util.List<Integer> covers = new java.util.ArrayList<>();
         for (int[] row : scan.found) {
             reliefs.add(row[0]);
             falls.add(row[4]);
@@ -754,6 +761,7 @@ public class DebugCommand {
             if (footOk && row[2] == WHY_OK) {
                 pass++;
                 descents.add(row[3]);
+                if (row[5] >= 0) covers.add(row[5]);
             }
         }
         java.util.Collections.sort(reliefs);
@@ -808,6 +816,33 @@ public class DebugCommand {
             src.sendFeedback(() -> Text.literal("spacing with the " + spacing
                             + "-chunk grid: about one every " + gap + " blocks")
                     .formatted(Formatting.GOLD), false);
+        }
+
+        // The third knob, and the one this scan exists to settle now: MIN_SOLID_RATIO, the share
+        // of rock a buried maze has to sit in. It is 60%, which accepts a maze hanging four
+        // tenths in open cavern, and that is what a player sees as a flat slab across a cave.
+        //
+        // Every accepted site here recorded the cover of the height it actually took, so the
+        // cost of a stricter bar can be counted rather than guessed. The counts are exact for a
+        // bar at or below the cover of the site's chosen height -- what they cannot show is a
+        // site that would have taken a DIFFERENT, better-buried height had the bar been higher,
+        // since the search stops at the first height that clears it and goes no deeper. So read
+        // these as a floor on what survives, not as the whole truth.
+        if (!covers.isEmpty()) {
+            java.util.Collections.sort(covers);
+            src.sendFeedback(() -> Text.literal("cover   rock around the accepted height: min "
+                            + covers.get(0) + "%, 25% " + covers.get(covers.size() / 4)
+                            + "%, median " + covers.get(covers.size() / 2)
+                            + "%, 75% " + covers.get(covers.size() * 3 / 4)
+                            + "%, max " + covers.get(covers.size() - 1) + "%")
+                    .formatted(Formatting.GRAY), false);
+            StringBuilder bar = new StringBuilder("cover   sites left if the bar were:");
+            for (int b : new int[]{60, 70, 75, 80, 85, 90, 95}) {
+                int n = 0;
+                for (int c : covers) if (c >= b) n++;
+                bar.append("  ").append(b).append("%: ").append(n);
+            }
+            src.sendFeedback(() -> Text.literal(bar.toString()).formatted(Formatting.AQUA), false);
         }
 
         StringBuilder table = new StringBuilder("relief  if the allowance were:");
@@ -1163,7 +1198,10 @@ public class DebugCommand {
                            : ", best rock cover " + Math.round(report.bestRatio() * 100) + "%")
                         + (report.leastFluid() <= 0 ? ""
                            : ", driest height still had " + report.leastFluid() + " of "
-                             + report.fluidProbes() + " probes wet"))
+                             + report.fluidProbes() + " probes wet")
+                        + (report.leastWetColumns() <= 0 ? ""
+                           : " across " + report.leastWetColumns() + " of "
+                             + report.columnCount() + " columns"))
                 .formatted(Formatting.GRAY), false);
         var floorY = report.found();
         if (floorY.isEmpty()) {
