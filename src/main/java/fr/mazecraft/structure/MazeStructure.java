@@ -104,7 +104,7 @@ public class MazeStructure extends Structure {
 
     /** Would a maze placed here reach into the cleared square around the origin? */
     private boolean coversWorldSpawn(int centerX, int centerZ) {
-        int reach = size.span() / 2 + MazeStyle.MAX_MARGIN + SPAWN_CLEARANCE;
+        int reach = MazePiece.spanOf(style, size) / 2 + MazeStyle.MAX_MARGIN + SPAWN_CLEARANCE;
         return Math.abs(centerX) < reach && Math.abs(centerZ) < reach;
     }
 
@@ -139,7 +139,7 @@ public class MazeStructure extends Structure {
             // must also keep well clear of ancient cities, which share its depth — the usual
             // avoidance ignores them because a surface maze never meets one.
             if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
-            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size,
+            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, style, size,
                     KRONOS_MIN_FLOOR, KRONOS_MAX_FLOOR);
             if (floorY.isEmpty()) return Optional.empty();
             int y = floorY.getAsInt();
@@ -231,11 +231,11 @@ public class MazeStructure extends Structure {
             // isNether(), not enclosed: this branch is about a lava sea at Y=31 and a bedrock
             // roof from Y=123, which is a fact about the Nether, not about having a roof.
             if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
-            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, size,
+            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, style, size,
                     NETHER_MIN_FLOOR, NETHER_MAX_FLOOR);
             if (floorY.isEmpty()) return Optional.empty();
             int y = floorY.getAsInt();
-            int entrance = mostOpenSide(context, centerX, centerZ, size, y);
+            int entrance = mostOpenSide(context, centerX, centerZ, style, size, y);
             return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
                     collector.addPiece(new MazePiece(style, size, mazeSeed, centerX, y, centerZ, entrance))));
         }
@@ -245,12 +245,12 @@ public class MazeStructure extends Structure {
         MazeSize actual = size;
         if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
                 && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
-                && findFloorY(context, centerX, centerZ, MazeSize.COLOSSAL).isPresent()) {
+                && findFloorY(context, centerX, centerZ, style, MazeSize.COLOSSAL).isPresent()) {
             actual = MazeSize.COLOSSAL;
         }
 
         if (StructureAvoidance.isNearOtherStructure(context, actual, style)) return Optional.empty();
-        OptionalInt floorY = findFloorY(context, centerX, centerZ, actual);
+        OptionalInt floorY = findFloorY(context, centerX, centerZ, style, actual);
         if (floorY.isEmpty()) return Optional.empty();
         final MazeSize finalSize = actual;
         int y = floorY.getAsInt();
@@ -304,7 +304,8 @@ public class MazeStructure extends Structure {
     }
 
     /** The worldgen view of {@link #surveyFloor}: the floor Y, or empty when the site is refused. */
-    private static OptionalInt findFloorY(Context context, int centerX, int centerZ, MazeSize size) {
+    private static OptionalInt findFloorY(Context context, int centerX, int centerZ,
+                                          MazeStyle style, MazeSize size) {
         // ringMargin 0: the survey still stops at the maze's own half-span, which is what
         // every world generated so far was built on. The flattened ring reaches `margin`
         // blocks further out and is NOT surveyed, which is how a maze ends up with a shelf of
@@ -313,7 +314,7 @@ public class MazeStructure extends Structure {
         // from `/maze debug placement ... scan`, which reports both spans side by side,
         // before it is changed here and not after.
         Site site = surveyFloor(context.chunkGenerator(), context.world(), context.noiseConfig(),
-                centerX, centerZ, size, 0, reliefAllowance(size), MAX_WATER_DEPTH);
+                centerX, centerZ, style, size, 0, reliefAllowance(size), MAX_WATER_DEPTH);
         return site.ok() ? OptionalInt.of(site.floorY()) : OptionalInt.empty();
     }
 
@@ -427,10 +428,10 @@ public class MazeStructure extends Structure {
      */
     public static Site surveyFloor(ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
                                    net.minecraft.world.gen.noise.NoiseConfig noise,
-                                   int centerX, int centerZ, MazeSize size, int ringMargin,
-                                   int maxRelief, int maxWater) {
-        return surveyFloor(gen, world, noise, centerX, centerZ, size.span() / 2, ringMargin,
-                maxRelief, maxWater);
+                                   int centerX, int centerZ, MazeStyle style, MazeSize size,
+                                   int ringMargin, int maxRelief, int maxWater) {
+        return surveyFloor(gen, world, noise, centerX, centerZ,
+                MazePiece.spanOf(style, size) / 2, ringMargin, maxRelief, maxWater);
     }
 
     /**
@@ -637,7 +638,7 @@ public class MazeStructure extends Structure {
      */
     private static int bestEntranceSide(Context context, int centerX, int centerZ, MazeSize size, int floorY, MazeStyle style) {
         ChunkGenerator gen = context.chunkGenerator();
-        int half = size.span() / 2;
+        int half = MazePiece.spanOf(style, size) / 2;
         int dist = half + style.margin + 3; // just past the flattened ring
         int[][] sideDirs = {
                 {0, -1}, // NORTH
@@ -675,10 +676,11 @@ public class MazeStructure extends Structure {
      * buried in solid rock. Rejects heights with lava around the maze, and returns empty if even
      * the best height is not solid enough (the maze would float in a cavern).
      */
-    private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ, MazeSize size,
+    private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ,
+                                                MazeStyle style, MazeSize size,
                                                 int minFloor, int maxFloor) {
         var columns = burialColumns(context.chunkGenerator(), context.world(), context.noiseConfig(),
-                centerX, centerZ, size);
+                centerX, centerZ, style, size);
         int bestY = -1;
         float bestRatio = -1f;
         int offset = context.random().nextInt(2); // vary the parity between mazes
@@ -702,8 +704,9 @@ public class MazeStructure extends Structure {
      */
     private static java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> burialColumns(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
-            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ, MazeSize size) {
-        int half = size.span() / 2 + 4;
+            net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
+            MazeStyle style, MazeSize size) {
+        int half = MazePiece.spanOf(style, size) / 2 + 4;
         var columns = new java.util.ArrayList<net.minecraft.world.gen.chunk.VerticalBlockSample>();
         for (int i = -2; i <= 2; i++) {
             for (int j = -2; j <= 2; j++) {
@@ -763,8 +766,8 @@ public class MazeStructure extends Structure {
     public static float gridBurialSolid(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
-            MazeSize size, int y, int radius) {
-        int half = size.span() / 2 + 4;
+            MazeStyle style, MazeSize size, int y, int radius) {
+        int half = MazePiece.spanOf(style, size) / 2 + 4;
         int solid = 0, total = 0;
         for (int i = -radius; i <= radius; i++) {
             for (int j = -radius; j <= radius; j++) {
@@ -932,8 +935,8 @@ public class MazeStructure extends Structure {
     public static OptionalInt findShallowestBuriedFloorY(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
-            MazeSize size, int minFloor, int maxFloor) {
-        return findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ, size,
+            MazeStyle style, MazeSize size, int minFloor, int maxFloor) {
+        return findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ, style, size,
                 minFloor, maxFloor, 0);
     }
 
@@ -946,9 +949,9 @@ public class MazeStructure extends Structure {
     public static OptionalInt findShallowestBuriedFloorY(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
-            MazeSize size, int minFloor, int maxFloor, int below) {
+            MazeStyle style, MazeSize size, int minFloor, int maxFloor, int below) {
         if (maxFloor < minFloor) return OptionalInt.empty();
-        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor, below)
+        return surveyBurial(gen, world, noise, centerX, centerZ, style, size, minFloor, maxFloor, below)
                 .found();
     }
 
@@ -985,18 +988,18 @@ public class MazeStructure extends Structure {
     public static BurialReport surveyBurial(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
-            MazeSize size, int minFloor, int maxFloor) {
-        return surveyBurial(gen, world, noise, centerX, centerZ, size, minFloor, maxFloor, 0);
+            MazeStyle style, MazeSize size, int minFloor, int maxFloor) {
+        return surveyBurial(gen, world, noise, centerX, centerZ, style, size, minFloor, maxFloor, 0);
     }
 
     public static BurialReport surveyBurial(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
             net.minecraft.world.gen.noise.NoiseConfig noise, int centerX, int centerZ,
-            MazeSize size, int minFloor, int maxFloor, int below) {
+            MazeStyle style, MazeSize size, int minFloor, int maxFloor, int below) {
         if (maxFloor < minFloor) {
             return new BurialReport(OptionalInt.empty(), 0, 0, 0, -1f, -1, 0, -1, 0);
         }
-        var columns = burialColumns(gen, world, noise, centerX, centerZ, size);
+        var columns = burialColumns(gen, world, noise, centerX, centerZ, style, size);
         int candidates = 0, wet = 0, open = 0;
         int leastFluid = Integer.MAX_VALUE, leastWet = Integer.MAX_VALUE;
         float bestRatio = -1f;
@@ -1032,16 +1035,16 @@ public class MazeStructure extends Structure {
      * Enclosed mazes: the entrance goes on the side where the rock just outside the maze is the
      * most open (air at walking height), so the doorway tends to open onto a cave.
      */
-    private static int mostOpenSide(Context context, int centerX, int centerZ, MazeSize size, int floorY) {
+    private static int mostOpenSide(Context context, int centerX, int centerZ, MazeStyle style, MazeSize size, int floorY) {
         ChunkGenerator gen = context.chunkGenerator();
-        int dist = size.span() / 2 + 4 + 3; // just past the sealed outer wall (enclosed margin = 4)
+        int dist = MazePiece.spanOf(style, size) / 2 + 4 + 3; // just past the sealed outer wall (enclosed margin = 4)
         int[][] sideDirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}; // N, S, W, E
         int best = context.random().nextInt(4);
         int bestAir = -1;
         for (int side = 0; side < 4; side++) {
             int air = 0;
             for (int k = -2; k <= 2; k++) {
-                int along = k * size.span() / 6;
+                int along = k * MazePiece.spanOf(style, size) / 6;
                 int x = centerX + sideDirs[side][0] * dist + (sideDirs[side][0] == 0 ? along : 0);
                 int z = centerZ + sideDirs[side][1] * dist + (sideDirs[side][1] == 0 ? along : 0);
                 var column = gen.getColumnSample(x, z, context.world(), context.noiseConfig());

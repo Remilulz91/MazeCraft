@@ -263,14 +263,14 @@ public class DebugCommand {
         ChunkGenerator gen = world.getChunkManager().getChunkGenerator();
         NoiseConfig noise = world.getChunkManager().getNoiseConfig();
         MazeStructure.Site verdict = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, 0, MazeStructure.reliefAllowance(size),
+                at.getX(), at.getZ(), spanHalf(style, size), 0, MazeStructure.reliefAllowance(size),
                 MazeStructure.maxWaterDepth());
         MazeStructure.Site truth = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                at.getX(), at.getZ(), spanHalf(style, size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         // The same ground, surveyed over what actually gets built: the maze plus its
         // flattened ring. The gap between the two numbers is the overhang risk.
         MazeStructure.Site built = MazeStructure.surveyFloor(gen, world, noise,
-                at.getX(), at.getZ(), size, style.margin,
+                at.getX(), at.getZ(), spanHalf(style, size), style.margin,
                 MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
 
         int allowed = MazeStructure.reliefAllowance(size);
@@ -510,7 +510,7 @@ public class DebugCommand {
                     continue;
                 }
                 MazeStructure.Site real = MazeStructure.surveyFloor(gen, world, noise, x, z,
-                        scan.size, 0, scan.allowance, MazeStructure.maxWaterDepth());
+                        spanHalf(scanStyle(scan), scan.size), 0, scan.allowance, MazeStructure.maxWaterDepth());
                 var biomeHere = gen.getBiomeSource().getBiome(BiomeCoords.fromBlock(x),
                         BiomeCoords.fromBlock(real.ok() ? real.floorY() : sea),
                         BiomeCoords.fromBlock(z), sampler);
@@ -525,7 +525,7 @@ public class DebugCommand {
                 if (real.ok() && provesSomething
                         && scan.structure.getValidBiomes().contains(biomeHere)) {
                     MazeStructure.Site measured = MazeStructure.surveyFloor(gen, world, noise,
-                            x, z, scan.size, scan.margin,
+                            x, z, spanHalf(scanStyle(scan), scan.size), scan.margin,
                             MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
                     if (measured.drop() < scan.minDrop) {
                         scan.nanos += System.nanoTime() - started;
@@ -565,7 +565,7 @@ public class DebugCommand {
             }
             if (MazeStructure.biomeCouldMatch(scan.structure, gen.getBiomeSource(), sampler, sea, x, z)) {
                 MazeStructure.Site s = MazeStructure.surveyFloor(gen, world, noise, x, z,
-                        scan.size, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                        spanHalf(scanStyle(scan), scan.size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
                 boolean acceptedToday = s.relief() <= MazeStructure.reliefAllowance(scan.size)
                         && s.water() <= MazeStructure.maxWaterDepth();
                 var biome = gen.getBiomeSource().getBiome(BiomeCoords.fromBlock(x),
@@ -578,7 +578,7 @@ public class DebugCommand {
                     // The same twenty-five samples plus the sixteen on the built ring, so
                     // this row can only ever be lower than the one above it.
                     MazeStructure.Site wide = MazeStructure.surveyFloor(gen, world, noise,
-                            x, z, scan.size, scan.margin,
+                            x, z, spanHalf(scanStyle(scan), scan.size), scan.margin,
                             MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
                     scan.found.add(new int[]{s.relief(), s.water(), s.wet(), wide.relief(),
                             acceptedToday ? wide.drop() : -1});
@@ -669,6 +669,21 @@ public class DebugCommand {
         return tightest == Integer.MAX_VALUE ? 32 : tightest;
     }
 
+    /**
+     * Half the footprint of one floor, which is what every survey needs and what the switch to
+     * stacked mazes changed. It is {@link MazePiece#spanOf}, named here so the debug command
+     * cannot drift from the rule generation uses.
+     */
+    private static int spanHalf(MazeStyle style, MazeSize size) {
+        return MazePiece.spanOf(style, size) / 2;
+    }
+
+    /** The style a scan is measuring: a landmark scan knows it, a placement scan asks its structure. */
+    private static MazeStyle scanStyle(Scan scan) {
+        if (scan.landmark != null) return scan.landmark.style();
+        return scan.structure instanceof MazeStructure ms ? ms.getStyle() : MazeStyle.HEDGE;
+    }
+
     /** Outcomes a landmark site can have, as stored in the scan's rows. */
     private static final int WHY_OK = 0, WHY_STAIR = 1, WHY_WET = 2, WHY_OPEN = 3;
 
@@ -696,7 +711,7 @@ public class DebugCommand {
         MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, x, z,
                 landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, x, z,
-                scan.size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                spanHalf(scanStyle(scan), scan.size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
         int minFloor = Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY()));
 
@@ -708,7 +723,7 @@ public class DebugCommand {
             why = WHY_STAIR;
         } else {
             MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
-                    x, z, scan.size, minFloor, maxFloor);
+                    x, z, scanStyle(scan), scan.size, minFloor, maxFloor);
             if (report.found().isPresent()) {
                 why = WHY_OK;
                 descent = landmark.descent(pad.floorY(), report.found().getAsInt());
@@ -721,7 +736,7 @@ public class DebugCommand {
                 // instead of every ~37. Scan only: generation is untouched until this says
                 // whether the coarse grid has been overstating, and by how much.
                 fine = Math.round(MazeStructure.gridBurialSolid(gen, world, noise, x, z,
-                        scan.size, report.found().getAsInt(), FINE_GRID_RADIUS) * 100);
+                        scanStyle(scan), scan.size, report.found().getAsInt(), FINE_GRID_RADIUS) * 100);
             } else {
                 why = report.wet() == report.candidates() ? WHY_WET : WHY_OPEN;
             }
@@ -1133,10 +1148,10 @@ public class DebugCommand {
         var found = landmark.floorY(gen, world, noise, at.getX(), at.getZ(), size, pad.floorY());
         if (!pad.ok() || found.isEmpty()) {
             String why = pad.ok()
-                    ? MazeStructure.surveyBurial(gen, world, noise, at.getX(), at.getZ(), size,
+                    ? MazeStructure.surveyBurial(gen, world, noise, at.getX(), at.getZ(), landmark.style(), size,
                             Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY())),
                             landmark.ceilingUnder(MazeStructure.surveyFloor(gen, world, noise,
-                                    at.getX(), at.getZ(), size.span() / 2, 0,
+                                    at.getX(), at.getZ(), spanHalf(landmark.style(), size), 0,
                                     MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT))
                                     - MazePiece.ROOF_DY).why()
                     : pad.rejected() + " on the building's own footprint";
@@ -1154,7 +1169,7 @@ public class DebugCommand {
         // ground in a 101 by 101 footprint was a hundred blocks below the building. That is not
         // a maze anybody can look at, and the point of forcing a build is to look at it.
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
-                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                spanHalf(landmark.style(), size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         int floorY = found.orElse(Math.max(
                 Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY())),
                 landmark.ceilingUnder(over) - MazePiece.ROOF_DY));
@@ -1244,7 +1259,7 @@ public class DebugCommand {
         MazeStructure.Site pad = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
                 landmark.half(), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
-                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                spanHalf(landmark.style(), size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         int maxFloor = landmark.ceilingUnder(over) - MazePiece.ROOF_DY;
         int minFloor = Math.max(landmark.floorLimit(), landmark.deepestForStair(pad.floorY()));
         if (minFloor > maxFloor) {
@@ -1253,7 +1268,7 @@ public class DebugCommand {
             return 0;
         }
         MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
-                at.getX(), at.getZ(), size, minFloor, maxFloor);
+                at.getX(), at.getZ(), landmark.style(), size, minFloor, maxFloor);
         if (report.found().isEmpty()) {
             src.sendError(Text.literal("[DEBUG] the site test refuses this spot (" + report.why()
                     + "), so there is no box to measure. Move and run it again."));
@@ -1261,7 +1276,7 @@ public class DebugCommand {
         }
         int floor = report.found().getAsInt();
 
-        int step = Math.max(1, size.span() / (CARVE_GRID - 1));
+        int step = Math.max(1, MazePiece.spanOf(landmark.style(), size) / (CARVE_GRID - 1));
         // Centre the grid on the player rather than hanging it off the west edge. Stepping from
         // -span/2 would have run -50 to +46 on a medium: the right number of soundings, two
         // blocks off true, and every figure below quietly measuring a box the maze is not in.
@@ -1301,8 +1316,8 @@ public class DebugCommand {
         final int fBitten = bittenColumns, fWorst = worstColumn, fCols = columns, fH = heights;
         final int fFloor = floor;
         src.sendFeedback(() -> Text.literal("[DEBUG] carve: " + CARVE_GRID + "x" + CARVE_GRID
-                        + " columns every " + step + " blocks over the " + size.span() + "x"
-                        + size.span() + " footprint, floor " + fFloor + ", shell band "
+                        + " columns every " + step + " blocks over the " + MazePiece.spanOf(landmark.style(), size) + "x"
+                        + MazePiece.spanOf(landmark.style(), size) + " footprint, floor " + fFloor + ", shell band "
                         + (fFloor - 1) + ".." + (fFloor + MazePiece.ROOF_DY + 1)
                         + " (" + fH + " heights)")
                 .formatted(Formatting.GRAY), false);
@@ -1365,9 +1380,9 @@ public class DebugCommand {
         // The maze: only measured. Nothing about its footprint is judged any more - a bump no
         // longer refuses anything, which is the whole point of burying it.
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, at.getX(), at.getZ(),
-                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
-        src.sendFeedback(() -> Text.literal("[DEBUG] maze footprint " + size.span() + "x"
-                        + size.span() + ": surface " + over.lowest() + " to " + over.highest()
+                spanHalf(landmark.style(), size), 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+        src.sendFeedback(() -> Text.literal("[DEBUG] maze footprint " + MazePiece.spanOf(landmark.style(), size) + "x"
+                        + MazePiece.spanOf(landmark.style(), size) + ": surface " + over.lowest() + " to " + over.highest()
                         + " (relief " + over.relief() + ", not judged), lowest sea bed "
                         + over.lowestGround()
                         + (over.lowestGround() == over.lowest() ? " (dry)"
@@ -1402,7 +1417,7 @@ public class DebugCommand {
         // a range of open cavern, which are three different problems with three different
         // answers - and the one that was actually happening was the second.
         MazeStructure.BurialReport report = MazeStructure.surveyBurial(gen, world, noise,
-                at.getX(), at.getZ(), size, minFloor, maxFloor);
+                at.getX(), at.getZ(), landmark.style(), size, minFloor, maxFloor);
         src.sendFeedback(() -> Text.literal("[DEBUG] " + report.candidates() + " heights tried: "
                         + report.wet() + " refused for fluid, " + report.open()
                         + " for too little rock"
@@ -1544,12 +1559,14 @@ public class DebugCommand {
         // can be mistaken for the real thing has to say so itself.
         MazeStructure.Site check = MazeStructure.surveyFloor(
                 world.getChunkManager().getChunkGenerator(), world,
-                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(), size, 0,
+                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(),
+                spanHalf(style, size), 0,
                 MazeStructure.reliefAllowance(size), MazeStructure.maxWaterDepth());
         MazeStructure.Site measured = MazeStructure.surveyFloor(
                 world.getChunkManager().getChunkGenerator(), world,
-                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(), size,
-                style.margin, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                world.getChunkManager().getNoiseConfig(), origin.getX(), origin.getZ(),
+                spanHalf(style, size), style.margin,
+                MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         if (check.ok()) {
             src.sendFeedback(() -> Text.literal("[DEBUG] this site PASSES the placement rules"
                             + " (interior relief " + check.relief() + " of "
@@ -1591,7 +1608,7 @@ public class DebugCommand {
 
         lastPlaced = piece;
         src.sendFeedback(() -> Text.literal("[DEBUG] Placed " + size.id() + " " + style.id() + " maze ("
-                + size.span() + "x" + size.span() + ") centered on " + origin.getX() + " " + floorY + " " + origin.getZ()
+                + MazePiece.spanOf(style, size) + "x" + MazePiece.spanOf(style, size) + ") centered on " + origin.getX() + " " + floorY + " " + origin.getZ()
                 + " - seed " + seed).formatted(Formatting.LIGHT_PURPLE), true);
         return 1;
     }

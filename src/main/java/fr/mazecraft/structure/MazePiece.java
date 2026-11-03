@@ -135,24 +135,27 @@ public class MazePiece extends StructurePiece {
      * not suffer from. {@code enteredFromPlaza} is exactly the set that does.</p>
      */
     public static int floorsFor(MazeStyle style, MazeSize size) {
-        return FLOORS_ENABLED && style.enteredFromPlaza() ? size.floors() : 1;
+        return style.enteredFromPlaza() ? size.floors() : 1;
     }
 
     /**
-     * Off until the <b>footprint</b> follows the floors, and this flag is the honest way to say
-     * so rather than leaving a half-built feature live.
+     * Cells per side of <b>one floor</b> of this maze, which is the footprint everything else
+     * has to agree on.
      *
-     * <p>Everything a stack needs is in place: a piece knows where it sits, saves it, lays skin
-     * only at the ends, roots its layout under the floor above, and the burial survey probes the
-     * whole drop. What is not done is that {@code size.cells()} still answers with the old
-     * single-slab footprint, so flipping this on today would stack three mazes <b>149 blocks
-     * wide</b> on top of each other — three times the structure, none of the gain, and strictly
-     * worse than what it replaces. The footprint has to become {@link MazeSize#cellsPerFloor}
-     * at some twenty-six places first, among them the surveys that decide where a maze may go.</p>
-     *
-     * <p>The flag goes away in the same change that moves them.</p>
+     * <p>This is the whole of the switch to floors, and it has to live in exactly one place.
+     * A maze that is folded into a stack occupies its per-floor footprint; one that is not —
+     * every surface style, the five of the Nether, and SMALL, which stays flat — occupies the
+     * one it always did. Two answers to "how wide is this maze" is how the surveys end up
+     * deciding where a 149-wide maze may go and then an 85-wide one gets built there.</p>
      */
-    private static final boolean FLOORS_ENABLED = false;
+    public static int cellsOf(MazeStyle style, MazeSize size) {
+        return floorsFor(style, size) > 1 ? size.cellsPerFloor() : size.cells();
+    }
+
+    /** Side of one floor's footprint in blocks. */
+    public static int spanOf(MazeStyle style, MazeSize size) {
+        return cellsOf(style, size) * MazeLayout.CELL + 1;
+    }
 
     /** Blocks from the top floor's slab down to the bottom one's. */
     public static int stackDrop(MazeStyle style, MazeSize size) {
@@ -210,10 +213,10 @@ public class MazePiece extends StructurePiece {
     }
 
     private static BlockBox boxFor(MazeStyle style, MazeSize size, int centerX, int floorY, int centerZ) {
-        int half = size.span() / 2;
+        int half = spanOf(style, size) / 2;
         int minX = centerX - half - style.margin;
         int minZ = centerZ - half - style.margin;
-        int side = size.span() + 2 * style.margin;
+        int side = spanOf(style, size) + 2 * style.margin;
         // The box starts just ABOVE the floor on purpose: with terrain_adaptation "beard_thin",
         // Minecraft makes the ground solid up to the box bottom (so up to floorY, flush with our
         // floor) and clears above it, with a smooth slope around the box (like villages).
@@ -263,7 +266,7 @@ public class MazePiece extends StructurePiece {
      */
     private int arenaSink(int lx, int lz) {
         if (!style.isKronos() || !layout().isPlaza(lx, lz)) return 0;
-        int centre = size.span() / 2;
+        int centre = spanOf(style, size) / 2;
         int d = Math.max(Math.abs(lx - centre), Math.abs(lz - centre));
         if (d <= ARENA_FLOOR) return ARENA_DEPTH;
         return d == ARENA_FLOOR + 1 ? 1 : 0;
@@ -276,7 +279,7 @@ public class MazePiece extends StructurePiece {
 
     /** Centre of the maze in local coordinates. */
     private int localCentre() {
-        return size.span() / 2;
+        return spanOf(style, size) / 2;
     }
 
     // =====================================================================
@@ -696,7 +699,7 @@ public class MazePiece extends StructurePiece {
      * than the few microseconds it costs.</p>
      */
     private MazeLayout layoutFor(int index) {
-        MazeLayout top = MazeLayout.generate(size.cells(), seed, entranceSide, size.gates(),
+        MazeLayout top = MazeLayout.generate(cellsOf(style, size), seed, entranceSide, size.gates(),
                 plazaRadius(), style.enteredFromPlaza());
         if (index == 0) return top;
         MazeLayout current = top;
@@ -704,7 +707,7 @@ public class MazePiece extends StructurePiece {
             int[] root = current.goal();
             if (root == null) return current;   // no progression: nothing to descend from
             boolean last = f == floorCount - 1;
-            current = MazeLayout.generateFloor(size.cells(), seed * 31 + f, size.gates(),
+            current = MazeLayout.generateFloor(cellsOf(style, size), seed * 31 + f, size.gates(),
                     root[0], root[1], last ? CRYPT_GOAL_CLEARANCE : STAIR_GOAL_CLEARANCE);
         }
         return current;

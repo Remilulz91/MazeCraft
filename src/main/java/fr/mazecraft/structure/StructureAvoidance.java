@@ -126,7 +126,7 @@ public final class StructureAvoidance {
     /** True if another structure could start close enough to overlap a maze of this size here. */
     public static boolean isNearOtherStructure(Structure.Context context, MazeSize size, MazeStyle style) {
         ChunkPos center = context.chunkPos();
-        int mazeRadius = (size.span() / 2 + style.margin) / 16 + 1;
+        int mazeRadius = (MazePiece.spanOf(style, size) / 2 + style.margin) / 16 + 1;
         long seed = context.seed();
 
         int ownRank = rank(style, size);
@@ -225,7 +225,8 @@ public final class StructureAvoidance {
         int best = DEFAULT_RADIUS_CHUNKS;
         for (StructureSet.WeightedEntry weighted : set.structures()) {
             if (weighted.structure().value() instanceof MazeStructure maze) {
-                best = Math.max(best, (maze.getSize().span() / 2 + maze.getStyle().margin) / 16 + 1);
+                best = Math.max(best, (MazePiece.spanOf(maze.getStyle(), maze.getSize()) / 2
+                        + maze.getStyle().margin) / 16 + 1);
             }
         }
         return best;

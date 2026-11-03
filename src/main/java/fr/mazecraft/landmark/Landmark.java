@@ -142,7 +142,8 @@ public interface Landmark {
         // Measured, not judged: thresholds nothing can exceed, so the survey walks the whole
         // footprint and `lowest` is exact rather than wherever an early return stopped.
         MazeStructure.Site over = MazeStructure.surveyFloor(gen, world, noise, centerX, centerZ,
-                size.span() / 2, 0, MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
+                fr.mazecraft.structure.MazePiece.spanOf(style(), size) / 2, 0,
+                MazeStructure.NO_LIMIT, MazeStructure.NO_LIMIT);
         return floorY(gen, world, noise, centerX, centerZ, size, padFloorY, over);
     }
 
@@ -158,8 +159,8 @@ public interface Landmark {
         // two pitches further than the limit was ever meant to allow.
         int drop = fr.mazecraft.structure.MazePiece.stackDrop(style(), size);
         int minFloor = Math.max(floorLimit() + drop, deepestForStair(padFloorY));
-        return MazeStructure.findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ, size,
-                minFloor, maxFloor, drop);
+        return MazeStructure.findShallowestBuriedFloorY(gen, world, noise, centerX, centerZ,
+                style(), size, minFloor, maxFloor, drop);
     }
 
     /**
