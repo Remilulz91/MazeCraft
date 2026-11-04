@@ -73,6 +73,7 @@
   "item.mazecraft.ariadne_thread.tooltip1": "Outside a maze: points to the nearest one",
   "item.mazecraft.ariadne_thread.tooltip2": "Inside: traces the way to the next lever",
   "mazecraft.thread.follow": "Follow the golden thread (%s blocks)",
+  "mazecraft.thread.follow_floor": "Follow the golden thread (%s blocks) \u2014 floor %s of %s",
   "mazecraft.thread.here": "The thread stops here: your objective is right in front of you",
   "mazecraft.thread.distance": "Nearest maze: %s blocks, %s",
   "mazecraft.thread.none": "The thread goes slack... no maze nearby",

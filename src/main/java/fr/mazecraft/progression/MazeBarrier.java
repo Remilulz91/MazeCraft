@@ -167,7 +167,7 @@ public final class MazeBarrier {
         if (!maze.isInsideMaze(pos.getX(), pos.getZ())) return;
         if (mayEnter(world, player, maze, hit.key())) return;
 
-        BlockPos out = maze.entranceOutsidePos();
+        BlockPos out = maze.wayOutPos();
         player.teleport(world, out.getX() + 0.5, out.getY(), out.getZ() + 0.5,
                 player.getYaw(), player.getPitch());
         player.fallDistance = 0;

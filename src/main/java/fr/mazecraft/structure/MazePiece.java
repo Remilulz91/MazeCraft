@@ -176,6 +176,11 @@ public class MazePiece extends StructurePiece {
         return floorIndex;
     }
 
+    /** How many floors this maze is folded into; 1 for a maze that is not a stack. */
+    public int floorCount() {
+        return floorCount;
+    }
+
     /**
      * @param entranceSide {@link MazeLayout#NORTH}.. {@link MazeLayout#EAST}, or -1 for random
      */
@@ -381,6 +386,19 @@ public class MazePiece extends StructurePiece {
             cryptCell = cached;
         }
         return cached == NO_CRYPT ? null : cached;
+    }
+
+    /**
+     * Local X/Z of the middle of this floor's goal cell, or null.
+     *
+     * <p>The end of this floor's walk, whatever is built on it: the crypt on the deepest floor
+     * of a stack, the stair down on every floor above, and the dead end behind the last gate
+     * for a flat maze entered through its middle.</p>
+     */
+    private int[] goalOrigin() {
+        int[] cell = layout().goal();
+        return cell == null ? null
+                : new int[]{MazeLayout.CELL * cell[0] + 2, MazeLayout.CELL * cell[1] + 2};
     }
 
     /** Local X/Z of the middle of the crypt's dead-end cell, or null. */
@@ -1016,6 +1034,36 @@ public class MazePiece extends StructurePiece {
         return new BlockPos(originX() + l[0], floorY + 1, originZ() + l[1]);
     }
 
+    /**
+     * Blocks from the descent's pole that somebody put back in the plaza stands on.
+     *
+     * <p>Not the pole itself. {@link MazeLayout#entranceOutside} answers "the middle" for a maze
+     * with no outer doorway, which is right — the middle is where the staircase is — but the
+     * middle <em>column</em> is the staircase's pole, and a player teleported into it
+     * suffocates. Three blocks clear of it is still well inside a plaza three cells wide, and
+     * clear of the eight-block ring the spiral's treads wind round.</p>
+     */
+    private static final int PLAZA_STAND = 3;
+
+    /**
+     * Where a player is put when something takes them out of the maze — the thread once the maze
+     * is beaten, the barrier when they may not come in.
+     *
+     * <p>For a maze you walk into, two blocks past its doorway, as it always was.</p>
+     *
+     * <p>For a maze entered through its middle, the plaza of the <b>top</b> floor, which is the
+     * foot of the building's staircase and the only way up. {@link #entranceOutsidePos} answers
+     * for the floor it is asked of, and on the second floor of a stack that is a corridor in the
+     * middle of the maze — not out of anything. The top floor's Y is this one's plus a pitch per
+     * floor above it, and the X and Z are shared by the whole stack.</p>
+     */
+    public BlockPos wayOutPos() {
+        if (!style.enteredFromPlaza()) return entranceOutsidePos();
+        int c = layout().center();
+        int topY = floorY + MazeSize.FLOOR_PITCH * floorIndex;
+        return new BlockPos(originX() + c + PLAZA_STAND, topY + 1, originZ() + c);
+    }
+
     /** Flattened ring around the maze, in blocks; part of the bounding box. */
     public int getMargin() {
         return style.margin;
@@ -1280,12 +1328,21 @@ public class MazePiece extends StructurePiece {
             }
         }
         if (target < 0) {
-            // Every gate open, so the thread now points at the end of the road. Which end that
-            // is depends on which way the maze runs: inwards to the plaza for the fifteen
-            // surface styles, outwards to the goal dead end — and the crypt under it — for a
-            // maze entered through its own middle. This line was the inversion's last stone
-            // left unturned: it sent the player back to the middle they had walked in from.
-            int[] goal = hasCrypt() ? cryptOrigin() : null;
+            // Every gate on THIS floor open, so the thread now points at the end of this
+            // floor's road. Which end that is depends on which way the maze runs: inwards to
+            // the plaza for the surface styles, outwards to the goal dead end for a maze
+            // entered through its own middle.
+            //
+            // For a stack that goal is two different things and the same cell: on the deepest
+            // floor it is the crypt, and on every floor above it is the stair down. Asking the
+            // layout for its goal says both at once, which is what makes the thread lead all
+            // the way through a stack — levers of this floor, then the way down, then the
+            // levers of the next.
+            //
+            // It used to ask hasCrypt() instead, which is true on the deepest floor alone. On
+            // the floors above, the answer fell through to the middle of the maze -- a corridor
+            // cell like any other, since only the top floor has a plaza, and not the way down.
+            int[] goal = style.enteredFromPlaza() ? goalOrigin() : null;
             target = goal != null ? goal[0] * span + goal[1]
                     : layout.center() * span + layout.center();
         }

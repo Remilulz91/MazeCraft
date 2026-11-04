@@ -98,7 +98,7 @@ public class AriadneThreadItem extends Item {
         // chore. So the thread does what it does in the myth and takes you out. Only once the
         // maze is beaten — before that, finding the way is the whole point.
         if (state.isSolved(key)) {
-            BlockPos out = maze.entranceOutsidePos();
+            BlockPos out = maze.wayOutPos();
             world.spawnParticles(net.minecraft.particle.ParticleTypes.PORTAL,
                     player.getX(), player.getY() + 1.0, player.getZ(), 40, 0.4, 0.8, 0.4, 0.1);
             player.requestTeleport(out.getX() + 0.5, out.getY(), out.getZ() + 0.5);
@@ -121,7 +121,15 @@ public class AriadneThreadItem extends Item {
             points.add(Vec3d.ofBottomCenter(path.get(i)).add(0, 0.3, 0));
         }
         ThreadTrails.show(player, points);
-        player.sendMessage(Text.translatable("mazecraft.thread.follow", path.size()).formatted(Formatting.GOLD), true);
+        // A stack says which floor, because a player three floors down has no other way to
+        // know how far down they are: the floors are the same size, lit the same and built of
+        // the same blocks, which is the point of them and also what makes them easy to lose
+        // count of. One floor, no number -- there is nothing to situate.
+        net.minecraft.text.MutableText message = maze.floorCount() > 1
+                ? Text.translatable("mazecraft.thread.follow_floor", path.size(),
+                        maze.floorIndex() + 1, maze.floorCount())
+                : Text.translatable("mazecraft.thread.follow", path.size());
+        player.sendMessage(message.formatted(Formatting.GOLD), true);
         return true;
     }
 

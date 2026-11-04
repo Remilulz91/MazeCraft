@@ -73,6 +73,7 @@
   "item.mazecraft.ariadne_thread.tooltip1": "Hors d'un labyrinthe : indique le plus proche",
   "item.mazecraft.ariadne_thread.tooltip2": "À l'intérieur : trace le chemin vers le prochain levier",
   "mazecraft.thread.follow": "Suivez le fil doré (%s blocs)",
+  "mazecraft.thread.follow_floor": "Suivez le fil doré (%s blocs) \u2014 étage %s sur %s",
   "mazecraft.thread.here": "Le fil s'arrête ici : votre objectif est juste devant vous",
   "mazecraft.thread.distance": "Labyrinthe le plus proche : %s blocs, %s",
   "mazecraft.thread.none": "Le fil se détend... aucun labyrinthe à proximité",
