@@ -70,8 +70,8 @@ public class MazeStructure extends Structure {
         this.style = parsedStyle;
 
         MazeSize parsedSize = MazeSize.fromId(sizeId);
-        // Colossal is normally a rare upgrade of a large maze rather than a size a structure may
-        // ask for — except for Kronos, which is colossal by definition.
+        // Colossal is not a size a biome maze may ask for — only Kronos, which is colossal by
+        // definition and is the sole reason the size still exists.
         if (parsedSize == null || (parsedSize == MazeSize.COLOSSAL && !this.style.isKronos())) {
             MazeCraft.LOGGER.warn("[MazeCraft] Invalid maze size '{}' in worldgen JSON, using medium", sizeId);
             parsedSize = MazeSize.MEDIUM;
@@ -83,7 +83,7 @@ public class MazeStructure extends Structure {
         return style;
     }
 
-    /** The progression step this structure generates (never COLOSSAL — that is a LARGE variant). */
+    /** The progression step this structure generates (COLOSSAL only for Kronos). */
     public MazeSize getSize() {
         return size;
     }
@@ -172,18 +172,14 @@ public class MazeStructure extends Structure {
                     context.noiseConfig(), centerX, centerZ);
             if (!pad.ok()) return Optional.empty();
 
-            // No colossal under a landmark. A landmark is an Overworld building, and the
-            // colossal maze belongs to the End now: it is the one that carries the code vault,
-            // and behind that door a Key of Kronos ready forged. That is an End reward, and the
-            // End is where it is earned.
-            //
-            // There used to be a one-in-COLOSSAL_CHANCE upgrade here, with a comment calling it
-            // "rare to the point of myth": a colossal footprint was 221 blocks across and the
-            // ceiling has to clear the lowest ground anywhere in it, and over that much terrain
-            // there is almost always a dip. Folding a maze into floors took the footprint to 125
-            // and the upgrade started succeeding routinely, which is how a code room turned up
-            // under a pagoda that read as large. It was never meant to be common here, and it
-            // is no longer meant to exist here at all.
+            // The size the structure asked for, and no upgrade. There used to be a one-in-eight
+            // roll here that turned a large maze into a colossal one, with a comment calling it
+            // "rare to the point of myth": a colossal footprint is 221 blocks across and the
+            // ceiling has to clear the lowest ground anywhere under it, and over that much
+            // terrain there is almost always a dip. Folding mazes into floors took the footprint
+            // to 125 and the roll started succeeding routinely, which is how a code room turned
+            // up under a pagoda that read as large. The colossal is Kronos's size now and
+            // nothing else is built at it.
             final MazeSize chosen = size;
 
             // How deep the maze goes, which the terrain decides rather than a constant.
@@ -214,26 +210,15 @@ public class MazeStructure extends Structure {
             }));
         }
 
-        // The End: one large maze in COLOSSAL_CHANCE becomes a colossal one. It is the same
-        // progression step, just bigger and richer — so it needs the flat area to match.
-        //
-        // The End and nowhere else. A colossal maze is the only one with a code vault, and the
-        // vault's chest holds a Key of Kronos ready forged -- the reward for reading four digits
-        // off four walls instead of collecting nine fragments. Handing that out in the Overworld
-        // would let a player skip the progression from the first biome they walked into; the End
-        // is already past most of it.
-        MazeSize actual = size;
-        if (style.isEnd() && size == MazeSize.LARGE
-                && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
-                && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
-                && findFloorY(context, centerX, centerZ, style, MazeSize.COLOSSAL).isPresent()) {
-            actual = MazeSize.COLOSSAL;
-        }
-
-        if (StructureAvoidance.isNearOtherStructure(context, actual, style)) return Optional.empty();
-        OptionalInt floorY = findFloorY(context, centerX, centerZ, style, actual);
+        // The size a structure asks for is the size it gets. There used to be a one-in-eight
+        // upgrade of a large maze to a colossal one here, kept to the End at the last turn and
+        // then measured: no End site in a thousand blocks can hold 149 blocks clear of the void,
+        // never mind 221, so the roll could only ever have failed. A size nothing can build is
+        // not content, so it is gone and the colossal belongs to Kronos alone.
+        if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
+        OptionalInt floorY = findFloorY(context, centerX, centerZ, style, size);
         if (floorY.isEmpty()) return Optional.empty();
-        final MazeSize finalSize = actual;
+        final MazeSize finalSize = size;
         int y = floorY.getAsInt();
         int entrance = bestEntranceSide(context, centerX, centerZ, finalSize, y, style);
         return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->

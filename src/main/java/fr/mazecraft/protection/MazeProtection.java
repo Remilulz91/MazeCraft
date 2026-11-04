@@ -413,12 +413,6 @@ public final class MazeProtection {
         world.playSound(null, player.getBlockPos(), SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 1.0f, 1.0f);
 
         grant(player, "conquer_maze");
-        if (maze.getSize() == MazeSize.COLOSSAL) {
-            grant(player, "conquer_colossal");
-            if (maze.getStyle().isEnd()) {
-                grant(player, "conquer_end_colossal");
-            }
-        }
 
         // Progression step: clears this style's current step and unlocks the next one for
         // THIS player only. A colossal maze counts as the large step of its style.

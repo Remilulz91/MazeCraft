@@ -157,7 +157,17 @@ public enum MazeSize {
     // Each style generates three mazes — one per PROGRESSION step — and each step has its
     // own structure and its own structure set, so a given style/size pair is always findable
     // (see data/mazecraft/worldgen/structure[_set]/maze_<style>_<size>.json).
-    // COLOSSAL is not a step of its own: it is a rare variant of LARGE and counts as LARGE.
+    // COLOSSAL is not a step of its own and no biome maze is ever built at it: it is the size
+    // of the Labyrinth of Kronos, and only maze_kronos.json asks for it. It still maps to the
+    // LARGE step, because anything that counts steps must give it one.
+    //
+    // It used to be a rare upgrade of a large maze as well, one in eight. That was taken out:
+    // the End was the only dimension allowed to roll it, and a scan of 60 sites in
+    // end_highlands and end_midlands found not one that could hold even 149 blocks clear of the
+    // void, let alone the colossal's 221. A size that cannot occur is content nobody will ever
+    // see, so the roll, the loot tables behind it and the two advancements went with it. The
+    // constant stays because Kronos is 55 cells across, its 160 shifting walls are tuned to
+    // that, and a saved piece reads its size back by this name.
 
     /** The three progression steps, in order. COLOSSAL is excluded (it counts as LARGE). */
     public static final MazeSize[] STEPS = { SMALL, MEDIUM, LARGE };
@@ -180,21 +190,6 @@ public enum MazeSize {
     public int stepIndex() {
         return step().ordinal() + 1;
     }
-
-    /**
-     * One LARGE maze in {@code 1/CHANCE} is upgraded to a colossal one — <b>in the End only</b>.
-     *
-     * <p>Nowhere else, because the colossal is the only maze with a code vault and the vault's
-     * chest holds a Key of Kronos ready forged. In the Overworld that would hand a player the
-     * end of the progression at the start of it.</p>
-     *
-     * <p>Which makes this one knob over one structure, {@code maze_end_large}: at a spacing of
-     * 40 chunks, one End large in eight. It stays a variant of the large step rather than a
-     * fourth size of its own, so a site that cannot hold 221 blocks simply builds the large
-     * maze it was already going to build — the player loses nothing they could have known
-     * about.</p>
-     */
-    public static final int COLOSSAL_CHANCE = 8;
 
     /**
      * Relief the terrain may have across the footprint before the spot is rejected.

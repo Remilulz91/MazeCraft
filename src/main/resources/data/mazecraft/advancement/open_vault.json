@@ -1,5 +1,5 @@
 {
-  "parent": "mazecraft:conquer_colossal",
+  "parent": "mazecraft:conquer_maze",
   "display": {
     "icon": {
       "id": "minecraft:tripwire_hook"

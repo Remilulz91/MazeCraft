@@ -477,8 +477,7 @@ public class MazePiece extends StructurePiece {
      * four plaques want. The colossal keeps its vault for wherever it ever fits.</p>
      */
     public boolean mazeHasVault() {
-        if (style.isKronos()) return false;
-        return size == MazeSize.COLOSSAL || (style.isEnd() && size == MazeSize.LARGE);
+        return style.isEnd() && size == MazeSize.LARGE;
     }
 
     /**
