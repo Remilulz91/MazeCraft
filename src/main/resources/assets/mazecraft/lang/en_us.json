@@ -201,6 +201,7 @@
   "mazecraft.command.players_only": "This command can only be used by a player.",
   "mazecraft.progression.unlocked": "%s: the %s maze is now open to you.",
   "mazecraft.progression.style_complete": "%s mastered — every size conquered.",
+  "itemGroup.mazecraft": "MazeCraft",
   "block.mazecraft.sealed_gateway": "Sealed Gateway",
   "block.mazecraft.code_key": "Keypad Key",
   "block.mazecraft.vault_door": "Vault Door",

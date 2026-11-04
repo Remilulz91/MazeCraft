@@ -201,6 +201,7 @@
   "mazecraft.command.players_only": "Cette commande ne peut être utilisée que par un joueur.",
   "mazecraft.progression.unlocked": "%s : le labyrinthe %s t'est maintenant ouvert.",
   "mazecraft.progression.style_complete": "%s maîtrisé — toutes les tailles conquises.",
+  "itemGroup.mazecraft": "MazeCraft",
   "block.mazecraft.sealed_gateway": "Portail scellé",
   "block.mazecraft.code_key": "Touche du clavier",
   "block.mazecraft.vault_door": "Porte du caveau",
