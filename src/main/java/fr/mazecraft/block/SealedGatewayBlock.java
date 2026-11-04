@@ -80,6 +80,11 @@ public class SealedGatewayBlock extends Block {
         /** The gateway tier guarding this maze, or null when it is never sealed. */
         public static Tier of(MazeStyle style, MazeSize size) {
             if (style.isKronos()) return KRONOS;
+            // No order in the End, so nothing to seal there. The gateway is only the visible
+            // half of the rule; MazeProgress.canEnter is the rule, and it lets the End through.
+            // Leaving the block would be worse than useless: a purple wall that opens for
+            // everybody is a lock that teaches the player the wrong thing.
+            if (style.isEnd()) return null;
             return switch (size.step()) {
                 case MEDIUM -> MEDIUM;
                 case LARGE -> LARGE;

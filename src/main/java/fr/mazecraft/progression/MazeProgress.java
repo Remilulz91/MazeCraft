@@ -82,7 +82,15 @@ public final class MazeProgress {
         //
         // The three sizes still all have to be cleared to finish the style -- the count is
         // untouched -- they simply no longer have to be cleared in order.
-        if (style.enteredFromPlaza()) return true;
+        //
+        // The End is the second exception, for a different reason. Its mazes are scarce: a scan
+        // of 60 sites in end_highlands and end_midlands found not one that could hold even a
+        // large maze, because almost every footprint in the End touches the void. Asking a
+        // player to find three of those in order is not a progression, it is a search. The End
+        // is also already a gate of its own — you do not walk into it by accident — and it
+        // carries no key fragment, so the order locks nothing the mod needs locked. Its large
+        // maze is where the code vault is now, and that should be reachable by whoever finds it.
+        if (style.enteredFromPlaza() || style.isEnd()) return true;
         MazeSize previous = size.previousStep();
         return previous == null || hasCleared(player, style, previous);
     }

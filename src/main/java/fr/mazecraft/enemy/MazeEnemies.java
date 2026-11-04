@@ -76,7 +76,13 @@ public final class MazeEnemies {
             case SNOW -> List.of(EntityType.STRAY, EntityType.ZOMBIE);
             case JUNGLE -> List.of(EntityType.ZOMBIE, EntityType.SPIDER, EntityType.CAVE_SPIDER);
             case SWAMP -> List.of(EntityType.BOGGED, EntityType.SLIME, EntityType.ZOMBIE);
-            case END -> List.of(EntityType.ENDERMITE, EntityType.SHULKER, EntityType.ENDERMAN);
+            // No shulker. One attaches itself to a block face and a maze is nothing but block
+            // faces, so it ends up on top of a wall: out of reach in a corridor three wide,
+            // answerable only with a bow, and its bullet lifts the player over the walls. A
+            // guardian you cannot walk up to is not a guard, it is weather. The silverfish is
+            // here for the third slot and earns it — end stone brick is masonry, and something
+            // living in the masonry is the oldest trap in the game.
+            case END -> List.of(EntityType.ENDERMITE, EntityType.SILVERFISH, EntityType.ENDERMAN);
             // Kronos: the Underworld's own, drawn from every dimension at once.
             case KRONOS -> List.of(EntityType.WITHER_SKELETON, EntityType.VINDICATOR,
                     EntityType.CAVE_SPIDER, EntityType.BOGGED);

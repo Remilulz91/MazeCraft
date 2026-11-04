@@ -60,6 +60,24 @@ public final class MazeProtection {
     /** Wall-walking check interval (ticks). */
     private static final int CHECK_INTERVAL = 10;
 
+    /**
+     * How long after a lift wears off the wall check stays quiet, in ticks.
+     *
+     * <p>Five seconds, which is a fall of far more than the four blocks of a maze wall. The
+     * check does not need to know how the player got up there while they are still coming
+     * down.</p>
+     */
+    private static final int LEVITATION_GRACE = 100;
+
+    /**
+     * Players the check is holding its tongue for, and the world time it may speak again.
+     *
+     * <p>Weak keys on purpose: the entry belongs to the player object, so it goes when they
+     * disconnect or change dimension and there is nothing to clean up. Only ever touched from
+     * the world tick, which is one thread.</p>
+     */
+    private static final java.util.Map<ServerPlayerEntity, Long> lifted = new java.util.WeakHashMap<>();
+
     private MazeProtection() { }
 
     public static void register() {
@@ -297,6 +315,29 @@ public final class MazeProtection {
         if (maze.getStyle().enclosed) return;                            // roofed maze: nothing to walk on
         if (!maze.isInsideMaze(pos.getX(), pos.getZ())) return;          // margin ring is fine
         if (pos.getY() <= maze.getFloorY() + MazePiece.WALL_HEIGHT) return; // inside the corridors
+
+        // Lifted over the walls rather than climbed over them. A shulker's bullet gives
+        // levitation, the player floats above the corridor, and this used to read that as
+        // scaling the maze and post them back to the front door -- a guardian of ours throwing
+        // the player out of the maze it was guarding. The rule is about climbing, and nobody
+        // climbs by being shot.
+        //
+        // The grace matters as much as the test: when the levitation ends the player is still
+        // over the walls, falling, and without it they would be teleported on the way down
+        // instead of on the way up. The check picks up again once they have landed.
+        //
+        // This does leave a player who arranges to be levitated five seconds in which to cross
+        // the maze from above. That buys them nothing: the central chest is claimed by having
+        // opened every gate, not by standing in front of it.
+        if (player.hasStatusEffect(net.minecraft.entity.effect.StatusEffects.LEVITATION)) {
+            lifted.put(player, world.getTime() + LEVITATION_GRACE);
+            return;
+        }
+        Long until = lifted.get(player);
+        if (until != null) {
+            if (world.getTime() < until) return;
+            lifted.remove(player);
+        }
 
         BlockPos back = maze.entranceOutsidePos();
         player.teleport(world, back.getX() + 0.5, back.getY(), back.getZ() + 0.5, player.getYaw(), player.getPitch());
