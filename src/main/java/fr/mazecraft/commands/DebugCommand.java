@@ -1864,12 +1864,25 @@ public class DebugCommand {
      * large maze when the ground under it is flat enough. The only way to know is to look at the
      * mazes themselves, which is what this does — it walks a spiral of probes outward, locates
      * the nearest large maze to each, and reads the size the roll actually gave it.</p>
+     *
+     * <p>Run it <b>in the End</b>. The upgrade is rolled there and nowhere else, so in the
+     * Overworld this walks a spiral of perfectly good large mazes and reports nothing, which
+     * reads like a broken command rather than a rule.</p>
      */
     private static int onColossal(CommandContext<ServerCommandSource> ctx) {
         ServerCommandSource src = ctx.getSource();
         ServerWorld world = src.getWorld();
         BlockPos from = BlockPos.ofFloored(src.getPosition());
         TagKey<Structure> large = TagKey.of(RegistryKeys.STRUCTURE, MazeCraft.id("size/large"));
+
+        // Say it rather than let the spiral say it in forty seconds of silence.
+        if (!world.getRegistryKey().equals(net.minecraft.world.World.END)) {
+            src.sendError(Text.literal("[DEBUG] Colossal mazes are rolled in the End only"
+                    + " (one large in " + MazeSize.COLOSSAL_CHANCE + "). There are none in this"
+                    + " dimension to find. Use /maze debug place colossal <style> to look at one"
+                    + " here, or run this in the End."));
+            return 0;
+        }
 
         src.sendFeedback(() -> Text.literal("[DEBUG] Looking for a colossal maze — up to "
                 + (COLOSSAL_BUDGET_NANOS / 1_000_000_000L) + " seconds.").formatted(Formatting.GRAY), false);

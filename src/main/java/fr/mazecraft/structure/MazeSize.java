@@ -181,7 +181,19 @@ public enum MazeSize {
         return step().ordinal() + 1;
     }
 
-    /** One LARGE maze in {@code 1/CHANCE} is upgraded to a colossal one (Overworld and End only). */
+    /**
+     * One LARGE maze in {@code 1/CHANCE} is upgraded to a colossal one — <b>in the End only</b>.
+     *
+     * <p>Nowhere else, because the colossal is the only maze with a code vault and the vault's
+     * chest holds a Key of Kronos ready forged. In the Overworld that would hand a player the
+     * end of the progression at the start of it.</p>
+     *
+     * <p>Which makes this one knob over one structure, {@code maze_end_large}: at a spacing of
+     * 40 chunks, one End large in eight. It stays a variant of the large step rather than a
+     * fourth size of its own, so a site that cannot hold 221 blocks simply builds the large
+     * maze it was already going to build — the player loses nothing they could have known
+     * about.</p>
+     */
     public static final int COLOSSAL_CHANCE = 8;
 
     /**

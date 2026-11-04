@@ -172,28 +172,19 @@ public class MazeStructure extends Structure {
                     context.noiseConfig(), centerX, centerZ);
             if (!pad.ok()) return Optional.empty();
 
-            // One large in COLOSSAL_CHANCE becomes a colossal one, exactly as it does for the
-            // surface styles. A colossal is a VARIANT of the large step, not a step of its own
-            // (MazeSize.step maps it to LARGE), so falling back to large when it does not fit
-            // costs the player nothing — which is why this one downgrade is allowed and a
-            // large quietly becoming a medium is not.
+            // No colossal under a landmark. A landmark is an Overworld building, and the
+            // colossal maze belongs to the End now: it is the one that carries the code vault,
+            // and behind that door a Key of Kronos ready forged. That is an End reward, and the
+            // End is where it is earned.
             //
-            // This used to say "rare to the point of myth", on the grounds that a colossal
-            // footprint was 221 blocks across and the ceiling has to clear the lowest ground
-            // anywhere in it -- over that much terrain there is almost always a dip. Folding a
-            // maze into floors took the footprint to 125, so the ceiling rule it used to fail
-            // now passes routinely: a colossal pagoda is simply one large in COLOSSAL_CHANCE,
-            // and a player finding a code room under a "large" pagoda is seeing that upgrade,
-            // not a bug. Worth retuning the odds now that they mean something.
-            MazeSize actual = size;
-            if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
-                    && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
-                    && landmark.floorY(context.chunkGenerator(), context.world(),
-                            context.noiseConfig(), centerX, centerZ, MazeSize.COLOSSAL,
-                            pad.floorY()).isPresent()) {
-                actual = MazeSize.COLOSSAL;
-            }
-            final MazeSize chosen = actual;
+            // There used to be a one-in-COLOSSAL_CHANCE upgrade here, with a comment calling it
+            // "rare to the point of myth": a colossal footprint was 221 blocks across and the
+            // ceiling has to clear the lowest ground anywhere in it, and over that much terrain
+            // there is almost always a dip. Folding a maze into floors took the footprint to 125
+            // and the upgrade started succeeding routinely, which is how a code room turned up
+            // under a pagoda that read as large. It was never meant to be common here, and it
+            // is no longer meant to exist here at all.
+            final MazeSize chosen = size;
 
             // How deep the maze goes, which the terrain decides rather than a constant.
             OptionalInt floorY = landmark.floorY(context.chunkGenerator(), context.world(),
@@ -223,10 +214,17 @@ public class MazeStructure extends Structure {
             }));
         }
 
-        // Overworld / End: one large maze in COLOSSAL_CHANCE becomes a colossal one. It is the
-        // same progression step, just bigger and richer — so it needs the flat area to match.
+        // The End: one large maze in COLOSSAL_CHANCE becomes a colossal one. It is the same
+        // progression step, just bigger and richer — so it needs the flat area to match.
+        //
+        // The End and nowhere else. A colossal maze is the only one with a code vault, and the
+        // vault's chest holds a Key of Kronos ready forged -- the reward for reading four digits
+        // off four walls instead of collecting nine fragments. Handing that out in the Overworld
+        // would let a player skip the progression from the first biome they walked into; the End
+        // is already past most of it.
         MazeSize actual = size;
-        if (size == MazeSize.LARGE && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
+        if (style.isEnd() && size == MazeSize.LARGE
+                && context.random().nextInt(MazeSize.COLOSSAL_CHANCE) == 0
                 && !StructureAvoidance.isNearOtherStructure(context, MazeSize.COLOSSAL, style)
                 && findFloorY(context, centerX, centerZ, style, MazeSize.COLOSSAL).isPresent()) {
             actual = MazeSize.COLOSSAL;
