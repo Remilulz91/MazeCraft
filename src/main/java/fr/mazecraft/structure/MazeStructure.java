@@ -50,10 +50,6 @@ public class MazeStructure extends Structure {
     private final MazeStyle style;
     private final MazeSize size;
 
-    /** Floor height range of enclosed (Nether) mazes. Lava sea is at Y=31, bedrock roof from Y=123. */
-    private static final int NETHER_MIN_FLOOR = 40;
-    private static final int NETHER_MAX_FLOOR = 80;
-
     /**
      * Floor height range of the Labyrinth of Kronos: deep under the Overworld, clear of the
      * bedrock floor (Y -64..-59) and below where players dig by habit.
@@ -127,8 +123,8 @@ public class MazeStructure extends Structure {
         // Vanilla checks a structure's biome AFTER getStructurePosition has returned, which is
         // fine for a structure that costs one height query to place and ruinous for this one:
         // every candidate site ran the full avoidance sweep and a 25-point terrain survey, and
-        // was then thrown away because a hedge maze cannot stand in a desert. Fifteen styles
-        // out of sixteen paid in full for an answer that was already known.
+        // was then thrown away because a hedge maze cannot stand in a desert. Ten styles
+        // out of eleven paid in full for an answer that was already known.
         if (!biomeCouldMatch(context, centerX, centerZ)) return Optional.empty();
 
         // The size is fixed by the structure. It is never downgraded when the terrain is poor:
@@ -225,22 +221,6 @@ public class MazeStructure extends Structure {
                 collector.addPiece(new fr.mazecraft.landmark.LandmarkPiece(landmark,
                         new BlockPos(centerX, y, centerZ), pad.floorY(), y, facing));
             }));
-        }
-
-        if (style.isNether()) {
-            // Nether: buried in the rock like a fortress, at the height where the rock is the
-            // most solid (never hanging over the lava sea). No colossal mazes down here.
-            //
-            // isNether(), not enclosed: this branch is about a lava sea at Y=31 and a bedrock
-            // roof from Y=123, which is a fact about the Nether, not about having a roof.
-            if (StructureAvoidance.isNearOtherStructure(context, size, style)) return Optional.empty();
-            OptionalInt floorY = findBuriedFloorY(context, centerX, centerZ, style, size,
-                    NETHER_MIN_FLOOR, NETHER_MAX_FLOOR);
-            if (floorY.isEmpty()) return Optional.empty();
-            int y = floorY.getAsInt();
-            int entrance = mostOpenSide(context, centerX, centerZ, style, size, y);
-            return Optional.of(new StructurePosition(new BlockPos(centerX, y, centerZ), collector ->
-                    collector.addPiece(new MazePiece(style, size, mazeSeed, centerX, y, centerZ, entrance))));
         }
 
         // Overworld / End: one large maze in COLOSSAL_CHANCE becomes a colossal one. It is the
@@ -674,9 +654,9 @@ public class MazeStructure extends Structure {
     private static final float MIN_SOLID_RATIO = 0.6f;
 
     /**
-     * Enclosed mazes: samples the terrain on a 5×5 grid over the footprint and returns the floor
-     * height (between NETHER_MIN_FLOOR and NETHER_MAX_FLOOR) where the maze would be the most
-     * buried in solid rock. Rejects heights with lava around the maze, and returns empty if even
+     * Buried mazes: samples the terrain on a 5×5 grid over the footprint and returns the floor
+     * height between {@code minFloor} and {@code maxFloor} where the maze would be the most
+     * buried in solid rock. Rejects heights with fluid around the maze, and returns empty if even
      * the best height is not solid enough (the maze would float in a cavern).
      */
     private static OptionalInt findBuriedFloorY(Context context, int centerX, int centerZ,
@@ -688,7 +668,7 @@ public class MazeStructure extends Structure {
         float bestRatio = -1f;
         int offset = context.random().nextInt(2); // vary the parity between mazes
         for (int y = minFloor + offset; y <= maxFloor; y += 2) {
-            if (netherFluid(columns, y)) continue;
+            if (buriedFluid(columns, y)) continue;
             float ratio = burialSolid(columns, y, 0);
             if (ratio > bestRatio) {
                 bestRatio = ratio;
@@ -724,9 +704,9 @@ public class MazeStructure extends Structure {
      * Share of solid rock around a floor laid at {@code y}, or -1 when a fluid is in the way.
      *
      * <p>The probes are relative to the floor and straddle it: below it, at walking height, and
-     * above the roof. No fluid is allowed at any of them — lava far below is fine, the support
-     * pillars reach through it — so a maze is never cut open by a lava sea in the Nether or by
-     * an aquifer in the Overworld.</p>
+     * above the roof. No fluid is allowed at any of them — lava well below is fine, it is the
+     * floor's own fill that meets it — so a maze is never cut open by an aquifer or a lava
+     * pocket.</p>
      */
     /** The six heights the solid share is counted at, relative to the floor. */
     private static final int[] BURIAL_PROBES =
@@ -909,13 +889,16 @@ public class MazeStructure extends Structure {
     private static final float MAX_WET_SHARE = 0.10f;
 
     /**
-     * The Nether's own fluid test, left exactly as it was.
+     * The fluid test of a maze placed at the best-buried height: Kronos, and the Nether before
+     * it was taken out.
      *
-     * <p>Six spaced probes, gaps and all. It has a lava sea under it and years of play behind it,
-     * and the band above is new and unmeasured; changing both at once would leave neither
+     * <p>Six spaced probes, gaps and all, rather than the per-column count {@link
+     * #surveyBurial} uses. Left exactly as it was when it was the Nether's: Kronos is forty
+     * blocks under the Overworld with years of play behind it, and the two tests answer the
+     * same question differently on purpose — changing this one as well would leave neither
      * answerable.</p>
      */
-    private static boolean netherFluid(
+    private static boolean buriedFluid(
             java.util.List<net.minecraft.world.gen.chunk.VerticalBlockSample> columns, int y) {
         for (var column : columns) {
             for (int dy : BURIAL_PROBES) {
@@ -929,11 +912,11 @@ public class MazeStructure extends Structure {
      * The <b>shallowest</b> floor between {@code minFloor} and {@code maxFloor} that is buried
      * in enough solid rock — not the best-buried one.
      *
-     * <p>Which is the opposite of what {@link #findBuriedFloorY} wants, and deliberately. A
-     * Nether maze is found by walking into its doorway, so where it sits only has to be solid;
-     * a maze under a landmark is reached by a staircase somebody has to walk down, and every
-     * block of depth is four more steps of spiral. So this one takes the first acceptable floor
-     * on the way down and stops. Deep is a cost here, not a virtue.</p>
+     * <p>Which is the opposite of what {@link #findBuriedFloorY} wants, and deliberately. Kronos
+     * is meant not to be stumbled upon, so where it sits only has to be solid and deeper is
+     * better; a maze under a landmark is reached by a staircase somebody has to walk down, and
+     * every block of depth is four more steps of spiral. So this one takes the first acceptable
+     * floor on the way down and stops. Deep is a cost here, not a virtue.</p>
      */
     public static OptionalInt findShallowestBuriedFloorY(
             ChunkGenerator gen, net.minecraft.world.HeightLimitView world,
@@ -1032,35 +1015,6 @@ public class MazeStructure extends Structure {
         return new BurialReport(OptionalInt.empty(), candidates, wet, open, bestRatio,
                 leastFluid == Integer.MAX_VALUE ? -1 : leastFluid, probes,
                 leastWet == Integer.MAX_VALUE ? -1 : leastWet, columns.size());
-    }
-
-    /**
-     * Enclosed mazes: the entrance goes on the side where the rock just outside the maze is the
-     * most open (air at walking height), so the doorway tends to open onto a cave.
-     */
-    private static int mostOpenSide(Context context, int centerX, int centerZ, MazeStyle style, MazeSize size, int floorY) {
-        ChunkGenerator gen = context.chunkGenerator();
-        int dist = MazePiece.spanOf(style, size) / 2 + 4 + 3; // just past the sealed outer wall (enclosed margin = 4)
-        int[][] sideDirs = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}}; // N, S, W, E
-        int best = context.random().nextInt(4);
-        int bestAir = -1;
-        for (int side = 0; side < 4; side++) {
-            int air = 0;
-            for (int k = -2; k <= 2; k++) {
-                int along = k * MazePiece.spanOf(style, size) / 6;
-                int x = centerX + sideDirs[side][0] * dist + (sideDirs[side][0] == 0 ? along : 0);
-                int z = centerZ + sideDirs[side][1] * dist + (sideDirs[side][1] == 0 ? along : 0);
-                var column = gen.getColumnSample(x, z, context.world(), context.noiseConfig());
-                for (int dy = 1; dy <= 3; dy++) {
-                    if (column.getState(floorY + dy).isAir()) air++;
-                }
-            }
-            if (air > bestAir) {
-                bestAir = air;
-                best = side;
-            }
-        }
-        return best;
     }
 
     @Override

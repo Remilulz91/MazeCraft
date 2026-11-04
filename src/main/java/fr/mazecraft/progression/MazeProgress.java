@@ -32,7 +32,7 @@ import java.util.List;
  */
 public final class MazeProgress {
 
-    /** Number of steps to clear before the Labyrinth of Kronos opens (16 styles × 3 steps). */
+    /** Number of steps to clear before the Labyrinth of Kronos opens (11 styles × 3 steps). */
     public static final int TOTAL_STEPS = MazeStyle.PROGRESSION.length * MazeSize.STEPS.length;
 
     private MazeProgress() { }
@@ -110,7 +110,7 @@ public final class MazeProgress {
         return done;
     }
 
-    /** How many of the 16 styles this player has fully cleared (one key fragment each). */
+    /** How many of the styles this player has fully cleared (one key fragment each). */
     public static int completedStyles(ServerPlayerEntity player) {
         int done = 0;
         for (MazeStyle style : MazeStyle.PROGRESSION) {
@@ -132,12 +132,11 @@ public final class MazeProgress {
         List<MazeStyle> list = new ArrayList<>();
         for (MazeStyle style : MazeStyle.PROGRESSION) {
             boolean match;
-            // isNether(), not enclosed: a roof is how a maze is built, not where it is. The
-            // cherry maze is roofed and belongs to the Overworld.
-            if (key.equals(World.NETHER)) match = style.isNether();
-            else if (key.equals(World.END)) match = style.isEnd();
-            else if (key.equals(World.OVERWORLD)) match = !style.isNether() && !style.isEnd();
-            else match = false; // modded dimension: no maze of ours
+            // Not `enclosed`: a roof is how a maze is built, not where it is. The cherry maze is
+            // roofed and belongs to the Overworld. The Nether has no mazes of ours at all.
+            if (key.equals(World.END)) match = style.isEnd();
+            else if (key.equals(World.OVERWORLD)) match = !style.isEnd();
+            else match = false; // the Nether, or a modded dimension: no maze of ours
             if (match) list.add(style);
         }
         return list;

@@ -191,7 +191,7 @@ public final class StructureSearch {
      * <p>The tightest, not the average: a tag holding several sets is searched ring by ring in
      * each set's own grid, so the distance the whole call is <em>guaranteed</em> to have covered
      * is the one from the densest grid. Assuming more would put the next sweep past ground
-     * nothing has looked at. This matters for Ariadne's Thread, whose tag holds all 48.</p>
+     * nothing has looked at. This matters for Ariadne's Thread, whose tag holds every maze.</p>
      */
     private static int spacingOf(ServerWorld world, TagKey<Structure> tag) {
         var structures = world.getRegistryManager().get(RegistryKeys.STRUCTURE);

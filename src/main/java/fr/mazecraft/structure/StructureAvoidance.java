@@ -35,14 +35,16 @@ public final class StructureAvoidance {
     /**
      * How far each vanilla structure set actually sprawls from its start chunk, in chunks.
      *
-     * <p>A flat 5 was both too small and too large: a big plains village or a nether fortress
-     * reaches well past 5 chunks (which is how a village ended up sliced in half by a large
-     * maze), while a single igloo or desert pyramid fits in one — and blocking 5 chunks around
-     * every one of those rejected far more maze spots than it needed to.</p>
+     * <p>A flat 5 was both too small and too large: a big plains village reaches well past 5
+     * chunks (which is how a village ended up sliced in half by a large maze), while a single
+     * igloo or desert pyramid fits in one — and blocking 5 chunks around every one of those
+     * rejected far more maze spots than it needed to.</p>
+     *
+     * <p>Nether sets are not listed at all, here or below: no maze of ours generates in the
+     * Nether, so an entry for one could never be read.</p>
      */
     private static final Map<Identifier, Integer> RADIUS = Map.ofEntries(
             // Sprawling: these grow far beyond their start chunk
-            Map.entry(Identifier.ofVanilla("nether_complexes"), 9),   // fortresses crawl a long way
             Map.entry(Identifier.ofVanilla("villages"), 8),
             Map.entry(Identifier.ofVanilla("end_cities"), 8),
             Map.entry(Identifier.ofVanilla("woodland_mansions"), 7),
@@ -71,7 +73,6 @@ public final class StructureAvoidance {
             Identifier.ofVanilla("buried_treasures"),
             Identifier.ofVanilla("ancient_cities"),
             Identifier.ofVanilla("trial_chambers"),
-            Identifier.ofVanilla("nether_fossils"),
             Identifier.ofVanilla("ocean_ruins")
     );
 

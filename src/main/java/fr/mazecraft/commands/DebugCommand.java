@@ -1588,7 +1588,7 @@ public class DebugCommand {
         // growing through it (clearAbove does nothing for an enclosed maze, on purpose - taking
         // the column up would bore a shaft to the sky). Say so here rather than letting a
         // screenshot of that be taken as evidence about the roof.
-        if (style.enclosed && !style.isNether() && !style.isKronos()) {
+        if (style.enclosed && !style.isKronos()) {
             src.sendFeedback(() -> Text.literal("[DEBUG] NOTE: " + style.id() + " is a roofed style"
                             + " meant to be buried under its own landmark. What you place here is"
                             + " the hall as it will look underground. A " + style.id() + " maze"

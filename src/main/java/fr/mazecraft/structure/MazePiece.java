@@ -64,7 +64,7 @@ public class MazePiece extends StructurePiece {
     public static final int WALL_HEIGHT = 4;
     /** Blocks cleared above the floor (removes hills / overhangs inside the maze). */
     public static final int CLEAR_HEIGHT = 10;
-    /** Enclosed mazes (Nether): the roof sits right on top of the walls. */
+    /** Enclosed mazes: the roof sits right on top of the walls. */
     public static final int ROOF_DY = WALL_HEIGHT + 1;
     /** Maximum depth filled with foundation under the floor on uneven ground. */
     /**
@@ -130,9 +130,9 @@ public class MazePiece extends StructurePiece {
      * How many floors a maze of this style and size is folded into.
      *
      * <p>Only a maze buried under a building. A surface maze is open to the sky and has no
-     * burial problem to solve, and the Nether's hang over the lava sea and are walked into
-     * through a doorway — stacking either would change what they are to fix something they do
-     * not suffer from. {@code enteredFromPlaza} is exactly the set that does.</p>
+     * burial problem to solve, and Kronos is one room of a kind entered through its own wall —
+     * stacking either would change what they are to fix something they do not suffer from.
+     * {@code enteredFromPlaza} is exactly the set that does.</p>
      */
     public static int floorsFor(MazeStyle style, MazeSize size) {
         return style.enteredFromPlaza() ? size.floors() : 1;
@@ -144,7 +144,7 @@ public class MazePiece extends StructurePiece {
      *
      * <p>This is the whole of the switch to floors, and it has to live in exactly one place.
      * A maze that is folded into a stack occupies its per-floor footprint; one that is not —
-     * every surface style, the five of the Nether, and SMALL, which stays flat — occupies the
+     * every surface style, Kronos, and SMALL, which stays flat — occupies the
      * one it always did. Two answers to "how wide is this maze" is how the surveys end up
      * deciding where a 149-wide maze may go and then an 85-wide one gets built there.</p>
      */
@@ -1425,8 +1425,8 @@ public class MazePiece extends StructurePiece {
                 boolean isPillar = inside && layout.isPillar(lx, lz);
                 boolean isPlaza = inside && layout.isPlaza(lx, lz);
 
-                // 1. Foundation. Enclosed (Nether): a clean underside slab + fortress-like support
-                //    pillars down to the ground or into the lava. Overworld: fill gaps until solid ground.
+                // 1. Foundation. Fill the gaps under the floor until solid ground, and for an
+                //    enclosed maze do the same over its roof and under its underside.
                 if (style.enclosed) {
                     // Only the ends of the stack. A floor's slab sits exactly where the floor
                     // below's roof skin would go, so in between the two would write the same
@@ -1652,7 +1652,7 @@ public class MazePiece extends StructurePiece {
     private void clearAbove(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z,
                             boolean inside) {
         // Enclosed mazes are buried in rock under a roof of their own: there is no sky over
-        // them to clear, and taking the column up would bore a shaft to the Nether ceiling.
+        // them to clear, and taking the column up would bore a shaft to the surface.
         if (style.enclosed) return;
 
         BlockState air = Blocks.AIR.getDefaultState();
@@ -2365,10 +2365,6 @@ public class MazePiece extends StructurePiece {
             case SWAMP -> Blocks.MUD_BRICK_SLAB.getDefaultState();
             case TAIGA -> Blocks.MOSSY_COBBLESTONE_SLAB.getDefaultState();
             case END -> Blocks.END_STONE_BRICK_SLAB.getDefaultState();
-            case FORTRESS -> Blocks.NETHER_BRICK_SLAB.getDefaultState();
-            case CRIMSON -> Blocks.CRIMSON_SLAB.getDefaultState();
-            case WARPED -> Blocks.WARPED_SLAB.getDefaultState();
-            case SOUL, BASALT -> Blocks.POLISHED_BLACKSTONE_SLAB.getDefaultState();
             case KRONOS -> Blocks.DEEPSLATE_BRICK_SLAB.getDefaultState();
         };
     }
@@ -2481,56 +2477,25 @@ public class MazePiece extends StructurePiece {
         }
     }
 
-    /** Spacing of the support pillars under enclosed mazes (2×2 pillars). */
-    private static final int SUPPORT_SPACING = 12;
-    /** Maximum pillar length (blocks below the underside slab). */
-    private static final int SUPPORT_MAX_DEPTH = 80;
-
-    /** True on a 2-wide band every SUPPORT_SPACING blocks, and along the far edge. */
-    private static boolean supportBand(int v, int side) {
-        return Math.floorMod(v, SUPPORT_SPACING) < 2 || v >= side - 2;
-    }
-
     /**
-     * Enclosed mazes: underside slab (styled, replaces the old netherrack blob) and, on a grid,
-     * 2×2 support pillars going down through air and lava until they reach solid ground.
+     * The underside of an enclosed maze: one block of fill under its floor, and only where
+     * there is a hole for one.
+     *
+     * <p>A maze buried in the Overworld is standing in rock, so it needs no plate and no posts
+     * — exactly as the roof already works, and by the same {@link #seal}.</p>
+     *
+     * <p>What it did before was write a continuous plate for every column of the box, 101 by 101
+     * for a medium and 149 by 149 for a large, plus 2 × 2 pillars on a twelve-block grid dropping
+     * up to eighty blocks through open air. Invisible in solid ground, and in a cliff, a cave or a
+     * river bed a perfectly flat, perfectly square ceiling of one stone: the big grey rectangle
+     * in the rock face. The plate was written for the Nether, where a maze really did hang over
+     * the lava sea and really did need a floor on legs, fortress-fashion. The Nether is gone and
+     * so are the legs. Burying the maze deeper would never have helped: the plate showed because
+     * it was written whether it was needed or not, not because there was too little rock over
+     * it.</p>
      */
     private void buildUnderside(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
-        // A maze buried in the Overworld is standing in rock, so it needs no plate and no
-        // posts: one block of fill where there is a hole, exactly as the roof already does.
-        //
-        // What it did before was write the plate unconditionally, for every column of the box
-        // -- 101 by 101 for a medium, 149 by 149 for a large. Invisible in solid ground, and in
-        // a cliff, a cave or a river bed it is a perfectly flat, perfectly square ceiling of
-        // one stone: the big grey rectangle in the rock face. The pillars did the same lower
-        // down, dropping up to eighty blocks of post through open air.
-        //
-        // The plate was written for the Nether, where the maze really does hang over the lava
-        // sea and really does need a floor on legs, fortress-fashion. Keeping it there and
-        // dropping it here is not a compromise, it is what each case actually wants. Burying
-        // the maze deeper would not have helped: the plate shows because it is written whether
-        // it is needed or not, not because there is too little rock above it.
-        if (!style.isNether()) {
-            seal(world, pos, x, floorY - 1, z);
-            return;
-        }
-        BlockBox box = this.boundingBox;
-        BlockState slab = style.substructure();
-        pos.set(x, floorY - 1, z);
-        if (world.getBlockState(pos) != slab) {
-            world.setBlockState(pos, slab, Block.NOTIFY_LISTENERS);
-        }
-        int side = box.getMaxX() - box.getMinX() + 1;
-        if (!supportBand(x - box.getMinX(), side) || !supportBand(z - box.getMinZ(), side)) return;
-        int bottom = Math.max(world.getBottomY() + 1, floorY - 1 - SUPPORT_MAX_DEPTH);
-        BlockState post = style.support();
-        for (int y = floorY - 2; y >= bottom; y--) {
-            pos.set(x, y, z);
-            BlockState current = world.getBlockState(pos);
-            boolean solid = !current.isAir() && !current.isReplaceable() && current.getFluidState().isEmpty();
-            if (solid) break;
-            world.setBlockState(pos, post, Block.NOTIFY_LISTENERS);
-        }
+        seal(world, pos, x, floorY - 1, z);
     }
 
     /**
@@ -2544,11 +2509,9 @@ public class MazePiece extends StructurePiece {
      * plugs any cave that would otherwise open onto the outer wall and let mobs path in.</p>
      *
      * <p>Only where there is actually something to fill, so the vast majority of columns cost one
-     * read and no write. Not in the Nether, where the doorway is <em>meant</em> to open onto a
-     * cave — {@code mostOpenSide} picks the side where the rock is most open on purpose.</p>
+     * read and no write.</p>
      */
     private void buildShell(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z) {
-        if (style.isNether()) return;
         seal(world, pos, x, floorY + ROOF_DY + 1, z);
     }
 
@@ -2671,17 +2634,15 @@ public class MazePiece extends StructurePiece {
      * natural touches — the middle of a wide opening, or a sea bed whose floor we have already
      * replaced — fall back on what the Overworld is actually made of at that height.</p>
      *
-     * <p>The Nether and the End keep their own stone and this does not touch them. Their styles
-     * already lay netherrack, basalt, soul soil and end stone — the ground those dimensions are
-     * made of — so there is nothing to hide; and a fortress hanging over the lava sea is
-     * <em>supposed</em> to read as built.</p>
+     * <p>The End keeps its own stone and this does not touch it: the End style already lays end
+     * stone, which is the ground that dimension is made of, so there is nothing to hide.</p>
      *
      * <p>A borrowed neighbour has to pass {@link #isSoundRock} as well as being on the list. The
      * list says what is tasteful, that says what is safe, and the second is what keeps a rebuild
      * from writing over its own work for ever.</p>
      */
     private BlockState skinAt(StructureWorldAccess world, BlockPos pos, int y) {
-        if (style.isNether() || style.isEnd()) return style.foundation;
+        if (style.isEnd()) return style.foundation;
         for (Direction dir : Direction.values()) {
             BlockPos at = pos.offset(dir);
             BlockState neighbour = world.getBlockState(at);
@@ -2722,8 +2683,8 @@ public class MazePiece extends StructurePiece {
     }
 
     /**
-     * One column of an enclosed (Nether) maze: walls up to the roof, a sealed outer wall around
-     * the whole box (except the doorway in front of the entrance), and a roof with lights.
+     * One column of an enclosed maze: walls up to the roof, a sealed outer wall around the
+     * whole box (except the doorway in front of the entrance), and a roof with lights.
      */
     private void buildEnclosedColumn(StructureWorldAccess world, BlockPos.Mutable pos, int x, int z, int lx, int lz,
                                      boolean inside, boolean isWall, boolean isPillar, BlockState air, BlockPos keep) {

@@ -156,8 +156,7 @@ public enum MazeStyle {
                     Blocks.GRAVEL.getDefaultState(), 15)
     ),
     /**
-     * Cherry grove: pink hedges, cherry wood — and the first maze with a roof over it that is
-     * not in the Nether.
+     * Cherry grove: pink hedges, cherry wood — and the first maze with a roof over it.
      *
      * <p>A cherry grove covers about one position in 241, and five percent of those are flat
      * enough for a maze, which put this style at 0.022 % of the world against 2 % for a hedge
@@ -269,105 +268,8 @@ public enum MazeStyle {
     ),
 
     // =====================================================================
-    // NETHER — enclosed mazes carved into the rock: sealed outer wall, roof with lights
-    // =====================================================================
-
-    /** Nether wastes: fortress-like nether bricks. */
-    FORTRESS(
-            Blocks.NETHER_BRICKS.getDefaultState(),
-            Blocks.RED_NETHER_BRICKS.getDefaultState(),
-            Blocks.NETHER_BRICKS.getDefaultState(),
-            Blocks.CRACKED_NETHER_BRICKS.getDefaultState(),
-            Blocks.CHISELED_NETHER_BRICKS.getDefaultState(),
-            Blocks.NETHERRACK.getDefaultState(),
-            Blocks.NETHER_BRICK_FENCE.getDefaultState(),
-            Mix.of(Blocks.CRACKED_NETHER_BRICKS.getDefaultState(), 40,
-                    Blocks.NETHER_BRICKS.getDefaultState(), 30,
-                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
-                    Blocks.RED_NETHER_BRICKS.getDefaultState(), 10),
-            Realm.NETHER,
-            Blocks.NETHER_BRICKS.getDefaultState(),
-            Blocks.GLOWSTONE.getDefaultState(),
-            null
-    ),
-    /** Crimson forest: nether wart walls, crimson wood, shroomlights. */
-    CRIMSON(
-            Blocks.NETHER_WART_BLOCK.getDefaultState(),
-            Blocks.CRIMSON_STEM.getDefaultState(),
-            Blocks.CRIMSON_PLANKS.getDefaultState(),
-            Blocks.CRIMSON_PLANKS.getDefaultState(),
-            Blocks.RED_NETHER_BRICKS.getDefaultState(),
-            Blocks.NETHERRACK.getDefaultState(),
-            Blocks.CRIMSON_FENCE.getDefaultState(),
-            Mix.of(Blocks.CRIMSON_PLANKS.getDefaultState(), 45,
-                    Blocks.CRIMSON_HYPHAE.getDefaultState(), 20,
-                    Blocks.RED_NETHER_BRICKS.getDefaultState(), 20,
-                    Blocks.NETHER_BRICKS.getDefaultState(), 15),
-            Realm.NETHER,
-            // Roof NOT netherrack / nether wart: weeping vines would hang from it into the corridors
-            Blocks.CRIMSON_PLANKS.getDefaultState(),
-            Blocks.SHROOMLIGHT.getDefaultState(),
-            null
-    ),
-    /** Warped forest: warped wart walls, warped wood, shroomlights. */
-    WARPED(
-            Blocks.WARPED_WART_BLOCK.getDefaultState(),
-            Blocks.WARPED_STEM.getDefaultState(),
-            Blocks.WARPED_PLANKS.getDefaultState(),
-            Blocks.WARPED_PLANKS.getDefaultState(),
-            Blocks.WARPED_HYPHAE.getDefaultState(),
-            Blocks.NETHERRACK.getDefaultState(),
-            Blocks.WARPED_FENCE.getDefaultState(),
-            Mix.of(Blocks.WARPED_PLANKS.getDefaultState(), 45,
-                    Blocks.WARPED_HYPHAE.getDefaultState(), 20,
-                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
-                    Blocks.NETHER_BRICKS.getDefaultState(), 15),
-            Realm.NETHER,
-            Blocks.WARPED_PLANKS.getDefaultState(),
-            Blocks.SHROOMLIGHT.getDefaultState(),
-            null
-    ),
-    /** Soul sand valley: bone walls, blackstone, soul soil floor, hanging soul lanterns. */
-    SOUL(
-            Blocks.BONE_BLOCK.getDefaultState(),
-            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
-            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
-            Blocks.SOUL_SOIL.getDefaultState(),
-            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
-            Blocks.SOUL_SOIL.getDefaultState(),
-            Blocks.IRON_BARS.getDefaultState(),
-            Mix.of(Blocks.SOUL_SOIL.getDefaultState(), 45,
-                    Blocks.POLISHED_BLACKSTONE.getDefaultState(), 25,
-                    Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 20,
-                    Blocks.CRACKED_POLISHED_BLACKSTONE_BRICKS.getDefaultState(), 10),
-            Realm.NETHER,
-            // Roof NOT blackstone / basalt / netherrack: glowstone blobs would grow under it
-            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
-            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
-            Blocks.SOUL_LANTERN.getDefaultState().with(LanternBlock.HANGING, true)
-    ),
-    /** Basalt deltas: polished basalt walls, blackstone, gilded plaza. */
-    BASALT(
-            Blocks.POLISHED_BASALT.getDefaultState(),
-            Blocks.BLACKSTONE.getDefaultState(),
-            Blocks.BASALT.getDefaultState(),
-            Blocks.POLISHED_BLACKSTONE.getDefaultState(),
-            Blocks.GILDED_BLACKSTONE.getDefaultState(),
-            Blocks.BASALT.getDefaultState(),
-            Blocks.IRON_BARS.getDefaultState(),
-            Mix.of(Blocks.POLISHED_BLACKSTONE.getDefaultState(), 40,
-                    Blocks.POLISHED_BASALT.getDefaultState(), 20,
-                    Blocks.SMOOTH_BASALT.getDefaultState(), 20,
-                    Blocks.BLACKSTONE.getDefaultState(), 20),
-            Realm.NETHER,
-            Blocks.POLISHED_BLACKSTONE_BRICKS.getDefaultState(),
-            Blocks.GLOWSTONE.getDefaultState(),
-            null
-    ),
-
-    // =====================================================================
     // KRONOS — the Labyrinth of Kronos: one of a kind, buried deep under the
-    // Overworld. Not a biome style and NOT part of the 16-style progression
+    // Overworld. Not a biome style and NOT part of the 11-style progression
     // (see PROGRESSION below): it is the thing the progression leads to.
     // Deepslate and blackstone for the tomb, oxidised copper for the bronze.
     // =====================================================================
@@ -400,7 +302,7 @@ public enum MazeStyle {
     public final BlockState gate;
     public final int margin;
     public final Mix ring;
-    /** Enclosed maze (Nether): sealed outer wall + roof, no sky. */
+    /** Enclosed maze: sealed outer wall + roof, no sky. */
     public final boolean enclosed;
     /** Roof block (enclosed mazes only). */
     public final BlockState ceiling;
@@ -416,15 +318,11 @@ public enum MazeStyle {
      * was a Nether one. Four places read it as "is in the Nether" — the loot table prefix, the
      * floor-height range used to bury it, and the two lines that sort the styles by dimension
      * for the progression — and the moment a cherry maze got a roof, all four would have been
-     * wrong at once, in ways that look like content rather than like a bug: nether loot in a
-     * cherry chest, a maze buried at Y 40 to 80 looking for solid rock over a lava sea, and a
-     * step of the Overworld progression that the Overworld no longer counts. The Labyrinth of
-     * Kronos was already the counter-example — roofed, and in the Overworld — and got away with
-     * it only because a special case sits in front of each of those four reads.</p>
+     * wrong at once. The Nether is gone and {@code NETHER} with it, but the separation stays:
+     * Kronos and the landmarks are both roofed and are not the same place, and the next realm
+     * added will not be either.</p>
      */
     public enum Realm {
-        /** The Nether, buried in its rock and entered through a doorway that opens onto a cave. */
-        NETHER,
         /** Buried in the Overworld, entered down a shaft to a doorway in its outer wall. */
         VAULT,
         /** Buried under a building, entered by the staircase inside it, which comes down in the plaza. */
@@ -434,35 +332,12 @@ public enum MazeStyle {
     /** Null for a style with the sky over it; see {@link Realm}. */
     private final Realm realm;
 
-    /** True for the five Nether styles. Ask this, never {@link #enclosed}, about the dimension. */
-    public boolean isNether() {
-        return realm == Realm.NETHER;
-    }
-
-    /**
-     * What the parts of an enclosed maze that are <b>not</b> seen are made of: the slab under
-     * its floor, and the support pillars that reach down from it.
-     *
-     * <p>In the Nether that is the roof block and the pillar block, as it always was. Underground
-     * it is the foundation, and the reason is fire. The cherry maze is leaves, logs and planks,
-     * and {@code buildUnderside} was laying a continuous sheet of <b>cherry planks</b> across the
-     * whole 101 by 101 underside of it, then dropping <b>cherry log</b> stilts up to eighty
-     * blocks down through whatever air and lava they met. One lava pocket anywhere under a maze
-     * that size, and the fire ran along that sheet and came up through the plaza floor, which is
-     * cherry planks too. The Nether never had the problem because netherrack does not burn.</p>
-     *
-     * <p>These are under the floor and invisible from inside, so there is nothing to trade.</p>
-     */
-    public BlockState substructure() {
-        return isNether() ? ceiling : foundation;
-    }
-
     /**
      * True when the way into this style's mazes is the plaza in the middle rather than a doorway
      * in the outer wall — because a staircase comes down into it from a building on the surface.
      *
      * <p>Asked of the style rather than of the landmark package so that {@code MazeLayout} and
-     * {@code MazePiece}, which are shared by all sixteen styles, do not have to know that
+     * {@code MazePiece}, which are shared by every style, do not have to know that
      * landmarks exist.</p>
      *
      * <p>It was nearly derived as "underground and not Kronos", which is the same answer and a
@@ -475,15 +350,9 @@ public enum MazeStyle {
         return realm == Realm.LANDMARK;
     }
 
-    /** Support pillars under an enclosed maze. See {@link #substructure}. */
-    public BlockState support() {
-        return isNether() ? pillar : foundation;
-    }
-
     /** Loot table prefix: chests/<prefix>_<size>. */
     public String lootPrefix() {
         if (this == KRONOS) return "kronos";
-        if (isNether()) return "nether_maze";
         return this == END ? "end_maze" : "maze";
     }
 
@@ -498,9 +367,9 @@ public enum MazeStyle {
     }
 
     /**
-     * The sixteen styles that make up the per-player progression — every style except
+     * The eleven styles that make up the per-player progression — every style except
      * {@link #KRONOS}, which is the reward at the end of it rather than a step in it.
-     * Anything counting steps, listing branches or building the 48 structures uses this,
+     * Anything counting steps, listing branches or building the 33 structures uses this,
      * never {@code values()}.
      */
     public static final MazeStyle[] PROGRESSION = java.util.Arrays.stream(values())
@@ -577,7 +446,7 @@ public enum MazeStyle {
     /**
      * Enclosed style: a sealed outer wall and a roof instead of the sky.
      *
-     * <p>The flattened ring around the maze is four blocks wide in the Nether and <b>one</b>
+     * <p>The flattened ring around the maze is four blocks wide for Kronos and <b>one</b>
      * under a landmark. A ring is the approach to a doorway — somewhere to arrive, a path laid up
      * to the entrance — and a maze entered through its own middle has no doorway, so four blocks
      * of walled corridor going right round it was dead space reachable from nowhere. What is left

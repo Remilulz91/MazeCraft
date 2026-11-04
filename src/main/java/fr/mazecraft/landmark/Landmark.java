@@ -121,9 +121,9 @@ public interface Landmark {
      * bed. So the ceiling is set by {@code lowest}, measured over the whole footprint.</p>
      *
      * <p>The second is rock: of the floors that clear the ground, the <b>shallowest</b> one that
-     * is actually buried in stone wins — not the best-buried one, which is what a Nether maze
-     * wants. Here the maze is reached by a staircase somebody walks down, and every block of
-     * depth is four more slab steps, so depth is a cost rather than a virtue.</p>
+     * is actually buried in stone wins — not the best-buried one, which is what Kronos wants.
+     * Here the maze is reached by a staircase somebody walks down, and every block of depth is
+     * four more slab steps, so depth is a cost rather than a virtue.</p>
      *
      * <p>The third is {@link #maxStair}, which refuses the site outright when even the
      * shallowest floor that clears the ground is further down than that.</p>
