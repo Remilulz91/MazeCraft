@@ -1760,7 +1760,8 @@ public class DebugCommand {
         if (!maze.hasVault() || maze.vaultEntrance() == null) {
             src.sendError(Text.literal("[DEBUG] This maze has no vault ("
                     + maze.getSize().id() + " " + maze.getStyle().id()
-                    + ") - only colossal mazes have one, Kronos excepted."));
+                    + ") - a colossal maze has one, and so does a large maze of the End."
+                    + " Kronos never."));
             return 0;
         }
         MazeState state = MazeState.get(world);

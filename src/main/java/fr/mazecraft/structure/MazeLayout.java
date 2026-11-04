@@ -992,8 +992,9 @@ public final class MazeLayout {
      */
     public int[] vaultDeadEnd(int clearance) {
         int[] found = vaultDeadEnd(clearance, VAULT_LEVER_CLEARANCE);
-        // A colossal maze has hundreds of dead ends and the rule has never cost one in testing,
-        // but a vault somewhere imperfect beats a colossal maze with no vault at all.
+        // A large maze has dozens of dead ends and a colossal one hundreds, and the rule has
+        // never cost one in testing -- but a vault somewhere imperfect beats a maze with no
+        // vault at all, and in the End that vault is the only Key of Kronos that is not crafted.
         return found != null ? found : vaultDeadEnd(clearance, 1);
     }
 

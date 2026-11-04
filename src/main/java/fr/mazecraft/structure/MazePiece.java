@@ -438,14 +438,29 @@ public class MazePiece extends StructurePiece {
     private int[] vaultCell;
 
     /**
-     * True for a maze that has a vault at all: the colossal ones, Kronos excepted.
+     * True for a maze that has a vault at all: a colossal one, or a <b>large maze of the End</b>.
+     * Kronos never, whatever its size — the arena is its own puzzle.
      *
      * <p>Of the <b>maze</b>. {@link #hasVault} answers for the floor that holds it, which is the
      * bottom one; this is what the things belonging to the maze as a whole ask — the code, and
      * the plaques that carry its digits, which are scattered over every floor.</p>
+     *
+     * <p>The End large is here because of a measurement. The vault was the colossal's alone, and
+     * the colossal was moved to the End so that the Key of Kronos lying ready forged behind its
+     * door would be an End reward. Then the End terrain was scanned: of <b>60 sites</b> in
+     * end_highlands and end_midlands within a thousand blocks, <b>not one</b> has a 149-block
+     * square clear of the void, and the colossal needs 221. The number the scan prints as
+     * "relief" is 59 to 62 at every single site, which is not rough ground — it is the height of
+     * the island above the void, because a column with no blocks in it reports the bottom of the
+     * world. An End island big enough for a colossal maze does not exist.</p>
+     *
+     * <p>So the vault goes to the maze the End can actually hold. It costs no ground: the room is
+     * dug <em>under</em> the maze, and a large maze's four zones are exactly the four the code's
+     * four plaques want. The colossal keeps its vault for wherever it ever fits.</p>
      */
     public boolean mazeHasVault() {
-        return size == MazeSize.COLOSSAL && !style.isKronos();
+        if (style.isKronos()) return false;
+        return size == MazeSize.COLOSSAL || (style.isEnd() && size == MazeSize.LARGE);
     }
 
     /**
@@ -456,6 +471,8 @@ public class MazePiece extends StructurePiece {
      * on any but the deepest floor is the middle of the maze below it. That is what a code room
      * "that went wrong, with another one further off that came out right" was: two rooms, the
      * upper one cut through the corridors of the floor beneath it.</p>
+     *
+     * <p>An End maze is one floor, so this is simply true there.</p>
      */
     public boolean hasVault() {
         return mazeHasVault() && isBottomFloor();
@@ -2134,7 +2151,13 @@ public class MazePiece extends StructurePiece {
     }
 
     /**
-     * One column of the vault of a colossal maze.
+     * One column of the vault — of a colossal maze, or of a large maze of the End.
+     *
+     * <p>Measured before it was moved there: over 400 flat 37-cell layouts, <b>every one</b> had
+     * a dead end the room fits in and <b>every one</b> placed all four digits, with a mean of 183
+     * dead ends and exactly the four zones the four digits want. 23 of the 400 put two digits in
+     * one zone, which the code's own fallback already allows for and costs nothing but tidiness.
+     * A colossal, for comparison, has 392 dead ends and does it 5 times in 400.</p>
      *
      * <p>Written exactly like the hoard of Asterion, and for the same reason: a room this size
      * cannot be raised from a tick, and nothing about it may depend on the {@code Random} handed
